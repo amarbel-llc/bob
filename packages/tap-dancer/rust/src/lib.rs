@@ -9,6 +9,7 @@ pub struct TapConfig {
     color: bool,
     locale: Option<Locale>,
     formatter: Option<DecimalFormatter>,
+    streamed_output: bool,
 }
 
 impl TapConfig {
@@ -93,6 +94,7 @@ impl<'a> TapWriterBuilder<'a> {
             color: self.color,
             locale,
             formatter,
+            streamed_output: false,
         })
     }
 
@@ -274,7 +276,11 @@ impl<'a> TapWriter<'a> {
 
     pub fn pragma(&mut self, key: &str, enabled: bool) -> io::Result<()> {
         let sign = if enabled { "+" } else { "-" };
-        writeln!(self.w, "pragma {}{}", sign, key)
+        writeln!(self.w, "pragma {}{}", sign, key)?;
+        if key == "streamed-output" && enabled {
+            self.config.streamed_output = true;
+        }
+        Ok(())
     }
 
     pub fn plan(&mut self) -> io::Result<()> {
@@ -353,6 +359,9 @@ impl<'a> TapWriter<'a> {
         };
         if let Some(ref locale) = child.config.locale {
             writeln!(child.w, "pragma +locale-formatting:{locale}")?;
+        }
+        if child.config.streamed_output {
+            writeln!(child.w, "pragma +streamed-output")?;
         }
         f(&mut child)
     }
@@ -1006,6 +1015,26 @@ mod tests {
         assert!(out.contains("    pragma +streamed-output\n"));
     }
 
+    #[test]
+    fn writer_subtest_inherits_streamed_output() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.pragma("streamed-output", true).unwrap();
+        tw.subtest("group", |sub| {
+            sub.comment("compiling")?;
+            sub.ok("build")?;
+            sub.plan()
+        })
+        .unwrap();
+        tw.ok("group").unwrap();
+        tw.plan().unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(
+            out.contains("    pragma +streamed-output\n"),
+            "expected subtest to contain pragma +streamed-output, got:\n{out}"
+        );
+    }
+
     // --- Directive/comment on TestResult ---
 
     #[test]
@@ -1496,6 +1525,7 @@ mod tests {
             color: false,
             locale: None,
             formatter: None,
+            streamed_output: false,
         };
         assert_eq!(config.format_number(1234), "1234");
     }
@@ -1509,6 +1539,7 @@ mod tests {
             color: true,
             locale: Some(locale),
             formatter: Some(formatter),
+            streamed_output: false,
         };
         assert_eq!(config.format_number(1234), "1,234");
     }
@@ -1519,6 +1550,7 @@ mod tests {
             color: true,
             locale: None,
             formatter: None,
+            streamed_output: false,
         };
         assert!(config.color());
     }

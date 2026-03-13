@@ -139,6 +139,11 @@ func TestConvertSubtests(t *testing.T) {
 		t.Errorf("expected child_a in output:\n%s", out)
 	}
 
+	// streamed-output pragma should be propagated into package subtest
+	if !strings.Contains(out, "    pragma +streamed-output\n") {
+		t.Errorf("expected subtest to contain pragma +streamed-output, got:\n%s", out)
+	}
+
 	reader := NewReader(strings.NewReader(out))
 	if !reader.Summary().Valid {
 		for _, d := range reader.Diagnostics() {

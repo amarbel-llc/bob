@@ -556,6 +556,25 @@ func TestStreamedOutput(t *testing.T) {
 	}
 }
 
+func TestStreamedOutputPropagatedToSubtest(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Pragma("streamed-output", true)
+
+	sub := tw.Subtest("group")
+	sub.StreamedOutput("compiling")
+	sub.Ok("build")
+	sub.Plan()
+
+	tw.Ok("group")
+	tw.Plan()
+
+	out := buf.String()
+	if !strings.Contains(out, "    pragma +streamed-output\n") {
+		t.Errorf("expected subtest to contain pragma +streamed-output, got:\n%s", out)
+	}
+}
+
 func TestWriteAllOutputValidatesWithReader(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewWriter(&buf)

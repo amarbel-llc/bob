@@ -20,14 +20,15 @@ const (
 )
 
 type Writer struct {
-	w           io.Writer
-	n           int
-	depth       int
-	planEmitted bool
-	failed      bool
-	color       bool
-	locale      language.Tag
-	printer     *message.Printer
+	w              io.Writer
+	n              int
+	depth          int
+	planEmitted    bool
+	failed         bool
+	color          bool
+	locale         language.Tag
+	printer        *message.Printer
+	streamedOutput bool
 }
 
 func NewWriter(w io.Writer) *Writer {
@@ -187,6 +188,9 @@ func (tw *Writer) Pragma(key string, enabled bool) {
 		sign = "+"
 	}
 	fmt.Fprintf(tw.w, "pragma %s%s\n", sign, key)
+	if key == "streamed-output" && enabled {
+		tw.streamedOutput = true
+	}
 }
 
 func (tw *Writer) StreamedOutput(text string) {
@@ -293,6 +297,10 @@ func (tw *Writer) Subtest(name string) *Writer {
 	}
 	if tw.printer != nil {
 		fmt.Fprintf(iw, "pragma +locale-formatting:%s\n", tw.locale)
+	}
+	if tw.streamedOutput {
+		child.streamedOutput = true
+		fmt.Fprintln(iw, "pragma +streamed-output")
 	}
 	return child
 }
