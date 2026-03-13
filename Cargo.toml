@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "packages/chix",
+    "packages/tap-dancer/rust",
+]
+resolver = "2"

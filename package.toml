@@ -1,0 +1,5 @@
+name = "bob"
+description = "MCP servers, CLI tools, and development workflow skills"
+
+[author]
+name = "friedenberg"
