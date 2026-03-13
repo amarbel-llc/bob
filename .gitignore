@@ -3,3 +3,5 @@ result-*
 build/
 target/
 vendor/
+.worktrees/
+.tmp/
