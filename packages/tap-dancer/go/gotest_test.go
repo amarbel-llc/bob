@@ -349,6 +349,71 @@ func TestConvertEmitsPragmaAndStreamedOutput(t *testing.T) {
 	}
 }
 
+func TestConvertBuildFailDefault(t *testing.T) {
+	// Package that fails to build (e.g. ./... from workspace root with no module).
+	// Without -skip-empty, this should produce not ok.
+	jsonEvents := strings.Join([]string{
+		`{"Action":"start","Package":"./..."}`,
+		`{"Action":"output","Package":"./...","Output":"FAIL\t./... [setup failed]\n"}`,
+		`{"Action":"fail","Package":"./...","Elapsed":0}`,
+	}, "\n") + "\n"
+
+	var buf bytes.Buffer
+	exitCode := ConvertGoTest(strings.NewReader(jsonEvents), &buf, false, false, false)
+
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "not ok") {
+		t.Errorf("expected not ok for build failure:\n%s", out)
+	}
+
+	reader := NewReader(strings.NewReader(out))
+	if !reader.Summary().Valid {
+		for _, d := range reader.Diagnostics() {
+			t.Errorf("diagnostic: line %d: %s: %s", d.Line, d.Severity, d.Message)
+		}
+		t.Fatalf("output is not valid TAP-14:\n%s", out)
+	}
+}
+
+func TestConvertBuildFailSkipEmpty(t *testing.T) {
+	// Same as above but with skipEmpty=true — should produce # SKIP.
+	jsonEvents := strings.Join([]string{
+		`{"Action":"start","Package":"./..."}`,
+		`{"Action":"output","Package":"./...","Output":"FAIL\t./... [setup failed]\n"}`,
+		`{"Action":"fail","Package":"./...","Elapsed":0}`,
+	}, "\n") + "\n"
+
+	var buf bytes.Buffer
+	exitCode := ConvertGoTest(strings.NewReader(jsonEvents), &buf, false, true, false)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "# SKIP") {
+		t.Errorf("expected SKIP directive:\n%s", out)
+	}
+	if !strings.Contains(out, "setup failed") {
+		t.Errorf("expected 'setup failed' reason:\n%s", out)
+	}
+	if strings.Contains(out, "not ok") {
+		t.Errorf("expected no 'not ok' with skip-empty:\n%s", out)
+	}
+
+	reader := NewReader(strings.NewReader(out))
+	if !reader.Summary().Valid {
+		for _, d := range reader.Diagnostics() {
+			t.Errorf("diagnostic: line %d: %s: %s", d.Line, d.Severity, d.Message)
+		}
+		t.Fatalf("output is not valid TAP-14:\n%s", out)
+	}
+}
+
 func TestConvertMixedEmptyAndRealPackages(t *testing.T) {
 	// One package with tests, one with no test files.
 	// With skipEmpty, the empty one is skipped, the real one passes.

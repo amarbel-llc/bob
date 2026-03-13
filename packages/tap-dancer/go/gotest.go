@@ -103,9 +103,13 @@ func ConvertGoTest(r io.Reader, w io.Writer, verbose bool, skipEmpty bool, color
 			case "fail":
 				pkg.failed = true
 				pkg.elapsed = ev.Elapsed
-				emitPackage(tw, pkg, verbose)
-				if exitCode < 1 {
-					exitCode = 1
+				if len(pkg.tests) == 0 && skipEmpty {
+					emitEmptyPackage(tw, pkg, skipEmpty)
+				} else {
+					emitPackage(tw, pkg, verbose)
+					if exitCode < 1 {
+						exitCode = 1
+					}
 				}
 			case "skip":
 				pkg.elapsed = ev.Elapsed
@@ -159,6 +163,9 @@ func emptyPackageReason(output string) string {
 	}
 	if strings.Contains(output, "no tests to run") {
 		return "no tests to run"
+	}
+	if strings.Contains(output, "[setup failed]") {
+		return "setup failed"
 	}
 	return "no tests"
 }
