@@ -33,7 +33,7 @@ just test-chix          # packages/chix (Rust, via cargo test)
 nix develop --command go test -run TestFunctionName ./packages/grit/...
 
 # Single BATS file:
-nix develop --command bats --tap zz-tests_bats/validate_marketplace.bats
+nix develop --command bats --tap zz-tests_bats/validate_plugin_repos.bats
 
 # Integration tests (requires nix build first):
 just test-integration

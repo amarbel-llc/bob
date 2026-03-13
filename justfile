@@ -92,7 +92,6 @@ vendor-hash:
 test-integration: build-batman
     nix build
     PURSE_FIRST_BIN={{justfile_directory()}}/result/bin/purse-first {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
-      zz-tests_bats/validate_marketplace.bats \
       zz-tests_bats/validate_plugin_repos.bats
 
 # Run lifecycle tests
