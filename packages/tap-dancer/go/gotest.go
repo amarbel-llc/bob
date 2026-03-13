@@ -1,7 +1,6 @@
 package tap
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,8 +50,7 @@ func parseFileLine(output string) (file string, line string) {
 // If color is true, ok/not ok keywords are ANSI-colorized.
 // Returns an exit code: 0 for all pass, 1 for any failure, 2 for build errors.
 func ConvertGoTest(r io.Reader, w io.Writer, verbose bool, skipEmpty bool, color bool) int {
-	// TODO wrap with bufio.Reader
-	scanner := bufio.NewScanner(r)
+	dec := json.NewDecoder(r)
 
 	packages := make(map[string]*packageResult)
 	var packageOrder []string
@@ -61,17 +59,13 @@ func ConvertGoTest(r io.Reader, w io.Writer, verbose bool, skipEmpty bool, color
 	tw.Pragma("streamed-output", true)
 	exitCode := 0
 
-	// TODO switch to json.Decoder
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	for {
 		var ev testEvent
-		// TODO extract / prepare package full path
-		if err := json.Unmarshal([]byte(line), &ev); err != nil {
-			tw.Comment(fmt.Sprintf("unparseable: %s", line))
+		if err := dec.Decode(&ev); err != nil {
+			if err == io.EOF {
+				break
+			}
+			tw.Comment(fmt.Sprintf("unparseable: %v", err))
 			continue
 		}
 
