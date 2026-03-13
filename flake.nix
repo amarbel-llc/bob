@@ -55,7 +55,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = nixpkgs.lib.fakeHash;
+      goVendorHash = "sha256-0powqqEky+YH3CAVGoL0mowS4E42NM+Dem57RbiAheU=";
 
       buildDevenvs =
         system:
@@ -200,7 +200,7 @@
         };
         description = "MCP servers, CLI tools, and development workflow skills";
         repo = "amarbel-llc/bob";
-        purse-first-cli = purse-first.packages;
+        purse-first-cli = purse-first;
         plugins =
           system:
           let
