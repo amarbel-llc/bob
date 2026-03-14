@@ -20,15 +20,16 @@ const (
 )
 
 type Writer struct {
-	w              io.Writer
-	n              int
-	depth          int
-	planEmitted    bool
-	failed         bool
-	color          bool
-	locale         language.Tag
-	printer        *message.Printer
-	streamedOutput bool
+	w                 io.Writer
+	n                 int
+	depth             int
+	planEmitted       bool
+	failed            bool
+	color             bool
+	locale            language.Tag
+	printer           *message.Printer
+	streamedOutput    bool
+	ttyBuildLastLine  bool
 }
 
 func NewWriter(w io.Writer) *Writer {
@@ -191,10 +192,26 @@ func (tw *Writer) Pragma(key string, enabled bool) {
 	if key == "streamed-output" && enabled {
 		tw.streamedOutput = true
 	}
+	if key == "tty-build-last-line" && enabled {
+		tw.ttyBuildLastLine = true
+	}
 }
 
 func (tw *Writer) StreamedOutput(text string) {
 	fmt.Fprintf(tw.w, "# %s\n", text)
+}
+
+func (tw *Writer) EnableTTYBuildLastLine() {
+	tw.ttyBuildLastLine = true
+	fmt.Fprintln(tw.w, "pragma +tty-build-last-line")
+}
+
+func (tw *Writer) UpdateLastLine(text string) {
+	fmt.Fprintf(tw.w, "\r\033[2K# %s", text)
+}
+
+func (tw *Writer) FinishLastLine() {
+	fmt.Fprint(tw.w, "\r\033[2K")
 }
 
 type Diagnostics struct {

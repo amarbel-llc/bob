@@ -438,8 +438,14 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 
 	color := stdoutIsTerminal()
 	executor := &tap.GoroutineExecutor{MaxJobs: maxJobs}
-	results := executor.Run(ctx, template, execArgs)
-	exitCode := tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
+
+	var exitCode int
+	if color {
+		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, params.Verbose, color)
+	} else {
+		results := executor.Run(ctx, template, execArgs)
+		exitCode = tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
+	}
 
 	if exitCode != 0 {
 		os.Exit(exitCode)

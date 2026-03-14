@@ -245,3 +245,111 @@ func TestGoroutineExecutorEmptyArgs(t *testing.T) {
 		t.Errorf("expected 0 results, got %d", len(results))
 	}
 }
+
+func stripANSIAndControl(s string) string {
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			i += 2
+			for i < len(s) && !((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z')) {
+				i++
+			}
+			if i < len(s) {
+				i++ // skip final byte
+			}
+		} else if s[i] == '\r' {
+			i++
+		} else {
+			result.WriteByte(s[i])
+			i++
+		}
+	}
+	return result.String()
+}
+
+func TestConvertExecParallelWithStatusSequential(t *testing.T) {
+	var buf bytes.Buffer
+	executor := &GoroutineExecutor{MaxJobs: 1}
+	exitCode := ConvertExecParallelWithStatus(
+		context.Background(), executor, "echo {}", []string{"hello", "world"},
+		&buf, false, true,
+	)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	out := buf.String()
+	clean := stripANSIAndControl(out)
+	if !strings.Contains(out, "pragma +tty-build-last-line") {
+		t.Errorf("expected tty-build-last-line pragma, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "ok 1 - echo hello") {
+		t.Errorf("expected ok for first command, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "ok 2 - echo world") {
+		t.Errorf("expected ok for second command, got:\n%s", clean)
+	}
+	// The status line should contain the last output line from each command
+	if !strings.Contains(clean, "# hello") {
+		t.Errorf("expected status line with stdout content 'hello', got:\n%s", clean)
+	}
+}
+
+func TestConvertExecParallelWithStatusParallel(t *testing.T) {
+	var buf bytes.Buffer
+	executor := &GoroutineExecutor{MaxJobs: 0}
+	exitCode := ConvertExecParallelWithStatus(
+		context.Background(), executor, "echo {}", []string{"a", "b"},
+		&buf, false, true,
+	)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "pragma +tty-build-last-line") {
+		t.Errorf("expected tty-build-last-line pragma, got:\n%s", out)
+	}
+	if !strings.Contains(out, "running") {
+		t.Errorf("expected 'running' in status line for parallel mode, got:\n%s", out)
+	}
+}
+
+func TestConvertExecParallelWithStatusSequentialFailure(t *testing.T) {
+	var buf bytes.Buffer
+	executor := &GoroutineExecutor{MaxJobs: 1}
+	exitCode := ConvertExecParallelWithStatus(
+		context.Background(), executor, "exit 1", []string{"x"},
+		&buf, false, true,
+	)
+
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	clean := stripANSIAndControl(buf.String())
+	if !strings.Contains(clean, "not ok 1") {
+		t.Errorf("expected not ok for failed command, got:\n%s", clean)
+	}
+}
+
+func TestGoroutineExecutorRunningCounter(t *testing.T) {
+	executor := &GoroutineExecutor{}
+
+	if executor.Running() != 0 {
+		t.Errorf("expected running=0 before execution, got %d", executor.Running())
+	}
+
+	results := collect(executor.Run(context.Background(), "echo {}", []string{"a"}))
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if executor.Running() != 0 {
+		t.Errorf("expected running=0 after completion, got %d", executor.Running())
+	}
+}

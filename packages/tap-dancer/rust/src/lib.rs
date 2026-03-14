@@ -10,6 +10,7 @@ pub struct TapConfig {
     locale: Option<Locale>,
     formatter: Option<DecimalFormatter>,
     streamed_output: bool,
+    tty_build_last_line: bool,
 }
 
 impl TapConfig {
@@ -29,6 +30,7 @@ pub struct TapWriterBuilder<'a> {
     w: &'a mut dyn Write,
     color: bool,
     locale: Option<Locale>,
+    tty_build_last_line: bool,
 }
 
 impl<'a> TapWriterBuilder<'a> {
@@ -37,6 +39,7 @@ impl<'a> TapWriterBuilder<'a> {
             w,
             color: false,
             locale: None,
+            tty_build_last_line: false,
         }
     }
 
@@ -56,6 +59,11 @@ impl<'a> TapWriterBuilder<'a> {
 
     pub fn no_locale(mut self) -> Self {
         self.locale = None;
+        self
+    }
+
+    pub fn tty_build_last_line(mut self, enabled: bool) -> Self {
+        self.tty_build_last_line = enabled;
         self
     }
 
@@ -95,6 +103,7 @@ impl<'a> TapWriterBuilder<'a> {
             locale,
             formatter,
             streamed_output: false,
+            tty_build_last_line: self.tty_build_last_line,
         })
     }
 
@@ -104,6 +113,9 @@ impl<'a> TapWriterBuilder<'a> {
         writeln!(self.w, "TAP version 14")?;
         if let Some(ref locale) = config.locale {
             writeln!(self.w, "pragma +locale-formatting:{locale}")?;
+        }
+        if config.tty_build_last_line {
+            writeln!(self.w, "pragma +tty-build-last-line")?;
         }
         Ok(TapWriter {
             w: self.w,
@@ -274,11 +286,24 @@ impl<'a> TapWriter<'a> {
         writeln!(self.w, "# {}", text)
     }
 
+    pub fn update_last_line(&mut self, text: &str) -> io::Result<()> {
+        write!(self.w, "\r\x1b[2K# {}", text)?;
+        self.w.flush()
+    }
+
+    pub fn finish_last_line(&mut self) -> io::Result<()> {
+        write!(self.w, "\r\x1b[2K")?;
+        self.w.flush()
+    }
+
     pub fn pragma(&mut self, key: &str, enabled: bool) -> io::Result<()> {
         let sign = if enabled { "+" } else { "-" };
         writeln!(self.w, "pragma {}{}", sign, key)?;
         if key == "streamed-output" && enabled {
             self.config.streamed_output = true;
+        }
+        if key == "tty-build-last-line" && enabled {
+            self.config.tty_build_last_line = true;
         }
         Ok(())
     }
@@ -349,7 +374,8 @@ impl<'a> TapWriter<'a> {
     ) -> io::Result<()> {
         writeln!(self.w, "    # Subtest: {}", name)?;
         let mut indent = IndentWriter { w: &mut *self.w };
-        let config = self.config.clone();
+        let mut config = self.config.clone();
+        config.tty_build_last_line = false;
         let mut child = TapWriter {
             w: &mut indent,
             counter: 0,
@@ -1526,6 +1552,7 @@ mod tests {
             locale: None,
             formatter: None,
             streamed_output: false,
+            tty_build_last_line: false,
         };
         assert_eq!(config.format_number(1234), "1234");
     }
@@ -1540,6 +1567,7 @@ mod tests {
             locale: Some(locale),
             formatter: Some(formatter),
             streamed_output: false,
+            tty_build_last_line: false,
         };
         assert_eq!(config.format_number(1234), "1,234");
     }
@@ -1551,6 +1579,7 @@ mod tests {
             locale: None,
             formatter: None,
             streamed_output: false,
+            tty_build_last_line: false,
         };
         assert!(config.color());
     }
@@ -1857,6 +1886,89 @@ mod tests {
         assert!(
             out.contains("ok 1,234 - big number\n"),
             "expected locale-formatted number, got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn writer_tty_build_last_line_pragma() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf)
+            .tty_build_last_line(true)
+            .build()
+            .unwrap();
+        tw.ok("test").unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(
+            out.contains("pragma +tty-build-last-line\n"),
+            "expected tty-build-last-line pragma, got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn writer_tty_build_last_line_not_emitted_by_default() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.ok("test").unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(
+            !out.contains("tty-build-last-line"),
+            "should not emit tty-build-last-line by default, got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn writer_update_last_line() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf)
+            .tty_build_last_line(true)
+            .build()
+            .unwrap();
+        tw.update_last_line("building... 1/3").unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(
+            out.contains("\r\x1b[2K# building... 1/3"),
+            "expected cursor control + comment prefix, got:\n{out}"
+        );
+        assert!(
+            !out.ends_with('\n'),
+            "update_last_line should not emit trailing newline"
+        );
+    }
+
+    #[test]
+    fn writer_finish_last_line_erases() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf)
+            .tty_build_last_line(true)
+            .build()
+            .unwrap();
+        tw.update_last_line("building...").unwrap();
+        tw.finish_last_line().unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(
+            out.ends_with("\r\x1b[2K"),
+            "finish_last_line should erase the line with CR+clear, got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn writer_subtest_does_not_inherit_tty_build_last_line() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf)
+            .tty_build_last_line(true)
+            .build()
+            .unwrap();
+        tw.subtest("child", |child| {
+            child.ok("inner").unwrap();
+            child.plan().unwrap();
+            Ok(())
+        })
+        .unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        let indented_pragma = "    pragma +tty-build-last-line";
+        assert!(
+            !out.contains(indented_pragma),
+            "subtest should not inherit tty-build-last-line, got:\n{out}"
         );
     }
 }

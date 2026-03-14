@@ -842,3 +842,76 @@ func TestLocaleWriterSubtestInheritsLocale(t *testing.T) {
 		t.Errorf("expected subtest to use locale formatting, got:\n%s", out)
 	}
 }
+
+func TestEnableTTYBuildLastLineEmitsPragma(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.EnableTTYBuildLastLine()
+	out := buf.String()
+	if !strings.Contains(out, "pragma +tty-build-last-line\n") {
+		t.Errorf("expected tty-build-last-line pragma, got:\n%s", out)
+	}
+}
+
+func TestTTYBuildLastLineNotEmittedByDefault(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Ok("test")
+	tw.Plan()
+	out := buf.String()
+	if strings.Contains(out, "tty-build-last-line") {
+		t.Errorf("should not emit tty-build-last-line by default, got:\n%s", out)
+	}
+}
+
+func TestUpdateLastLine(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.EnableTTYBuildLastLine()
+	tw.UpdateLastLine("building... 1/3")
+	out := buf.String()
+	if !strings.Contains(out, "\r\033[2K# building... 1/3") {
+		t.Errorf("expected cursor control + comment prefix, got:\n%s", out)
+	}
+	if strings.HasSuffix(out, "\n") {
+		t.Error("UpdateLastLine should not emit trailing newline")
+	}
+}
+
+func TestFinishLastLineErasesStatusLine(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.EnableTTYBuildLastLine()
+	tw.UpdateLastLine("building...")
+	tw.FinishLastLine()
+	out := buf.String()
+	if !strings.HasSuffix(out, "\r\033[2K") {
+		t.Errorf("FinishLastLine should erase the line with CR+clear, got suffix: %q", out[max(0, len(out)-20):])
+	}
+}
+
+func TestSubtestDoesNotInheritTTYBuildLastLine(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.EnableTTYBuildLastLine()
+
+	sub := tw.Subtest("child")
+	sub.Ok("inner")
+	sub.Plan()
+	tw.Ok("child")
+	tw.Plan()
+
+	out := buf.String()
+	if strings.Contains(out, "    pragma +tty-build-last-line") {
+		t.Errorf("subtest should not inherit tty-build-last-line, got:\n%s", out)
+	}
+}
+
+func TestPragmaTracksTTYBuildLastLine(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Pragma("tty-build-last-line", true)
+	if !tw.ttyBuildLastLine {
+		t.Error("expected ttyBuildLastLine to be true after Pragma call")
+	}
+}
