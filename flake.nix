@@ -4,7 +4,6 @@
   inputs = {
     purse-first.url = "github:amarbel-llc/purse-first";
 
-    # Re-declare inputs mkMarketplace needs.
     # Follow purse-first's pins for consistency.
     nixpkgs.follows = "purse-first/nixpkgs";
     nixpkgs-master.follows = "purse-first/nixpkgs-master";
