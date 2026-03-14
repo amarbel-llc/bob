@@ -252,7 +252,7 @@ func TestGoroutineExecutorEmptyArgs(t *testing.T) {
 // must not assert on which emoji appears.
 func stripANSIAndControl(s string) string {
 	// Strip spinner emoji first (before byte-level ANSI stripping)
-	for _, emoji := range []string{"🙈", "🙉", "🙊"} {
+	for _, emoji := range []string{"🙈", "🙉", "🙊", "💤"} {
 		s = strings.ReplaceAll(s, emoji, "")
 	}
 

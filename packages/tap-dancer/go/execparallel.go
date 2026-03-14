@@ -211,28 +211,37 @@ func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer
 // TODO: explore a timer-based spinner (goroutine advancing frames independently)
 // for smoother animation when commands produce output in bursts.
 type statusSpinner struct {
-	frames  []string
-	index   int
-	lastAdv time.Time
-	minDur  time.Duration
+	frames     []string
+	index      int
+	lastAdv    time.Time
+	lastUpdate time.Time
+	minDur     time.Duration
+	sleepAfter time.Duration
 }
 
 var monkeyFrames = []string{"🙈", "🙉", "🙊"}
 
 func newStatusSpinner() *statusSpinner {
 	return &statusSpinner{
-		frames: monkeyFrames,
-		minDur: time.Second / 3, // 3fps cap
+		frames:     monkeyFrames,
+		minDur:     time.Second / 3, // 3fps cap
+		sleepAfter: 5 * time.Second,
 	}
 }
 
 func (s *statusSpinner) Frame() string {
 	now := time.Now()
+	sleeping := !s.lastUpdate.IsZero() && now.Sub(s.lastUpdate) >= s.sleepAfter
 	if now.Sub(s.lastAdv) >= s.minDur {
 		s.index = (s.index + 1) % len(s.frames)
 		s.lastAdv = now
 	}
-	return s.frames[s.index]
+	s.lastUpdate = now
+	frame := s.frames[s.index]
+	if sleeping {
+		frame += " 💤"
+	}
+	return frame
 }
 
 // runWithStatusLine runs a single command, streaming its stdout lines to the
