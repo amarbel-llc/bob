@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 // ExecResult holds the outcome of a single parallel command execution.
@@ -202,12 +203,43 @@ func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer
 	return exitCode
 }
 
+// statusSpinner cycles through frames on each call to Frame(), rate-limited
+// to maxFPS. When called faster than the limit, it returns the same frame.
+//
+// TODO: explore a timer-based spinner (goroutine advancing frames independently)
+// for smoother animation when commands produce output in bursts.
+type statusSpinner struct {
+	frames  []string
+	index   int
+	lastAdv time.Time
+	minDur  time.Duration
+}
+
+var monkeyFrames = []string{"🙈", "🙉", "🙊"}
+
+func newStatusSpinner() *statusSpinner {
+	return &statusSpinner{
+		frames: monkeyFrames,
+		minDur: time.Second / 3, // 3fps cap
+	}
+}
+
+func (s *statusSpinner) Frame() string {
+	now := time.Now()
+	if now.Sub(s.lastAdv) >= s.minDur {
+		s.index = (s.index + 1) % len(s.frames)
+		s.lastAdv = now
+	}
+	return s.frames[s.index]
+}
+
 // runWithStatusLine runs a single command, streaming its stdout lines to the
 // TAP writer's status line. Emits a test point when the command completes.
 // Returns true if the command succeeded.
 func runWithStatusLine(ctx context.Context, tw *Writer, arg, command string, verbose bool) bool {
+	spinner := newStatusSpinner()
 	r := runCommandStreamingLines(ctx, arg, command, func(line string) {
-		tw.UpdateLastLine(line)
+		tw.UpdateLastLine(spinner.Frame() + " " + line)
 	})
 	tw.FinishLastLine()
 
@@ -229,8 +261,9 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 	total := len(args)
 	exitCode := 0
 	done := 0
+	spinner := newStatusSpinner()
 
-	tw.UpdateLastLine(parallelStatusLine(executor.Running(), done, total, color))
+	tw.UpdateLastLine(spinner.Frame() + " " + parallelStatusLine(executor.Running(), done, total, color))
 
 	results := executor.Run(ctx, template, args)
 	for r := range results {
@@ -248,7 +281,7 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 			tw.NotOk(r.Command, execResultDiagnosticsMap(r))
 		}
 
-		tw.UpdateLastLine(parallelStatusLine(executor.Running(), done, total, color))
+		tw.UpdateLastLine(spinner.Frame() + " " + parallelStatusLine(executor.Running(), done, total, color))
 	}
 
 	tw.FinishLastLine()
