@@ -4,7 +4,7 @@ use crate::tools::{
     NixFlakeCheckParams, NixFlakeInitParams, NixFlakeLockParams, NixFlakeMetadataParams,
     NixFlakeShowParams, NixFlakeUpdateParams,
 };
-use crate::validators::{validate_args, validate_flake_ref, validate_path};
+use crate::validators::{validate_flake_ref, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -213,7 +213,6 @@ pub async fn nix_flake_update(params: NixFlakeUpdateParams) -> Result<NixFlakeUp
     }
 
     let inputs = params.inputs.unwrap_or_default();
-    validate_args(&inputs).map_err(|e| e.to_string())?;
 
     let mut args = vec!["flake", "update"];
 
@@ -275,7 +274,6 @@ pub async fn nix_flake_lock(params: NixFlakeLockParams) -> Result<NixFlakeLockRe
 
     // Build update-input args
     let update_inputs = params.update_inputs.unwrap_or_default();
-    validate_args(&update_inputs).map_err(|e| e.to_string())?;
     let update_input_args: Vec<String> = update_inputs
         .iter()
         .flat_map(|i| vec!["--update-input".to_string(), i.clone()])

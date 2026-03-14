@@ -1,7 +1,7 @@
 use crate::nix_runner::run_nix_command;
 use crate::output::{limit_stderr, OutputLimitsConfig, PaginationInfo, TruncationInfo};
 use crate::tools::NixSearchParams;
-use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters};
+use crate::validators::validate_flake_ref;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -20,8 +20,6 @@ pub struct NixSearchResult {
 pub async fn nix_search(params: NixSearchParams) -> Result<NixSearchResult, String> {
     let flake_ref = params.flake_ref.unwrap_or_else(|| "nixpkgs".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
-
-    validate_no_shell_metacharacters(&params.query).map_err(|e| e.to_string())?;
 
     let mut args = vec!["search", "--json", &flake_ref, &params.query];
 

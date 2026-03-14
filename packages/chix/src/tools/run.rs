@@ -1,10 +1,7 @@
 use crate::nix_runner::run_nix_command_in_dir;
 use crate::output::{limit_stderr, limit_text_output, OutputLimits, TruncationInfo};
 use crate::tools::{NixDevelopRunParams, NixRunParams};
-use crate::validators::{
-    validate_args, validate_flake_ref, validate_installable, validate_no_shell_metacharacters,
-    validate_path,
-};
+use crate::validators::{validate_flake_ref, validate_installable, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -51,10 +48,6 @@ pub async fn nix_run(params: NixRunParams) -> Result<NixRunResult, String> {
     let flake_dir = params.flake_dir.as_deref();
     if let Some(dir) = flake_dir {
         validate_path(dir).map_err(|e| e.to_string())?;
-    }
-
-    if let Some(ref args) = params.args {
-        validate_args(args).map_err(|e| e.to_string())?;
     }
 
     let mut args: Vec<&str> = vec!["run", &installable];
@@ -108,12 +101,6 @@ pub async fn nix_develop_run(params: NixDevelopRunParams) -> Result<NixDevelopRu
     let mut any_truncated = false;
 
     for entry in &params.commands {
-        validate_no_shell_metacharacters(&entry.command).map_err(|e| e.to_string())?;
-
-        if let Some(ref args) = entry.args {
-            validate_args(args).map_err(|e| e.to_string())?;
-        }
-
         let mut nix_args: Vec<&str> = vec!["develop", &flake_ref, "-c", &entry.command];
 
         let user_args: Vec<&str> = entry
@@ -192,42 +179,6 @@ mod tests {
         let result = nix_develop_run(params).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must not be empty"));
-    }
-
-    #[tokio::test]
-    async fn test_develop_run_validates_command_metacharacters() {
-        let params = NixDevelopRunParams {
-            flake_ref: Some(".".to_string()),
-            commands: vec![CommandEntry {
-                command: "echo;rm".to_string(),
-                args: None,
-            }],
-            flake_dir: None,
-            max_bytes: None,
-            head: None,
-            tail: None,
-        };
-        let result = nix_develop_run(params).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("shell metacharacters"));
-    }
-
-    #[tokio::test]
-    async fn test_develop_run_validates_args() {
-        let params = NixDevelopRunParams {
-            flake_ref: Some(".".to_string()),
-            commands: vec![CommandEntry {
-                command: "echo".to_string(),
-                args: Some(vec!["hello; rm -rf /".to_string()]),
-            }],
-            flake_dir: None,
-            max_bytes: None,
-            head: None,
-            tail: None,
-        };
-        let result = nix_develop_run(params).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("shell metacharacters"));
     }
 
     #[tokio::test]

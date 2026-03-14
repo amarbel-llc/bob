@@ -7,9 +7,6 @@ pub enum ValidationError {
     #[error("invalid flake reference: `{0}`")]
     InvalidFlakeRef(String),
 
-    #[error("shell metacharacters not allowed: `{0}`. Retry with the metacharacters removed — use separate array entries or tool parameters instead of shell operators")]
-    ShellMetacharacters(String),
-
     #[error("nix expression contains invalid characters (null bytes): `{0}`")]
     InvalidNixExpr(String),
 
@@ -34,9 +31,6 @@ static FLAKE_REF_PATTERN: LazyLock<Regex> =
 
 static ATTR_PATH_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9._\-]+$").unwrap());
-
-static SHELL_METACHARACTERS: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[;&|`$(){}\\<>!]").unwrap());
 
 // Cachix cache names: alphanumeric with hyphens, must start with alphanumeric
 static CACHE_NAME_PATTERN: LazyLock<Regex> =
@@ -75,20 +69,6 @@ pub fn validate_attr_path(attr_path: &str) -> Result<&str, ValidationError> {
         return Err(ValidationError::InvalidAttrPath(attr_path.to_string()));
     }
     Ok(attr_path)
-}
-
-pub fn validate_no_shell_metacharacters(input: &str) -> Result<&str, ValidationError> {
-    if SHELL_METACHARACTERS.is_match(input) {
-        return Err(ValidationError::ShellMetacharacters(input.to_string()));
-    }
-    Ok(input)
-}
-
-pub fn validate_args(args: &[String]) -> Result<(), ValidationError> {
-    for arg in args {
-        validate_no_shell_metacharacters(arg)?;
-    }
-    Ok(())
 }
 
 /// Validate a Nix expression for use with `nix eval --expr` or `--apply`.
@@ -159,14 +139,6 @@ mod tests {
         assert!(validate_installable("$(malicious)").is_err());
         assert!(validate_installable("; rm -rf /").is_err());
         assert!(validate_installable("hello`whoami`").is_err());
-    }
-
-    #[test]
-    fn test_shell_metacharacters() {
-        assert!(validate_no_shell_metacharacters("hello").is_ok());
-        assert!(validate_no_shell_metacharacters("hello; rm -rf").is_err());
-        assert!(validate_no_shell_metacharacters("$(cmd)").is_err());
-        assert!(validate_no_shell_metacharacters("foo | bar").is_err());
     }
 
     #[test]

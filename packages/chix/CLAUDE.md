@@ -45,8 +45,9 @@ chix is a Claude Code plugin that combines a Nix MCP server with skills for work
 
 All inputs are validated before execution:
 - `validate_installable()` / `validate_flake_ref()` - Whitelist regex for flake references
-- `validate_no_shell_metacharacters()` - Blocks `;|&`$(){}\\<>!`
-- `validate_args()` - Validates argument arrays
+- `validate_nix_expr()` - Rejects null bytes (shell metacharacters are safe since commands use direct execvp, not shell)
+- `validate_store_path()` / `validate_store_subpath()` - Whitelist regex for Nix store paths
+- `validate_path()` - Whitelist regex for file paths
 
 Commands use `kill_on_drop(true)` to ensure cleanup on timeout.
 

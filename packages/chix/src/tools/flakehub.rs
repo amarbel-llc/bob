@@ -4,7 +4,7 @@ use crate::tools::{
     FhAddParams, FhFetchParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams,
     FhLoginParams, FhResolveParams, FhSearchParams,
 };
-use crate::validators::{validate_no_shell_metacharacters, validate_path};
+use crate::validators::validate_path;
 use serde::Serialize;
 
 fn paginate_json_array(
@@ -87,8 +87,6 @@ pub struct FhResolveResult {
 }
 
 pub async fn fh_search(params: FhSearchParams) -> Result<FhSearchResult, String> {
-    validate_no_shell_metacharacters(&params.query).map_err(|e| e.to_string())?;
-
     let mut args = vec!["search", "--json"];
     args.push(&params.query);
 
@@ -122,13 +120,10 @@ pub async fn fh_search(params: FhSearchParams) -> Result<FhSearchResult, String>
 }
 
 pub async fn fh_add(params: FhAddParams) -> Result<FhAddResult, String> {
-    validate_no_shell_metacharacters(&params.input_ref).map_err(|e| e.to_string())?;
-
     let mut args = vec!["add"];
 
     let flake_path;
     if let Some(ref path) = params.flake_path {
-        validate_no_shell_metacharacters(path).map_err(|e| e.to_string())?;
         flake_path = path.clone();
         args.push("--flake-path");
         args.push(&flake_path);
@@ -136,7 +131,6 @@ pub async fn fh_add(params: FhAddParams) -> Result<FhAddResult, String> {
 
     let input_name;
     if let Some(ref name) = params.input_name {
-        validate_no_shell_metacharacters(name).map_err(|e| e.to_string())?;
         input_name = name.clone();
         args.push("--input-name");
         args.push(&input_name);
@@ -190,8 +184,6 @@ pub async fn fh_list_flakes(params: FhListFlakesParams) -> Result<FhListResult, 
 }
 
 pub async fn fh_list_releases(params: FhListReleasesParams) -> Result<FhListResult, String> {
-    validate_no_shell_metacharacters(&params.flake).map_err(|e| e.to_string())?;
-
     let mut args = vec!["list", "releases", "--json"];
     args.push(&params.flake);
 
@@ -225,9 +217,6 @@ pub async fn fh_list_releases(params: FhListReleasesParams) -> Result<FhListResu
 }
 
 pub async fn fh_list_versions(params: FhListVersionsParams) -> Result<FhListResult, String> {
-    validate_no_shell_metacharacters(&params.flake).map_err(|e| e.to_string())?;
-    validate_no_shell_metacharacters(&params.version_constraint).map_err(|e| e.to_string())?;
-
     let mut args = vec!["list", "versions", "--json"];
     args.push(&params.flake);
     args.push(&params.version_constraint);
@@ -262,8 +251,6 @@ pub async fn fh_list_versions(params: FhListVersionsParams) -> Result<FhListResu
 }
 
 pub async fn fh_resolve(params: FhResolveParams) -> Result<FhResolveResult, String> {
-    validate_no_shell_metacharacters(&params.flake_ref).map_err(|e| e.to_string())?;
-
     let args = vec!["resolve", "--json", &params.flake_ref];
 
     let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
@@ -342,7 +329,6 @@ pub async fn fh_status() -> Result<FhStatusResult, String> {
 }
 
 pub async fn fh_fetch(params: FhFetchParams) -> Result<FhFetchResult, String> {
-    validate_no_shell_metacharacters(&params.flake_ref).map_err(|e| e.to_string())?;
     validate_path(&params.target_link).map_err(|e| e.to_string())?;
 
     let args = vec!["fetch", &params.flake_ref, &params.target_link];

@@ -1,6 +1,5 @@
 use crate::lsp_client::{create_nil_client, LspClient};
 use crate::output::PaginationInfo;
-use crate::validators::validate_no_shell_metacharacters;
 use serde::Serialize;
 use std::path::Path;
 
@@ -130,8 +129,6 @@ pub async fn nil_diagnostics(
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> Result<DiagnosticsResult, String> {
-    validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
-
     let path = Path::new(&file_path);
     if !path.exists() {
         return Ok(DiagnosticsResult {
@@ -211,8 +208,6 @@ pub async fn nil_completions(
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> Result<CompletionsResult, String> {
-    validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
-
     let path = Path::new(&file_path);
     if !path.exists() {
         return Ok(CompletionsResult {
@@ -288,8 +283,6 @@ pub async fn nil_hover(
     line: u32,
     character: u32,
 ) -> Result<HoverInfoResult, String> {
-    validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
-
     let path = Path::new(&file_path);
     if !path.exists() {
         return Ok(HoverInfoResult {
@@ -343,8 +336,6 @@ pub async fn nil_definition(
     line: u32,
     character: u32,
 ) -> Result<DefinitionResult, String> {
-    validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
-
     let path = Path::new(&file_path);
     if !path.exists() {
         return Ok(DefinitionResult {

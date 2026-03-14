@@ -1,7 +1,7 @@
 use crate::nix_runner::run_nix_command;
 use crate::output::{limit_stderr, PaginationInfo, TruncationInfo};
 use crate::tools::{NixCopyParams, NixStoreCatParams, NixStoreLsParams, NixStoreGcParams, NixStorePathInfoParams};
-use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters, validate_store_path, validate_store_subpath};
+use crate::validators::{validate_flake_ref, validate_store_path, validate_store_subpath};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -122,7 +122,6 @@ pub async fn nix_store_gc(params: NixStoreGcParams) -> Result<NixStoreGcResult, 
 
     let max_freed_str;
     if let Some(ref max) = params.max_freed {
-        validate_no_shell_metacharacters(max).map_err(|e| e.to_string())?;
         max_freed_str = max.clone();
         args.push("--max");
         args.push(&max_freed_str);
@@ -157,7 +156,6 @@ pub async fn nix_copy(params: NixCopyParams) -> Result<NixCopyResult, String> {
 
     let to_store;
     if let Some(ref to) = params.to {
-        validate_no_shell_metacharacters(to).map_err(|e| e.to_string())?;
         to_store = to.clone();
         args.push("--to");
         args.push(&to_store);
@@ -165,7 +163,6 @@ pub async fn nix_copy(params: NixCopyParams) -> Result<NixCopyResult, String> {
 
     let from_store;
     if let Some(ref from) = params.from {
-        validate_no_shell_metacharacters(from).map_err(|e| e.to_string())?;
         from_store = from.clone();
         args.push("--from");
         args.push(&from_store);
