@@ -91,13 +91,13 @@ vendor-hash:
 # Run integration tests
 test-integration: build-batman
     nix build
-    PURSE_FIRST_BIN={{justfile_directory()}}/result/bin/purse-first {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
+    {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
       zz-tests_bats/validate_plugin_repos.bats
 
 # Run lifecycle tests
 test-lifecycle: build-batman
     nix build
-    PURSE_FIRST_BIN={{justfile_directory()}}/result/bin/purse-first {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} zz-tests_bats/lux_service.bats
+    {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} zz-tests_bats/lux_service.bats
 
 # Validate own plugin manifest
 validate:

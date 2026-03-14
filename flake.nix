@@ -225,6 +225,7 @@
           [
             pkgs-master.claude-code
             localPkgs.batmanPkgs.default
+            purse-first.packages.${system}.purse-first
           ];
         devShellInputsFrom =
           system:
