@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -244,13 +245,49 @@ func (s *statusSpinner) Frame() string {
 	return frame
 }
 
+// startStatusTicker starts a background goroutine that re-renders the status
+// line at the spinner's frame rate. This keeps the spinner animating and
+// triggers the 💤 indicator even when no new output arrives. The caller must
+// hold mu when writing to tw or updating content. Returns a stop function.
+func startStatusTicker(tw *Writer, spinner *statusSpinner, mu *sync.Mutex, content *string) func() {
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(time.Second / 3)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				mu.Lock()
+				if *content != "" {
+					tw.UpdateLastLine(spinner.Frame() + " " + *content)
+				}
+				mu.Unlock()
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() { close(done) }
+}
+
 // runWithStatusLine runs a single command, streaming its stdout lines to the
-// TAP writer's status line with a spinner prefix. Emits a test point when
+// TAP writer's status line with a spinner prefix. A background ticker keeps
+// the spinner animating between output lines. Emits a test point when
 // the command completes. Returns true if the command succeeded.
 func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, arg, command string, verbose bool) bool {
+	var mu sync.Mutex
+	var lastContent string
+
+	stopTicker := startStatusTicker(tw, spinner, &mu, &lastContent)
+
 	r := runCommandStreamingLines(ctx, arg, command, func(line string) {
+		mu.Lock()
+		lastContent = line
 		tw.UpdateLastLine(spinner.Frame() + " " + line)
+		mu.Unlock()
 	})
+
+	stopTicker()
 	tw.FinishLastLine()
 
 	if r.ExitCode == 0 {
@@ -270,15 +307,28 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 	tw.EnableTTYBuildLastLine()
 	total := len(args)
 	exitCode := 0
-	done := 0
+	completed := 0
 	spinner := newStatusSpinner()
 
-	tw.UpdateLastLine(spinner.Frame() + " " + parallelStatusLine(executor.Running(), done, total, color))
+	var mu sync.Mutex
+	var lastContent string
+
+	renderParallel := func() {
+		lastContent = parallelStatusLine(executor.Running(), completed, total, color)
+		tw.UpdateLastLine(spinner.Frame() + " " + lastContent)
+	}
+
+	stopTicker := startStatusTicker(tw, spinner, &mu, &lastContent)
+
+	mu.Lock()
+	renderParallel()
+	mu.Unlock()
 
 	results := executor.Run(ctx, template, args)
 	for r := range results {
+		mu.Lock()
 		tw.FinishLastLine()
-		done++
+		completed++
 
 		if r.ExitCode == 0 {
 			if verbose {
@@ -291,9 +341,11 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 			tw.NotOk(r.Command, execResultDiagnosticsMap(r))
 		}
 
-		tw.UpdateLastLine(spinner.Frame() + " " + parallelStatusLine(executor.Running(), done, total, color))
+		renderParallel()
+		mu.Unlock()
 	}
 
+	stopTicker()
 	tw.FinishLastLine()
 	tw.Plan()
 	return exitCode
