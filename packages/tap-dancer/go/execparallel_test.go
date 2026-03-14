@@ -192,6 +192,39 @@ func TestConvertExecParallelVerboseIncludesDiagOnSuccess(t *testing.T) {
 	}
 }
 
+func TestGoroutineExecutorMaxJobsOne(t *testing.T) {
+	executor := &GoroutineExecutor{MaxJobs: 1}
+	results := collect(executor.Run(context.Background(), "echo {}", []string{"a", "b", "c"}))
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	for i, expected := range []string{"a", "b", "c"} {
+		if results[i].Arg != expected {
+			t.Errorf("result %d: expected arg %q, got %q", i, expected, results[i].Arg)
+		}
+		if results[i].ExitCode != 0 {
+			t.Errorf("result %d: expected exit code 0, got %d", i, results[i].ExitCode)
+		}
+	}
+}
+
+func TestGoroutineExecutorMaxJobsTwo(t *testing.T) {
+	executor := &GoroutineExecutor{MaxJobs: 2}
+	results := collect(executor.Run(context.Background(), "echo {}", []string{"a", "b", "c", "d"}))
+
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+
+	for i, expected := range []string{"a", "b", "c", "d"} {
+		if results[i].Arg != expected {
+			t.Errorf("result %d: expected arg %q, got %q", i, expected, results[i].Arg)
+		}
+	}
+}
+
 func TestGoroutineExecutorContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately

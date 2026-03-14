@@ -27,7 +27,10 @@ type Executor interface {
 }
 
 // GoroutineExecutor runs commands concurrently using goroutines.
-type GoroutineExecutor struct{}
+// MaxJobs limits concurrency; 0 means unlimited.
+type GoroutineExecutor struct {
+	MaxJobs int
+}
 
 // expandTemplate replaces {} with arg. Arguments are interpolated as-is
 // into the shell command, mirroring GNU parallel's ::: semantics.
@@ -49,8 +52,17 @@ func (e *GoroutineExecutor) Run(ctx context.Context, template string, args []str
 		done[i] = make(chan struct{})
 	}
 
+	var sem chan struct{}
+	if e.MaxJobs > 0 {
+		sem = make(chan struct{}, e.MaxJobs)
+	}
+
 	for i, arg := range args {
 		go func(idx int, a string) {
+			if sem != nil {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+			}
 			expanded := expandTemplate(template, a)
 			results[idx] = runCommand(ctx, a, expanded)
 			close(done[idx])

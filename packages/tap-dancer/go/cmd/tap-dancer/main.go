@@ -125,6 +125,7 @@ func registerCommands() *command.App {
 		Description: command.Description{Short: "Run commands in parallel and emit TAP-14 test points"},
 		Params: []command.Param{
 			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
+			{Name: "jobs", Short: 'j', Type: command.Int, Description: "Max parallel jobs (0 = unlimited)", Required: false},
 		},
 		RunCLI: handleExecParallel,
 	})
@@ -375,6 +376,7 @@ func handleReformat(_ context.Context, _ json.RawMessage) error {
 func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	var params struct {
 		Verbose bool `json:"verbose"`
+		Jobs    int  `json:"jobs"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
@@ -386,8 +388,13 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	for i, arg := range os.Args {
 		if arg == "exec-parallel" {
 			rest := os.Args[i+1:]
-			for _, a := range rest {
+			for j := 0; j < len(rest); j++ {
+				a := rest[j]
 				if a == "-v" || a == "--verbose" {
+					continue
+				}
+				if (a == "-j" || a == "--jobs") && j+1 < len(rest) {
+					j++ // skip the value; already parsed by command framework
 					continue
 				}
 				cliArgs = append(cliArgs, a)
@@ -421,7 +428,7 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	executor := &tap.GoroutineExecutor{}
+	executor := &tap.GoroutineExecutor{MaxJobs: params.Jobs}
 	results := executor.Run(ctx, template, execArgs)
 	exitCode := tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
 
