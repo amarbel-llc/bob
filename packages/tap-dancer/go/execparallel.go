@@ -162,11 +162,12 @@ func ConvertExecParallelWithStatus(ctx context.Context, executor *GoroutineExecu
 func execSequentialWithLastLine(ctx context.Context, template string, args []string, w io.Writer, verbose bool, color bool) int {
 	tw := NewColorWriter(w, color)
 	tw.EnableTTYBuildLastLine()
+	spinner := newStatusSpinner()
 	exitCode := 0
 
 	for _, arg := range args {
 		expanded := expandTemplate(template, arg)
-		if !runWithStatusLine(ctx, tw, arg, expanded, verbose) {
+		if !runWithStatusLine(ctx, tw, spinner, arg, expanded, verbose) {
 			exitCode = 1
 		}
 	}
@@ -184,16 +185,17 @@ func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer
 	if color {
 		tw.EnableTTYBuildLastLine()
 	}
+	spinner := newStatusSpinner()
 	exitCode := 0
 
 	if len(args) == 0 {
-		if !runWithStatusLine(ctx, tw, utility, utility, verbose) {
+		if !runWithStatusLine(ctx, tw, spinner, utility, utility, verbose) {
 			exitCode = 1
 		}
 	} else {
 		for _, arg := range args {
 			command := utility + " " + arg
-			if !runWithStatusLine(ctx, tw, arg, command, verbose) {
+			if !runWithStatusLine(ctx, tw, spinner, arg, command, verbose) {
 				exitCode = 1
 			}
 		}
@@ -234,10 +236,9 @@ func (s *statusSpinner) Frame() string {
 }
 
 // runWithStatusLine runs a single command, streaming its stdout lines to the
-// TAP writer's status line. Emits a test point when the command completes.
-// Returns true if the command succeeded.
-func runWithStatusLine(ctx context.Context, tw *Writer, arg, command string, verbose bool) bool {
-	spinner := newStatusSpinner()
+// TAP writer's status line with a spinner prefix. Emits a test point when
+// the command completes. Returns true if the command succeeded.
+func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, arg, command string, verbose bool) bool {
 	r := runCommandStreamingLines(ctx, arg, command, func(line string) {
 		tw.UpdateLastLine(spinner.Frame() + " " + line)
 	})
