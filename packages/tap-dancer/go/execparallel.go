@@ -230,17 +230,30 @@ func newStatusSpinner() *statusSpinner {
 	}
 }
 
+// Touch signals that new content arrived, resetting the sleep timer.
+func (s *statusSpinner) Touch() {
+	s.lastUpdate = time.Now()
+}
+
+// Frame advances the spinner (rate-limited) and returns the current frame.
+// Call this when new content arrives.
 func (s *statusSpinner) Frame() string {
 	now := time.Now()
-	sleeping := !s.lastUpdate.IsZero() && now.Sub(s.lastUpdate) >= s.sleepAfter
 	if now.Sub(s.lastAdv) >= s.minDur {
 		s.index = (s.index + 1) % len(s.frames)
 		s.lastAdv = now
 	}
-	s.lastUpdate = now
+	return s.current()
+}
+
+// current returns the current frame without advancing. Call this from the
+// ticker to re-render without progressing the animation.
+func (s *statusSpinner) current() string {
+	now := time.Now()
+	sleeping := !s.lastUpdate.IsZero() && now.Sub(s.lastUpdate) >= s.sleepAfter
 	frame := s.frames[s.index]
 	if sleeping {
-		frame += " 💤"
+		frame += "💤"
 	}
 	return frame
 }
@@ -259,7 +272,7 @@ func startStatusTicker(tw *Writer, spinner *statusSpinner, mu *sync.Mutex, conte
 			case <-ticker.C:
 				mu.Lock()
 				if *content != "" {
-					tw.UpdateLastLine(spinner.Frame() + " " + *content)
+					tw.UpdateLastLine(spinner.current() + " " + *content)
 				}
 				mu.Unlock()
 			case <-done:
@@ -278,11 +291,13 @@ func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, 
 	var mu sync.Mutex
 	var lastContent string
 
+	spinner.Touch()
 	stopTicker := startStatusTicker(tw, spinner, &mu, &lastContent)
 
 	r := runCommandStreamingLines(ctx, arg, command, func(line string) {
 		mu.Lock()
 		lastContent = line
+		spinner.Touch()
 		tw.UpdateLastLine(spinner.Frame() + " " + line)
 		mu.Unlock()
 	})
@@ -314,6 +329,7 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 	var lastContent string
 
 	renderParallel := func() {
+		spinner.Touch()
 		lastContent = parallelStatusLine(executor.Running(), completed, total, color)
 		tw.UpdateLastLine(spinner.Frame() + " " + lastContent)
 	}
