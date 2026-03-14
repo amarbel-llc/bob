@@ -336,6 +336,103 @@ func TestConvertExecParallelWithStatusSequentialFailure(t *testing.T) {
 	}
 }
 
+func TestConvertExecSingleCommand(t *testing.T) {
+	var buf bytes.Buffer
+	exitCode := ConvertExec(
+		context.Background(), "echo", []string{"hello"},
+		&buf, false, true,
+	)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	clean := stripANSIAndControl(buf.String())
+	if !strings.Contains(clean, "ok 1 - echo hello") {
+		t.Errorf("expected ok test point, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "1..1") {
+		t.Errorf("expected plan 1..1, got:\n%s", clean)
+	}
+}
+
+func TestConvertExecMultipleArgs(t *testing.T) {
+	var buf bytes.Buffer
+	exitCode := ConvertExec(
+		context.Background(), "echo", []string{"a", "b", "c"},
+		&buf, false, true,
+	)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	clean := stripANSIAndControl(buf.String())
+	if !strings.Contains(clean, "ok 1 - echo a") {
+		t.Errorf("expected first test point, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "ok 2 - echo b") {
+		t.Errorf("expected second test point, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "ok 3 - echo c") {
+		t.Errorf("expected third test point, got:\n%s", clean)
+	}
+	if !strings.Contains(clean, "1..3") {
+		t.Errorf("expected plan 1..3, got:\n%s", clean)
+	}
+}
+
+func TestConvertExecNoArgs(t *testing.T) {
+	var buf bytes.Buffer
+	exitCode := ConvertExec(
+		context.Background(), "echo bare", nil,
+		&buf, false, true,
+	)
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	clean := stripANSIAndControl(buf.String())
+	if !strings.Contains(clean, "ok 1 - echo bare") {
+		t.Errorf("expected ok for bare command, got:\n%s", clean)
+	}
+}
+
+func TestConvertExecFailure(t *testing.T) {
+	var buf bytes.Buffer
+	exitCode := ConvertExec(
+		context.Background(), "false", []string{"x"},
+		&buf, false, true,
+	)
+
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	clean := stripANSIAndControl(buf.String())
+	if !strings.Contains(clean, "not ok 1") {
+		t.Errorf("expected not ok, got:\n%s", clean)
+	}
+}
+
+func TestConvertExecStatusLineShowsOutput(t *testing.T) {
+	var buf bytes.Buffer
+	ConvertExec(
+		context.Background(), "echo", []string{"status-visible"},
+		&buf, false, true,
+	)
+
+	out := buf.String()
+	if !strings.Contains(out, "pragma +tty-build-last-line") {
+		t.Errorf("expected tty-build-last-line pragma, got:\n%s", out)
+	}
+	clean := stripANSIAndControl(out)
+	if !strings.Contains(clean, "# status-visible") {
+		t.Errorf("expected status line with stdout content, got:\n%s", clean)
+	}
+}
+
 func TestGoroutineExecutorRunningCounter(t *testing.T) {
 	executor := &GoroutineExecutor{}
 

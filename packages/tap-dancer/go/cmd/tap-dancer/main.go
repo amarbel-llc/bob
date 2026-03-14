@@ -29,6 +29,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  go-test [args...]     Run go test and convert output to TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  cargo-test [args...]  Run cargo test and convert output to TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  reformat              Read TAP from stdin and emit TAP-14 with ANSI colors\n")
+		fmt.Fprintf(os.Stderr, "  exec <cmd> [args...]  Run cmd for each arg sequentially and emit TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  exec-parallel         Run commands in parallel and emit TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  generate-plugin DIR   Generate MCP plugin (for Nix postInstall)\n")
 		fmt.Fprintf(os.Stderr, "\nWhen run with no args and no TTY, starts MCP server mode\n")
@@ -118,6 +119,15 @@ func registerCommands() *command.App {
 		Name:        "reformat",
 		Description: command.Description{Short: "Read TAP from stdin and emit TAP-14 with optional ANSI colors"},
 		RunCLI:      handleReformat,
+	})
+
+	app.AddCommand(&command.Command{
+		Name:        "exec",
+		Description: command.Description{Short: "Run a command for each argument sequentially and emit TAP-14"},
+		Params: []command.Param{
+			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
+		},
+		RunCLI: handleExec,
 	})
 
 	app.AddCommand(&command.Command{
@@ -370,6 +380,46 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 
 func handleReformat(_ context.Context, _ json.RawMessage) error {
 	tap.ReformatTAP(os.Stdin, os.Stdout, stdoutIsTerminal())
+	return nil
+}
+
+func handleExec(ctx context.Context, args json.RawMessage) error {
+	var params struct {
+		Verbose bool `json:"verbose"`
+	}
+	if err := json.Unmarshal(args, &params); err != nil {
+		return fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	// Parse CLI args: everything after "exec", excluding our flags.
+	var cliArgs []string
+	for i, arg := range os.Args {
+		if arg == "exec" {
+			rest := os.Args[i+1:]
+			for _, a := range rest {
+				if a == "-v" || a == "--verbose" {
+					continue
+				}
+				cliArgs = append(cliArgs, a)
+			}
+			break
+		}
+	}
+
+	if len(cliArgs) == 0 {
+		return fmt.Errorf("missing command\nusage: tap-dancer exec [--verbose] <cmd> [<arg1> <arg2> ...]")
+	}
+
+	utility := cliArgs[0]
+	execArgs := cliArgs[1:]
+
+	color := stdoutIsTerminal()
+	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, params.Verbose, color)
+
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
+
 	return nil
 }
 

@@ -165,25 +165,62 @@ func execSequentialWithLastLine(ctx context.Context, template string, args []str
 
 	for _, arg := range args {
 		expanded := expandTemplate(template, arg)
-		r := runCommandStreamingLines(ctx, arg, expanded, func(line string) {
-			tw.UpdateLastLine(line)
-		})
-		tw.FinishLastLine()
-
-		if r.ExitCode == 0 {
-			if verbose {
-				tw.OkDiag(r.Command, execResultDiagnostics(r))
-			} else {
-				tw.Ok(r.Command)
-			}
-		} else {
+		if !runWithStatusLine(ctx, tw, arg, expanded, verbose) {
 			exitCode = 1
-			tw.NotOk(r.Command, execResultDiagnosticsMap(r))
 		}
 	}
 
 	tw.Plan()
 	return exitCode
+}
+
+// ConvertExec runs commands sequentially with a tty-build-last-line status line
+// showing the last stdout line from the currently running command.
+// Each arg is run as: utility + " " + arg. If args is empty, utility is run once.
+// Returns 0 if all commands succeeded, 1 if any failed.
+func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer, verbose bool, color bool) int {
+	tw := NewColorWriter(w, color)
+	if color {
+		tw.EnableTTYBuildLastLine()
+	}
+	exitCode := 0
+
+	if len(args) == 0 {
+		if !runWithStatusLine(ctx, tw, utility, utility, verbose) {
+			exitCode = 1
+		}
+	} else {
+		for _, arg := range args {
+			command := utility + " " + arg
+			if !runWithStatusLine(ctx, tw, arg, command, verbose) {
+				exitCode = 1
+			}
+		}
+	}
+
+	tw.Plan()
+	return exitCode
+}
+
+// runWithStatusLine runs a single command, streaming its stdout lines to the
+// TAP writer's status line. Emits a test point when the command completes.
+// Returns true if the command succeeded.
+func runWithStatusLine(ctx context.Context, tw *Writer, arg, command string, verbose bool) bool {
+	r := runCommandStreamingLines(ctx, arg, command, func(line string) {
+		tw.UpdateLastLine(line)
+	})
+	tw.FinishLastLine()
+
+	if r.ExitCode == 0 {
+		if verbose {
+			tw.OkDiag(r.Command, execResultDiagnostics(r))
+		} else {
+			tw.Ok(r.Command)
+		}
+		return true
+	}
+	tw.NotOk(r.Command, execResultDiagnosticsMap(r))
+	return false
 }
 
 func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool) int {
