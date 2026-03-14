@@ -153,17 +153,44 @@ func ConvertExecParallel(results <-chan ExecResult, w io.Writer, verbose bool, c
 // When maxJobs == 1 (sequential), the status line shows the last line of stdout
 // from the currently running command. When maxJobs != 1 (parallel), the status
 // line shows how many commands are currently running.
-func ConvertExecParallelWithStatus(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool) int {
-	if executor.MaxJobs == 1 {
-		return execSequentialWithLastLine(ctx, template, args, w, verbose, color)
-	}
-	return execParallelWithRunningCount(ctx, executor, template, args, w, verbose, color)
+// ExecOption configures exec and exec-parallel behavior.
+type ExecOption func(*execConfig)
+
+type execConfig struct {
+	spinner bool
 }
 
-func execSequentialWithLastLine(ctx context.Context, template string, args []string, w io.Writer, verbose bool, color bool) int {
+func defaultExecConfig() execConfig {
+	return execConfig{spinner: true}
+}
+
+func applyExecOptions(opts []ExecOption) execConfig {
+	cfg := defaultExecConfig()
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return cfg
+}
+
+// WithSpinner controls whether a spinner prefix is shown on status lines.
+// Default is true.
+func WithSpinner(enabled bool) ExecOption {
+	return func(c *execConfig) { c.spinner = enabled }
+}
+
+func ConvertExecParallelWithStatus(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool, opts ...ExecOption) int {
+	cfg := applyExecOptions(opts)
+	if executor.MaxJobs == 1 {
+		return execSequentialWithLastLine(ctx, template, args, w, verbose, color, cfg)
+	}
+	return execParallelWithRunningCount(ctx, executor, template, args, w, verbose, color, cfg)
+}
+
+func execSequentialWithLastLine(ctx context.Context, template string, args []string, w io.Writer, verbose bool, color bool, cfg execConfig) int {
 	tw := NewColorWriter(w, color)
 	tw.EnableTTYBuildLastLine()
 	spinner := newStatusSpinner()
+	spinner.disabled = !cfg.spinner
 	exitCode := 0
 
 	for _, arg := range args {
@@ -181,12 +208,14 @@ func execSequentialWithLastLine(ctx context.Context, template string, args []str
 // showing the last stdout line from the currently running command.
 // Each arg is run as: utility + " " + arg. If args is empty, utility is run once.
 // Returns 0 if all commands succeeded, 1 if any failed.
-func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer, verbose bool, color bool) int {
+func ConvertExec(ctx context.Context, utility string, args []string, w io.Writer, verbose bool, color bool, opts ...ExecOption) int {
+	cfg := applyExecOptions(opts)
 	tw := NewColorWriter(w, color)
 	if color {
 		tw.EnableTTYBuildLastLine()
 	}
 	spinner := newStatusSpinner()
+	spinner.disabled = !cfg.spinner
 	exitCode := 0
 
 	if len(args) == 0 {
@@ -218,6 +247,7 @@ type statusSpinner struct {
 	lastUpdate time.Time
 	minDur     time.Duration
 	sleepAfter time.Duration
+	disabled   bool
 }
 
 var monkeyFrames = []string{"🙈", "🙉", "🙊"}
@@ -235,27 +265,34 @@ func (s *statusSpinner) Touch() {
 	s.lastUpdate = time.Now()
 }
 
-// Frame advances the spinner (rate-limited) and returns the current frame.
-// Call this when new content arrives.
-func (s *statusSpinner) Frame() string {
+// prefix returns the spinner frame followed by a space, or empty if disabled.
+// Advances the spinner (rate-limited). Call this when new content arrives.
+func (s *statusSpinner) prefix() string {
+	if s.disabled {
+		return ""
+	}
 	now := time.Now()
 	if now.Sub(s.lastAdv) >= s.minDur {
 		s.index = (s.index + 1) % len(s.frames)
 		s.lastAdv = now
 	}
-	return s.current()
+	return s.currentPrefix()
 }
 
-// current returns the current frame without advancing. Call this from the
-// ticker to re-render without progressing the animation.
-func (s *statusSpinner) current() string {
+// currentPrefix returns the current spinner frame followed by a space, without
+// advancing. Call this from the ticker to re-render without progressing the
+// animation. Returns empty if disabled.
+func (s *statusSpinner) currentPrefix() string {
+	if s.disabled {
+		return ""
+	}
 	now := time.Now()
 	sleeping := !s.lastUpdate.IsZero() && now.Sub(s.lastUpdate) >= s.sleepAfter
 	frame := s.frames[s.index]
 	if sleeping {
 		frame += "💤"
 	}
-	return frame
+	return frame + " "
 }
 
 // startStatusTicker starts a background goroutine that re-renders the status
@@ -264,7 +301,9 @@ func (s *statusSpinner) current() string {
 // hold mu when writing to tw or updating content. Returns a stop function.
 func startStatusTicker(tw *Writer, spinner *statusSpinner, mu *sync.Mutex, content *string) func() {
 	done := make(chan struct{})
+	exited := make(chan struct{})
 	go func() {
+		defer close(exited)
 		ticker := time.NewTicker(time.Second / 3)
 		defer ticker.Stop()
 		for {
@@ -272,7 +311,7 @@ func startStatusTicker(tw *Writer, spinner *statusSpinner, mu *sync.Mutex, conte
 			case <-ticker.C:
 				mu.Lock()
 				if *content != "" {
-					tw.UpdateLastLine(spinner.current() + " " + *content)
+					tw.UpdateLastLine(spinner.currentPrefix() + *content)
 				}
 				mu.Unlock()
 			case <-done:
@@ -280,7 +319,10 @@ func startStatusTicker(tw *Writer, spinner *statusSpinner, mu *sync.Mutex, conte
 			}
 		}
 	}()
-	return func() { close(done) }
+	return func() {
+		close(done)
+		<-exited
+	}
 }
 
 // runWithStatusLine runs a single command, streaming its stdout lines to the
@@ -298,7 +340,7 @@ func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, 
 		mu.Lock()
 		lastContent = line
 		spinner.Touch()
-		tw.UpdateLastLine(spinner.Frame() + " " + line)
+		tw.UpdateLastLine(spinner.prefix() + line)
 		mu.Unlock()
 	})
 
@@ -317,13 +359,14 @@ func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, 
 	return false
 }
 
-func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool) int {
+func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool, cfg execConfig) int {
 	tw := NewColorWriter(w, color)
 	tw.EnableTTYBuildLastLine()
 	total := len(args)
 	exitCode := 0
 	completed := 0
 	spinner := newStatusSpinner()
+	spinner.disabled = !cfg.spinner
 
 	var mu sync.Mutex
 	var lastContent string
@@ -331,7 +374,7 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 	renderParallel := func() {
 		spinner.Touch()
 		lastContent = parallelStatusLine(executor.Running(), completed, total, color)
-		tw.UpdateLastLine(spinner.Frame() + " " + lastContent)
+		tw.UpdateLastLine(spinner.prefix() + lastContent)
 	}
 
 	stopTicker := startStatusTicker(tw, spinner, &mu, &lastContent)

@@ -126,6 +126,7 @@ func registerCommands() *command.App {
 		Description: command.Description{Short: "Run a command for each argument sequentially and emit TAP-14"},
 		Params: []command.Param{
 			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
+			{Name: "no-spinner", Type: command.Bool, Description: "Hide the spinner prefix on status lines", Required: false},
 		},
 		RunCLI: handleExec,
 	})
@@ -136,6 +137,7 @@ func registerCommands() *command.App {
 		Params: []command.Param{
 			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
 			{Name: "jobs", Short: 'j', Type: command.Int, Description: "Max parallel jobs (0 = unlimited)", Required: false},
+			{Name: "no-spinner", Type: command.Bool, Description: "Hide the spinner prefix on status lines", Required: false},
 		},
 		RunCLI: handleExecParallel,
 	})
@@ -385,7 +387,8 @@ func handleReformat(_ context.Context, _ json.RawMessage) error {
 
 func handleExec(ctx context.Context, args json.RawMessage) error {
 	var params struct {
-		Verbose bool `json:"verbose"`
+		Verbose   bool `json:"verbose"`
+		NoSpinner bool `json:"no-spinner"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
@@ -397,7 +400,8 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 		if arg == "exec" {
 			rest := os.Args[i+1:]
 			for _, a := range rest {
-				if a == "-v" || a == "--verbose" {
+				if a == "-v" || a == "--verbose" ||
+					a == "--no-spinner" {
 					continue
 				}
 				cliArgs = append(cliArgs, a)
@@ -407,14 +411,14 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	}
 
 	if len(cliArgs) == 0 {
-		return fmt.Errorf("missing command\nusage: tap-dancer exec [--verbose] <cmd> [<arg1> <arg2> ...]")
+		return fmt.Errorf("missing command\nusage: tap-dancer exec [--verbose] [--no-spinner] <cmd> [<arg1> <arg2> ...]")
 	}
 
 	utility := cliArgs[0]
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, params.Verbose, color)
+	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, params.Verbose, color, tap.WithSpinner(!params.NoSpinner))
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -427,8 +431,9 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	// Use any for Jobs to tolerate the command framework assigning
 	// positional args (strings) to non-Bool params when -j is omitted.
 	var params struct {
-		Verbose bool `json:"verbose"`
-		Jobs    any  `json:"jobs"`
+		Verbose   bool `json:"verbose"`
+		Jobs      any  `json:"jobs"`
+		NoSpinner bool `json:"no-spinner"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
@@ -449,7 +454,8 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 			rest := os.Args[i+1:]
 			for j := 0; j < len(rest); j++ {
 				a := rest[j]
-				if a == "-v" || a == "--verbose" {
+				if a == "-v" || a == "--verbose" ||
+					a == "--no-spinner" {
 					continue
 				}
 				if (a == "-j" || a == "--jobs") && j+1 < len(rest) {
@@ -491,7 +497,7 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 
 	var exitCode int
 	if color {
-		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, params.Verbose, color)
+		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, params.Verbose, color, tap.WithSpinner(!params.NoSpinner))
 	} else {
 		results := executor.Run(ctx, template, execArgs)
 		exitCode = tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
