@@ -54,7 +54,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-0powqqEky+YH3CAVGoL0mowS4E42NM+Dem57RbiAheU=";
+      goVendorHash = "sha256-guti3AtrpFyIrJzhLawm6KohbELBqjrpka8ElNXlznY=";
 
       buildDevenvs =
         system:

@@ -374,12 +374,21 @@ func handleReformat(_ context.Context, _ json.RawMessage) error {
 }
 
 func handleExecParallel(ctx context.Context, args json.RawMessage) error {
+	// Use any for Jobs to tolerate the command framework assigning
+	// positional args (strings) to non-Bool params when -j is omitted.
 	var params struct {
 		Verbose bool `json:"verbose"`
-		Jobs    int  `json:"jobs"`
+		Jobs    any  `json:"jobs"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
+	}
+	var maxJobs int
+	switch v := params.Jobs.(type) {
+	case float64:
+		maxJobs = int(v)
+	default:
+		maxJobs = 0
 	}
 
 	// Parse CLI args: everything after "exec-parallel", excluding our flags,
@@ -428,7 +437,7 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	executor := &tap.GoroutineExecutor{MaxJobs: params.Jobs}
+	executor := &tap.GoroutineExecutor{MaxJobs: maxJobs}
 	results := executor.Run(ctx, template, execArgs)
 	exitCode := tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
 

@@ -111,6 +111,10 @@ test-grit-bats: build-batman
     nix build .#grit
     GRIT_BIN={{justfile_directory()}}/result/bin/grit PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/grit/zz-tests_bats/test
 
+test-tap-dancer-bats: build-batman
+    nix build .#tap-dancer
+    TAP_DANCER_BIN={{justfile_directory()}}/result/bin/tap-dancer PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/tap-dancer/zz-tests_bats/test
+
 test-batman-bats: build-batman
     BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
 
@@ -139,6 +143,7 @@ test: \
     test-lux \
     test-spinclass \
     test-spinclass-bats \
+    test-tap-dancer-bats \
     test-tap-dancer-go \
     test-tap-dancer-rust
 
