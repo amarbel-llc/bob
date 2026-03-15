@@ -12,6 +12,7 @@ import (
 
 	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
@@ -107,6 +108,36 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		if err := git.RunPassthroughEnv(wtPath, []string{"GIT_SEQUENCE_EDITOR=true"}, "rebase", defaultBranch, "-i"); err != nil {
 			log.Error("rebase failed, not merging")
 			return err
+		}
+	}
+
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		hierarchy, err := sweatfile.LoadHierarchy(home, repoPath)
+		if err == nil {
+			preMergeCmd := hierarchy.Merged.PreMergeHookCommand()
+			if preMergeCmd != nil && *preMergeCmd != "" {
+				if tw == nil {
+					log.Info("running pre-merge hook", "worktree", branch)
+				}
+
+				if err := hierarchy.Merged.RunPreMergeHook(wtPath); err != nil {
+					if tw != nil {
+						diag := map[string]string{"severity": "fail", "message": err.Error()}
+						tw.NotOk("pre-merge hook "+branch, diag)
+						if ownWriter {
+							tw.Plan()
+						}
+					} else {
+						log.Error("pre-merge hook failed, not merging")
+					}
+					return err
+				}
+
+				if tw != nil {
+					tw.Ok("pre-merge hook " + branch)
+				}
+			}
 		}
 	}
 

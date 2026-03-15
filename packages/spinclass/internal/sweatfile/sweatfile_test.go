@@ -465,6 +465,52 @@ func TestMergeHooksIndependentFields(t *testing.T) {
 	}
 }
 
+func TestParseHooksPreMerge(t *testing.T) {
+	input := `
+[hooks]
+pre-merge = "just test"
+`
+	sf, err := Parse([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sf.Hooks == nil || sf.Hooks.PreMerge == nil || *sf.Hooks.PreMerge != "just test" {
+		t.Errorf("hooks.pre-merge: got %v", sf.Hooks)
+	}
+}
+
+func TestMergeHooksPreMergeInherit(t *testing.T) {
+	cmd := "just test"
+	base := Sweatfile{Hooks: &Hooks{PreMerge: &cmd}}
+	repo := Sweatfile{}
+	merged := Merge(base, repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "just test" {
+		t.Errorf("expected inherited hooks.pre-merge, got %v", merged.Hooks)
+	}
+}
+
+func TestMergeHooksPreMergeOverride(t *testing.T) {
+	baseCmd := "just test"
+	repoCmd := "just lint"
+	base := Sweatfile{Hooks: &Hooks{PreMerge: &baseCmd}}
+	repo := Sweatfile{Hooks: &Hooks{PreMerge: &repoCmd}}
+	merged := Merge(base, repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "just lint" {
+		t.Errorf("expected overridden hooks.pre-merge, got %v", merged.Hooks)
+	}
+}
+
+func TestMergeHooksPreMergeClear(t *testing.T) {
+	baseCmd := "just test"
+	empty := ""
+	base := Sweatfile{Hooks: &Hooks{PreMerge: &baseCmd}}
+	repo := Sweatfile{Hooks: &Hooks{PreMerge: &empty}}
+	merged := Merge(base, repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "" {
+		t.Errorf("expected cleared hooks.pre-merge, got %v", merged.Hooks)
+	}
+}
+
 func TestLoadHierarchyRepoOverridesParent(t *testing.T) {
 	home := t.TempDir()
 	repoDir := filepath.Join(home, "eng", "repos", "myrepo")

@@ -625,3 +625,73 @@ func TestRunCreateHookEmptyStringIsNoop(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestRunPreMergeHookExecutes(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "pre-merge-ran")
+
+	cmd := "touch " + marker
+	sf := Sweatfile{Hooks: &Hooks{PreMerge: &cmd}}
+
+	err := sf.RunPreMergeHook(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := os.Stat(marker); os.IsNotExist(err) {
+		t.Error("expected pre-merge hook to run and create marker file")
+	}
+}
+
+func TestRunPreMergeHookReceivesWorktreeEnv(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "worktree-env")
+
+	cmd := "printenv WORKTREE > " + marker
+	sf := Sweatfile{Hooks: &Hooks{PreMerge: &cmd}}
+
+	err := sf.RunPreMergeHook(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("reading marker: %v", err)
+	}
+	if strings.TrimSpace(string(content)) != dir {
+		t.Errorf("expected WORKTREE=%s, got %q", dir, string(content))
+	}
+}
+
+func TestRunPreMergeHookFailureReturnsError(t *testing.T) {
+	dir := t.TempDir()
+
+	cmd := "exit 1"
+	sf := Sweatfile{Hooks: &Hooks{PreMerge: &cmd}}
+
+	err := sf.RunPreMergeHook(dir)
+	if err == nil {
+		t.Error("expected error from failing pre-merge hook")
+	}
+}
+
+func TestRunPreMergeHookNilIsNoop(t *testing.T) {
+	dir := t.TempDir()
+	sf := Sweatfile{}
+
+	err := sf.RunPreMergeHook(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunPreMergeHookEmptyStringIsNoop(t *testing.T) {
+	dir := t.TempDir()
+	empty := ""
+	sf := Sweatfile{Hooks: &Hooks{PreMerge: &empty}}
+
+	err := sf.RunPreMergeHook(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

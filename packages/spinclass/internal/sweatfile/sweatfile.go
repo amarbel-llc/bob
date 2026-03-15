@@ -15,6 +15,7 @@ import (
 type Hooks struct {
 	Create               *string `toml:"create"`
 	Stop                 *string `toml:"stop"`
+	PreMerge             *string `toml:"pre-merge"`
 	DisallowMainWorktree *bool   `toml:"disallow-main-worktree"`
 }
 
@@ -41,6 +42,13 @@ func (sf Sweatfile) CreateHookCommand() *string {
 		return nil
 	}
 	return sf.Hooks.Create
+}
+
+func (sf Sweatfile) PreMergeHookCommand() *string {
+	if sf.Hooks == nil {
+		return nil
+	}
+	return sf.Hooks.PreMerge
 }
 
 func (sf Sweatfile) DisallowMainWorktreeEnabled() bool {
