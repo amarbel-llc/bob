@@ -98,7 +98,7 @@ func removeWorktree(wt worktreeInfo) error {
 	if err := git.WorktreeRemove(wt.repoPath, wt.worktreePath); err != nil {
 		return fmt.Errorf("removing worktree %s: %w", wt.branch, err)
 	}
-	if err := git.BranchDelete(wt.repoPath, wt.branch); err != nil {
+	if _, err := git.BranchDelete(wt.repoPath, wt.branch); err != nil {
 		return fmt.Errorf("deleting branch %s: %w", wt.branch, err)
 	}
 	return nil
