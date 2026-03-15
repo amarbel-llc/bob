@@ -14,6 +14,7 @@ just test               # Run ALL tests (Go + Rust + BATS integration)
 just fmt                # Format code (Go, shell, Nix)
 nix flake check         # Nix-level validation
 just lint               # go vet ./...
+just go-mod-sync        # After ANY Go module change (see below)
 just vendor             # Regenerate go workspace vendor after dep changes
 just vendor-hash        # Recompute goVendorHash in flake.nix from vendor/
 just deps               # go work sync + go work vendor
@@ -65,6 +66,8 @@ nix build .#tap-dancer
 All Go packages share a single `go.work` workspace. Modules: `packages/{grit,get-hubbed,lux,mgp,potato,spinclass}`, `packages/tap-dancer/go`, `dummies/go`.
 
 In Nix, all Go packages share a single `goWorkspaceSrc` and `goVendorHash` in `flake.nix`. The vendor hash only covers external dependencies --- local code changes never require recomputing it. Run `just vendor-hash` only after adding/removing external dependencies.
+
+**After any Go module change** (adding/removing deps, changing module paths, editing `go.mod` or `go.work`), run `just go-mod-sync`. This syncs the workspace, re-vendors, recomputes the Nix vendor hash, and verifies the build. It uses the standalone `#go` devShell to avoid a chicken-and-egg problem: the default devShell builds all packages (requiring a valid vendor hash), but the vendor hash can't be computed until vendoring is done. The individual `just vendor`, `just deps`, and `just vendor-hash` recipes also use `#go` for the same reason.
 
 ### Rust Workspace
 

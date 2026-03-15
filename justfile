@@ -1,5 +1,6 @@
 
 cmd_nix_dev := "nix develop " + justfile_directory() + " --command "
+cmd_nix_dev_go := "nix develop " + justfile_directory() + "#go --command "
 cmd_batman_bats := justfile_directory() + "/result-batman/bin/bats"
 
 default: build test
@@ -73,12 +74,12 @@ lint:
 
 # Regenerate workspace vendor directory after dependency changes
 vendor:
-    {{cmd_nix_dev}} go work vendor
+    {{cmd_nix_dev_go}} go work vendor
 
 # Update go dependencies, tidy all modules, and re-vendor
 deps:
-    {{cmd_nix_dev}} go work sync
-    {{cmd_nix_dev}} go work vendor
+    {{cmd_nix_dev_go}} go work sync
+    {{cmd_nix_dev_go}} go work vendor
 
 # Recompute goVendorHash in flake.nix from the local vendor directory
 vendor-hash:
@@ -87,6 +88,27 @@ vendor-hash:
     hash=$(nix hash path vendor/)
     sed -i -E 's|(goVendorHash = )"sha256-[^"]+";|\1"'"$hash"'";|' flake.nix
     echo "updated goVendorHash to $hash"
+
+# Sync Go vendor directory and Nix vendor hash after any Go module change.
+# Use after: adding/removing deps, changing module paths, editing go.mod/go.work.
+# Uses the standalone Go devShell (#go) to avoid the chicken-and-egg problem
+# where the default devShell requires a successful nix build, but nix build
+# requires a correct vendor hash.
+go-mod-sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    nix_go="nix develop {{justfile_directory()}}#go --command"
+    echo "==> go work sync"
+    $nix_go go work sync
+    echo "==> go work vendor"
+    $nix_go go work vendor
+    echo "==> recomputing goVendorHash"
+    hash=$(nix hash path vendor/)
+    sed -i -E 's|(goVendorHash = )"sha256-[^"]+";|\1"'"$hash"'";|' flake.nix
+    echo "updated goVendorHash to $hash"
+    echo "==> nix build (verify)"
+    nix build --show-trace
+    echo "==> done"
 
 # Run integration tests
 test-integration: build-batman
