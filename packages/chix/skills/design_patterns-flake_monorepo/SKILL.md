@@ -110,7 +110,7 @@ This keeps `nix develop ./devenvs/go` and direnv working independently.
         result = import ./default.nix { inherit pkgs pkgs-master gomod2nix; };
       in {
         inherit (result) packages;
-        devShells.default = result.devShell;
+        devShells.default = result.devShells.default;
       }
     );
 }
@@ -163,9 +163,9 @@ top-level inputs.
         let devenvs = buildDevenvs system; in {
           devShells = {
             default = /* compose from devenvs */;
-            go = devenvs.go.devShell;
-            shell = devenvs.shell.devShell;
-            rust = devenvs.rust.devShell;
+            go = devenvs.go.devShells.default;
+            shell = devenvs.shell.devShells.default;
+            rust = devenvs.rust.devShells.default;
           };
           overlays.go = devenvs.go.overlay;
         }

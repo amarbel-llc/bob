@@ -207,7 +207,7 @@ Each `flake.nix` became a 3-line body that delegates to `default.nix`:
         result = import ./default.nix { inherit pkgs pkgs-master gomod2nix; };
       in {
         inherit (result) packages;
-        devShells.default = result.devShell;
+        devShells.default = result.devShells.default;
       }
     ));
 }
@@ -260,10 +260,10 @@ buildDevenvs = system:
 # devShellInputsFrom (was: go.devShells.${system}.default)
 devShellInputsFrom = system:
   let devenvs = buildDevenvs system; in [
-    devenvs.go.devShell
-    devenvs.shell.devShell
-    devenvs.bats.devShell
-    devenvs.rust.devShell
+    devenvs.go.devShells.default
+    devenvs.shell.devShells.default
+    devenvs.bats.devShells.default
+    devenvs.rust.devShells.default
   ];
 ```
 
@@ -277,10 +277,10 @@ for that pattern.
 ```nix
 devShells = {
   default = marketplaceOutputs.devShells.${system}.default;
-  go = devenvs.go.devShell;
-  shell = devenvs.shell.devShell;
-  bats = devenvs.bats.devShell;
-  rust = devenvs.rust.devShell;
+  go = devenvs.go.devShells.default;
+  shell = devenvs.shell.devShells.default;
+  bats = devenvs.bats.devShells.default;
+  rust = devenvs.rust.devShells.default;
 };
 ```
 
