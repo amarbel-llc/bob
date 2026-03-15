@@ -187,7 +187,7 @@ func closeShop(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, fo
 	isClean := worktreeStatus == ""
 
 	if isClean && mergeOnClose {
-		err := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, verbose)
+		err := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, false, verbose)
 		if tw != nil {
 			tw.Plan()
 		}
@@ -213,7 +213,7 @@ func closeShop(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, fo
 					}
 					return discardErr
 				}
-				mergeErr := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, verbose)
+				mergeErr := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, false, verbose)
 				if tw != nil {
 					tw.Plan()
 				}
@@ -230,7 +230,7 @@ func closeShop(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, fo
 				worktreeStatus = git.StatusPorcelain(rp.AbsPath)
 				isClean = worktreeStatus == ""
 				if isClean {
-					mergeErr := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, verbose)
+					mergeErr := merge.Resolved(exec, w, tw, format, rp.RepoPath, rp.AbsPath, rp.Branch, defaultBranch, false, false, verbose)
 					if tw != nil {
 						tw.Plan()
 					}

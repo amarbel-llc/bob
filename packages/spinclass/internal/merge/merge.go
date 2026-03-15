@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/log"
@@ -24,6 +25,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 	}
 
 	var repoPath, wtPath, branch string
+	inSession := false
 
 	if worktree.IsWorktree(cwd) && target == "" {
 		repoPath, err = git.CommonDir(cwd)
@@ -35,6 +37,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		if err != nil {
 			return fmt.Errorf("could not determine current branch: %w", err)
 		}
+		inSession = isInsideSession(cwd, wtPath)
 	} else {
 		if worktree.IsWorktree(cwd) {
 			repoPath, err = git.CommonDir(cwd)
@@ -60,10 +63,10 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		return err
 	}
 
-	return Resolved(execr, os.Stdout, nil, format, repoPath, wtPath, branch, defaultBranch, gitSync, verbose)
+	return Resolved(execr, os.Stdout, nil, format, repoPath, wtPath, branch, defaultBranch, gitSync, inSession, verbose)
 }
 
-func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repoPath, wtPath, branch, defaultBranch string, gitSync bool, verbose bool) error {
+func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repoPath, wtPath, branch, defaultBranch string, gitSync bool, inSession bool, verbose bool) error {
 	if info, err := os.Stat(repoPath); err != nil || !info.IsDir() {
 		return fmt.Errorf("repository not found: %s", repoPath)
 	}
@@ -170,59 +173,61 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		}
 	}
 
-	if tw == nil {
-		log.Info("removing worktree", "path", wtPath)
-	}
-
-	if tw != nil {
-		out, err := git.Run(repoPath, "worktree", "remove", wtPath)
-		if err != nil {
-			diag := map[string]string{"severity": "fail", "message": err.Error()}
-			if out != "" {
-				diag["output"] = out
-			}
-			tw.NotOk("remove worktree "+branch, diag)
-			if ownWriter {
-				tw.Plan()
-			}
-			return err
+	if !inSession {
+		if tw == nil {
+			log.Info("removing worktree", "path", wtPath)
 		}
-		if verbose && out != "" {
-			tw.OkDiag("remove worktree "+branch, &tap.Diagnostics{Extras: map[string]any{"output": out}})
+
+		if tw != nil {
+			out, err := git.Run(repoPath, "worktree", "remove", wtPath)
+			if err != nil {
+				diag := map[string]string{"severity": "fail", "message": err.Error()}
+				if out != "" {
+					diag["output"] = out
+				}
+				tw.NotOk("remove worktree "+branch, diag)
+				if ownWriter {
+					tw.Plan()
+				}
+				return err
+			}
+			if verbose && out != "" {
+				tw.OkDiag("remove worktree "+branch, &tap.Diagnostics{Extras: map[string]any{"output": out}})
+			} else {
+				tw.Ok("remove worktree " + branch)
+			}
 		} else {
-			tw.Ok("remove worktree " + branch)
-		}
-	} else {
-		if err := git.RunPassthrough(repoPath, "worktree", "remove", wtPath); err != nil {
-			return err
-		}
-	}
-
-	if tw == nil {
-		log.Info("deleting branch", "branch", branch)
-	}
-
-	if tw != nil {
-		out, err := git.BranchDelete(repoPath, branch)
-		if err != nil {
-			diag := map[string]string{"severity": "fail", "message": err.Error()}
-			if out != "" {
-				diag["output"] = out
+			if err := git.RunPassthrough(repoPath, "worktree", "remove", wtPath); err != nil {
+				return err
 			}
-			tw.NotOk("delete branch "+branch, diag)
-			if ownWriter {
-				tw.Plan()
-			}
-			return err
 		}
-		if verbose && out != "" {
-			tw.OkDiag("delete branch "+branch, &tap.Diagnostics{Extras: map[string]any{"output": out}})
+
+		if tw == nil {
+			log.Info("deleting branch", "branch", branch)
+		}
+
+		if tw != nil {
+			out, err := git.BranchDelete(repoPath, branch)
+			if err != nil {
+				diag := map[string]string{"severity": "fail", "message": err.Error()}
+				if out != "" {
+					diag["output"] = out
+				}
+				tw.NotOk("delete branch "+branch, diag)
+				if ownWriter {
+					tw.Plan()
+				}
+				return err
+			}
+			if verbose && out != "" {
+				tw.OkDiag("delete branch "+branch, &tap.Diagnostics{Extras: map[string]any{"output": out}})
+			} else {
+				tw.Ok("delete branch " + branch)
+			}
 		} else {
-			tw.Ok("delete branch " + branch)
-		}
-	} else {
-		if _, err := git.BranchDelete(repoPath, branch); err != nil {
-			return err
+			if _, err := git.BranchDelete(repoPath, branch); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -288,11 +293,30 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		tw.Plan()
 	}
 
+	if inSession {
+		return nil
+	}
+
 	if tw == nil {
 		log.Info("detaching from session")
 	}
 
 	return execr.Detach()
+}
+
+// isInsideSession returns true when both SPINCLASS_SESSION is set and cwd is
+// within the worktree directory. Both checks are required to avoid false
+// positives from stale env vars or running merge from a different location.
+func isInsideSession(cwd, wtPath string) bool {
+	session := os.Getenv("SPINCLASS_SESSION")
+	if session == "" {
+		return false
+	}
+
+	cleanCwd := filepath.Clean(cwd)
+	cleanWt := filepath.Clean(wtPath)
+
+	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
 }
 
 func resolveWorktree(repoPath, target string) (wtPath, branch string, err error) {

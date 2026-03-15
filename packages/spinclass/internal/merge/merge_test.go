@@ -85,7 +85,7 @@ func TestResolvedMergesAndRemovesWorktree(t *testing.T) {
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
 
-	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-merge", "main", false, false)
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-merge", "main", false, false, false)
 	if err != nil {
 		t.Fatalf("Resolved() error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestResolvedTapOutput(t *testing.T) {
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
 
-	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-tap", "main", false, false)
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-tap", "main", false, false, false)
 	if err != nil {
 		t.Fatalf("Resolved() error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestResolvedGitSyncTapOutput(t *testing.T) {
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
 
-	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-sync", "main", true, false)
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-sync", "main", true, false, false)
 	if err != nil {
 		t.Fatalf("Resolved() error: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestResolvedRepoNotFound(t *testing.T) {
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
 
-	err := Resolved(mock, &buf, nil, "tap", "/nonexistent/path", "/nonexistent/wt", "feature", "main", false, false)
+	err := Resolved(mock, &buf, nil, "tap", "/nonexistent/path", "/nonexistent/wt", "feature", "main", false, false, false)
 	if err == nil {
 		t.Error("expected error for nonexistent repo, got nil")
 	}
@@ -275,11 +275,139 @@ func TestResolvedDivergedBranch(t *testing.T) {
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
 
-	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-diverge", "main", false, false)
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-diverge", "main", false, false, false)
 	if err == nil {
 		t.Error("expected error for conflicting rebase, got nil")
 	}
 
 	// Abort the rebase to clean up
 	exec.Command("git", "-C", wtPath, "rebase", "--abort").Run()
+}
+
+func TestResolvedInSessionSkipsCleanup(t *testing.T) {
+	repoDir := setupRepo(t)
+
+	wtDir := filepath.Join(repoDir, ".worktrees")
+	if err := os.MkdirAll(wtDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wtPath := filepath.Join(wtDir, "feature-insession")
+	runGit(t, repoDir, "worktree", "add", "-b", "feature-insession", wtPath)
+
+	if err := os.WriteFile(filepath.Join(wtPath, "session.txt"), []byte("session"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, wtPath, "add", "session.txt")
+	runGit(t, wtPath, "commit", "-m", "session commit")
+
+	mock := &mockExecutor{}
+	var buf bytes.Buffer
+
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-insession", "main", false, true, false)
+	if err != nil {
+		t.Fatalf("Resolved() error: %v", err)
+	}
+
+	// Commit should be on main
+	mainLog := runGit(t, repoDir, "log", "--oneline")
+	if !strings.Contains(mainLog, "session commit") {
+		t.Errorf("expected commit on main, got: %s", mainLog)
+	}
+
+	// Worktree should still exist (not removed)
+	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+		t.Error("expected worktree to still exist in session mode")
+	}
+
+	// Branch should still exist (not deleted)
+	branchCheck := exec.Command("git", "-C", repoDir, "rev-parse", "--verify", "refs/heads/feature-insession")
+	if err := branchCheck.Run(); err != nil {
+		t.Error("expected branch to still exist in session mode")
+	}
+
+	// Detach should NOT have been called
+	if mock.detachCalled {
+		t.Error("expected Detach() to NOT be called in session mode")
+	}
+}
+
+func TestResolvedInSessionTapOutput(t *testing.T) {
+	repoDir := setupRepo(t)
+
+	wtDir := filepath.Join(repoDir, ".worktrees")
+	if err := os.MkdirAll(wtDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wtPath := filepath.Join(wtDir, "feature-session-tap")
+	runGit(t, repoDir, "worktree", "add", "-b", "feature-session-tap", wtPath)
+
+	if err := os.WriteFile(filepath.Join(wtPath, "tap.txt"), []byte("tap"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, wtPath, "add", "tap.txt")
+	runGit(t, wtPath, "commit", "-m", "session tap commit")
+
+	mock := &mockExecutor{}
+	var buf bytes.Buffer
+
+	err := Resolved(mock, &buf, nil, "tap", repoDir, wtPath, "feature-session-tap", "main", false, true, false)
+	if err != nil {
+		t.Fatalf("Resolved() error: %v", err)
+	}
+
+	got := buf.String()
+
+	if !strings.Contains(got, "ok 1 - rebase feature-session-tap") {
+		t.Errorf("expected rebase test point, got: %q", got)
+	}
+	if !strings.Contains(got, "ok 2 - merge feature-session-tap") {
+		t.Errorf("expected merge test point, got: %q", got)
+	}
+	// Should NOT contain worktree removal or branch deletion
+	if strings.Contains(got, "remove worktree") {
+		t.Errorf("did not expect remove worktree in session mode, got: %q", got)
+	}
+	if strings.Contains(got, "delete branch") {
+		t.Errorf("did not expect delete branch in session mode, got: %q", got)
+	}
+	if !strings.Contains(got, "1..2") {
+		t.Errorf("expected plan 1..2, got: %q", got)
+	}
+}
+
+func TestIsInsideSession(t *testing.T) {
+	t.Run("no env var", func(t *testing.T) {
+		t.Setenv("SPINCLASS_SESSION", "")
+		if isInsideSession("/tmp/repo/.worktrees/branch", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected false when SPINCLASS_SESSION is empty")
+		}
+	})
+
+	t.Run("env set and cwd matches wtPath", func(t *testing.T) {
+		t.Setenv("SPINCLASS_SESSION", "repo/branch")
+		if !isInsideSession("/tmp/repo/.worktrees/branch", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected true when cwd equals wtPath")
+		}
+	})
+
+	t.Run("env set and cwd is subdirectory", func(t *testing.T) {
+		t.Setenv("SPINCLASS_SESSION", "repo/branch")
+		if !isInsideSession("/tmp/repo/.worktrees/branch/src/pkg", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected true when cwd is inside wtPath")
+		}
+	})
+
+	t.Run("env set but cwd is outside wtPath", func(t *testing.T) {
+		t.Setenv("SPINCLASS_SESSION", "repo/branch")
+		if isInsideSession("/tmp/other-repo", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected false when cwd is outside wtPath")
+		}
+	})
+
+	t.Run("env set but cwd is sibling prefix", func(t *testing.T) {
+		t.Setenv("SPINCLASS_SESSION", "repo/branch")
+		if isInsideSession("/tmp/repo/.worktrees/branch-other", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected false for sibling path that shares prefix")
+		}
+	})
 }
