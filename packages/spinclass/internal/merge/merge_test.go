@@ -101,6 +101,12 @@ func TestResolvedMergesAndRemovesWorktree(t *testing.T) {
 		t.Errorf("expected worktree to be removed, but it still exists")
 	}
 
+	// Branch should be deleted
+	branchCheck := exec.Command("git", "-C", repoDir, "rev-parse", "--verify", "refs/heads/feature-merge")
+	if err := branchCheck.Run(); err == nil {
+		t.Error("expected branch feature-merge to be deleted, but it still exists")
+	}
+
 	// Detach should have been called
 	if !mock.detachCalled {
 		t.Error("expected Detach() to be called")
@@ -148,8 +154,11 @@ func TestResolvedTapOutput(t *testing.T) {
 	if !strings.Contains(got, "ok 3 - remove worktree feature-tap") {
 		t.Errorf("expected remove worktree test point, got: %q", got)
 	}
-	if !strings.Contains(got, "1..3") {
-		t.Errorf("expected plan 1..3, got: %q", got)
+	if !strings.Contains(got, "ok 4 - delete branch feature-tap") {
+		t.Errorf("expected delete branch test point, got: %q", got)
+	}
+	if !strings.Contains(got, "1..4") {
+		t.Errorf("expected plan 1..4, got: %q", got)
 	}
 }
 
@@ -212,14 +221,17 @@ func TestResolvedGitSyncTapOutput(t *testing.T) {
 	if !strings.Contains(got, "ok 3 - remove worktree feature-sync") {
 		t.Errorf("expected remove worktree test point, got: %q", got)
 	}
-	if !strings.Contains(got, "ok 4 - pull") {
+	if !strings.Contains(got, "ok 4 - delete branch feature-sync") {
+		t.Errorf("expected delete branch test point, got: %q", got)
+	}
+	if !strings.Contains(got, "ok 5 - pull") {
 		t.Errorf("expected pull test point, got: %q", got)
 	}
-	if !strings.Contains(got, "ok 5 - push") {
+	if !strings.Contains(got, "ok 6 - push") {
 		t.Errorf("expected push test point, got: %q", got)
 	}
-	if !strings.Contains(got, "1..5") {
-		t.Errorf("expected plan 1..5, got: %q", got)
+	if !strings.Contains(got, "1..6") {
+		t.Errorf("expected plan 1..6, got: %q", got)
 	}
 }
 

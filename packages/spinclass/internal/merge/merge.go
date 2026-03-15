@@ -167,6 +167,34 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		}
 	}
 
+	if tw == nil {
+		log.Info("deleting branch", "branch", branch)
+	}
+
+	if tw != nil {
+		out, err := git.Run(repoPath, "branch", "-d", branch)
+		if err != nil {
+			diag := map[string]string{"severity": "fail", "message": err.Error()}
+			if out != "" {
+				diag["output"] = out
+			}
+			tw.NotOk("delete branch "+branch, diag)
+			if ownWriter {
+				tw.Plan()
+			}
+			return err
+		}
+		if verbose && out != "" {
+			tw.OkDiag("delete branch "+branch, &tap.Diagnostics{Extras: map[string]any{"output": out}})
+		} else {
+			tw.Ok("delete branch " + branch)
+		}
+	} else {
+		if err := git.BranchDelete(repoPath, branch); err != nil {
+			return err
+		}
+	}
+
 	if gitSync {
 		if tw == nil {
 			log.Info("pulling", "repo", repoPath)
