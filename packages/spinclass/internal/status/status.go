@@ -158,7 +158,6 @@ var (
 	styleRemoteDrift = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	styleRemoteNone  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	styleSession     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	styleDim         = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 type renderRow struct {
@@ -272,7 +271,7 @@ func Render(repos []RepoStatus) string {
 
 		var styledPrefix string
 		if strings.Contains(r.prefix, "├") || strings.Contains(r.prefix, "└") {
-			styledPrefix = styleDim.Render(prefix)
+			styledPrefix = prefix
 		} else {
 			styledPrefix = styleRepo.Render(prefix)
 		}
