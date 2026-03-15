@@ -18,6 +18,9 @@ just go-mod-sync        # After ANY Go module change (see below)
 just vendor             # Regenerate go workspace vendor after dep changes
 just vendor-hash        # Recompute goVendorHash in flake.nix from vendor/
 just deps               # go work sync + go work vendor
+
+# EXPERIMENTAL
+just release-tap-dancer 0.2.0  # Bump versions, build, commit, tag (does not push)
 ```
 
 ### Running Individual Tests
