@@ -65,7 +65,9 @@ nix build .#tap-dancer
 
 All Go packages share a single `go.work` workspace. Modules: `packages/{grit,get-hubbed,lux,mgp,potato,spinclass}`, `packages/tap-dancer/go`, `dummies/go`.
 
-In Nix, all Go packages share a single `goWorkspaceSrc` and `goVendorHash` in `flake.nix`. The vendor hash only covers external dependencies --- local code changes never require recomputing it. Run `just vendor-hash` only after adding/removing external dependencies.
+The `vendor/` directory is **intentionally gitignored**. It exists only for local IDE/tooling use and for computing the Nix vendor hash via `nix hash path vendor/`. It will never appear in `git status` or `git diff` --- this is expected. The Nix build independently re-vendors inside the sandbox using `go work vendor -e` (see `mkGoWorkspaceModule.nix`); the local vendor directory is never copied into the Nix store.
+
+All Go packages share a single `goWorkspaceSrc` and `goVendorHash` in `flake.nix`. The vendor hash only covers external dependencies --- local code changes never require recomputing it. Run `just vendor-hash` only after adding/removing external dependencies.
 
 **After any Go module change** (adding/removing deps, changing module paths, editing `go.mod` or `go.work`), run `just go-mod-sync`. This syncs the workspace, re-vendors, recomputes the Nix vendor hash, and verifies the build. It uses the standalone `#go` devShell to avoid a chicken-and-egg problem: the default devShell builds all packages (requiring a valid vendor hash), but the vendor hash can't be computed until vendoring is done. The individual `just vendor`, `just deps`, and `just vendor-hash` recipes also use `#go` for the same reason.
 
