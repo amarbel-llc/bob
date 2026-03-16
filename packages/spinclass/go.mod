@@ -7,7 +7,7 @@ replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.0.0-20260222022802-be680fd2b4ac
-	github.com/charmbracelet/huh v0.8.0
+	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v0.4.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
