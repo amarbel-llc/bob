@@ -31,6 +31,14 @@ func main() {
 	}
 
 	if len(os.Args) >= 2 && os.Args[1] == "clone" {
+		if len(os.Args) >= 3 && (os.Args[2] == "-h" || os.Args[2] == "--help") {
+			fmt.Println("Usage: get-hubbed clone [dir]")
+			fmt.Println()
+			fmt.Println("Clone uncloned repos for the authenticated GitHub user.")
+			fmt.Println("Defaults to current directory if dir is omitted.")
+			os.Exit(0)
+		}
+
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
 
