@@ -9,6 +9,7 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
+	"github.com/friedenberg/get-hubbed/internal/clone"
 	"github.com/friedenberg/get-hubbed/internal/tools"
 )
 
@@ -29,13 +30,29 @@ func main() {
 		return
 	}
 
+	if len(os.Args) >= 2 && os.Args[1] == "clone" {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+
+		targetDir := "."
+		if len(os.Args) >= 3 {
+			targetDir = os.Args[2]
+		}
+
+		if err := clone.Run(ctx, targetDir); err != nil {
+			log.Fatalf("clone: %v", err)
+		}
+		return
+	}
+
 	for _, arg := range os.Args[1:] {
 		if arg == "-h" || arg == "--help" {
 			fmt.Println("get-hubbed - a GitHub MCP server wrapping the gh CLI")
 			fmt.Println()
-			fmt.Println("Usage: get-hubbed")
+			fmt.Println("Usage:")
+			fmt.Println("  get-hubbed              Start MCP server (stdio)")
+			fmt.Println("  get-hubbed clone [dir]   Clone uncloned repos for authenticated user")
 			fmt.Println()
-			fmt.Println("Runs an MCP server over stdio that exposes GitHub operations as tools.")
 			os.Exit(0)
 		}
 	}
