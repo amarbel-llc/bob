@@ -3,6 +3,7 @@ package clone
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,6 +52,7 @@ func fetchUserRepos(ctx context.Context) ([]repo, error) {
 func isCloned(ctx context.Context, targetDir, repoName string) bool {
 	dir := filepath.Join(targetDir, repoName)
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--git-dir")
+	cmd.Stderr = io.Discard
 	return cmd.Run() == nil
 }
 
