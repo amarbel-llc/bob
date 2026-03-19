@@ -58,15 +58,30 @@ func TestResourceHookCompoundCommand(t *testing.T) {
 	}
 }
 
-func TestResourceHookNoMatch(t *testing.T) {
+func TestResourceHookCatchAllGit(t *testing.T) {
 	input := makeHookInput("Bash", map[string]any{"command": "git commit -m 'foo'"})
 	var out bytes.Buffer
 	handled, err := HandleResourceHook(input, &out)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !handled {
+		t.Fatal("expected hook to deny git commit via catch-all")
+	}
+	if !strings.Contains(out.String(), "All git commands are blocked") {
+		t.Errorf("expected catch-all deny message, got %q", out.String())
+	}
+}
+
+func TestResourceHookNoMatchNonGit(t *testing.T) {
+	input := makeHookInput("Bash", map[string]any{"command": "ls -la"})
+	var out bytes.Buffer
+	handled, err := HandleResourceHook(input, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if handled {
-		t.Fatal("expected hook to not handle git commit")
+		t.Fatal("expected hook to not handle non-git command")
 	}
 	if out.Len() != 0 {
 		t.Errorf("expected no output, got %q", out.String())

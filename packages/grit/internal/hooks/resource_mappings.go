@@ -63,7 +63,27 @@ func HandleResourceHook(input []byte, w io.Writer) (bool, error) {
 		}
 	}
 
+	for _, cmd := range normalized {
+		if strings.HasPrefix(cmd, "git ") || cmd == "git" {
+			return true, writeDenyAllGit(w)
+		}
+	}
+
 	return false, nil
+}
+
+func writeDenyAllGit(w io.Writer) error {
+	reason := "All git commands are blocked. Use grit's MCP tools and resources exclusively.\nSubagents: use mcp__plugin_grit_grit__ tools (e.g. commit, diff, add) or mcp__plugin_grit_grit__resource-read for read-only operations."
+
+	output := map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreToolUse",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": reason,
+		},
+	}
+
+	return json.NewEncoder(w).Encode(output)
 }
 
 func writeDeny(w io.Writer, m resourceMapping) error {
