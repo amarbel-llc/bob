@@ -57,7 +57,7 @@ nix build .#tap-dancer
 ## Terminology
 
 - **Package** (not "plugin") --- the user-facing term. Three flavors:
-  - **MCP package** --- MCP server only (grit, get-hubbed, lux, mgp)
+  - **MCP package** --- MCP server only (grit, get-hubbed, lux)
   - **Skill package** --- Skill only (robin, tap-dancer, bob skills)
   - **MCP + Skill package** --- Both (chix)
 - **Marketplace** --- aggregated `symlinkJoin` output with `marketplace.json`
@@ -66,7 +66,7 @@ nix build .#tap-dancer
 
 ### Go Workspace
 
-All Go packages share a single `go.work` workspace. Modules: `packages/{grit,get-hubbed,lux,mgp,potato,spinclass}`, `packages/tap-dancer/go`, `dummies/go`.
+All Go packages share a single `go.work` workspace. Modules: `packages/{grit,get-hubbed,lux,potato,spinclass}`, `packages/tap-dancer/go`, `dummies/go`.
 
 The `vendor/` directory is **intentionally gitignored**. It exists only for local IDE/tooling use and for computing the Nix vendor hash via `nix hash path vendor/`. It will never appear in `git status` or `git diff` --- this is expected. The Nix build independently re-vendors inside the sandbox using `go work vendor -e` (see `mkGoWorkspaceModule.nix`); the local vendor directory is never copied into the Nix store.
 
@@ -98,7 +98,7 @@ Skills live in `skills/<name>/SKILL.md` with YAML frontmatter. Skills MAY have `
 
 | Directory | Purpose |
 |-----------|---------|
-| `packages/` | All packages (grit, get-hubbed, lux, mgp, chix, batman, tap-dancer, spinclass, potato, sandcastle, and-so-can-you-repo) |
+| `packages/` | All packages (grit, get-hubbed, lux, chix, batman, tap-dancer, spinclass, potato, sandcastle, and-so-can-you-repo) |
 | `skills/` | 22 general-purpose skills (workflow, documentation, debugging) |
 | `lib/packages/` | Nix build expressions for each package |
 | `devenvs/` | Dev shells (go, rust, shell, bats) |

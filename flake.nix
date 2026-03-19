@@ -54,7 +54,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-PyuIDFgVsx8MjJdCxEMSM6mVHSR/i3H3pZZ/+Fz3c0I=";
+      goVendorHash = "sha256-lIvXsYsOBQFgOe1tR86htORAVrl9VYrjehr9eZCJgLA=";
 
       buildDevenvs =
         system:
@@ -139,10 +139,6 @@
             inherit pkgs goWorkspaceSrc goVendorHash;
           };
 
-          mgpPkg = import ./lib/packages/mgp.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
-          };
-
           chixPkg = import ./lib/packages/chix.nix {
             inherit
               pkgs
@@ -179,7 +175,6 @@
             gritPkg
             get-hubbed-wrapped
             luxPkg
-            mgpPkg
             chixPkg
             tapDancerPkgs
             batmanPkgs
@@ -208,7 +203,6 @@
           [
             pkgs.gritPkg
             pkgs.luxPkg
-            pkgs.mgpPkg
             pkgs.chixPkg
             pkgs.get-hubbed-wrapped
             pkgs.batmanPkgs.robin
@@ -271,7 +265,6 @@
               grit = localPkgs.gritPkg;
               get-hubbed = localPkgs.get-hubbed-wrapped;
               lux = localPkgs.luxPkg;
-              mgp = localPkgs.mgpPkg;
               chix = localPkgs.chixPkg;
               robin = localPkgs.batmanPkgs.robin;
               batman = localPkgs.batmanPkgs.default;
@@ -286,7 +279,6 @@
                   localPkgs.gritPkg
                   localPkgs.get-hubbed-wrapped
                   localPkgs.luxPkg
-                  localPkgs.mgpPkg
                   localPkgs.chixPkg
                 ];
               };
