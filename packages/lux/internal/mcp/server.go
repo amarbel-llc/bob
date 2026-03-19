@@ -109,29 +109,47 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	mcpApp.MCPArgs = []string{"mcp-stdio"}
 
 	mcpApp.AddCommand(&command.Command{
-		Name: "read_resource",
+		Name: "resource-templates",
 		Description: command.Description{
-			Short: `Read an LSP resource by URI. Use resources/list and resources/templates/list to discover available resources.
+			Short: "List available lux resource templates. Call this first to discover what LSP resources are available, then use resource-read to access them.",
+		},
+		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+			templates, err := resProvider.ListResourceTemplates(ctx)
+			if err != nil {
+				return command.TextErrorResult(err.Error()), nil
+			}
 
-Available resource templates:
-- lux://lsp/hover?uri={file_uri}&line={line}&character={character} — type info, docs, signatures
-- lux://lsp/definition?uri={file_uri}&line={line}&character={character} — jump to definition
-- lux://lsp/references?uri={file_uri}&line={line}&character={character} — find all usages
-- lux://lsp/completion?uri={file_uri}&line={line}&character={character} — code completions
-- lux://lsp/document-symbols?uri={file_uri} — file outline (functions, types, etc.)
-- lux://lsp/diagnostics?uri={file_uri} — compiler/linter errors and warnings
-- lux://lsp/format?uri={file_uri} — formatting edits
-- lux://lsp/code-action?uri={file_uri}&start_line={sl}&start_character={sc}&end_line={el}&end_character={ec} — suggested fixes
-- lux://lsp/rename?uri={file_uri}&line={line}&character={character}&new_name={name} — semantic rename
-- lux://lsp/workspace-symbols?uri={file_uri}&query={pattern} — search symbols by name
-- lux://status — LSP server status
-- lux://languages — supported languages
-- lux://files — project files matching LSP extensions
+			resources, err := resProvider.ListResources(ctx)
+			if err != nil {
+				return command.TextErrorResult(err.Error()), nil
+			}
 
-File URIs must be file:// URIs (e.g., file:///path/to/file.go). Line and character are 0-indexed.`,
+			var sb strings.Builder
+			sb.WriteString("Resource templates (fill in {placeholders} and pass to resource-read):\n\n")
+			for _, t := range templates {
+				fmt.Fprintf(&sb, "- %s: %s\n  %s\n", t.Name, t.URITemplate, t.Description)
+			}
+
+			if len(resources) > 0 {
+				sb.WriteString("\nStatic resources (pass URI directly to resource-read):\n\n")
+				for _, r := range resources {
+					fmt.Fprintf(&sb, "- %s: %s\n  %s\n", r.Name, r.URI, r.Description)
+				}
+			}
+
+			sb.WriteString("\nFile URIs must be file:// URIs (e.g., file:///path/to/file.go). Line and character are 0-indexed.")
+
+			return command.TextResult(sb.String()), nil
+		},
+	})
+
+	mcpApp.AddCommand(&command.Command{
+		Name: "resource-read",
+		Description: command.Description{
+			Short: "Read a lux resource by URI. This tool exists because subagents cannot access MCP resources directly (forwarded resource permissions are not yet supported). Call resource-templates to discover available URIs.",
 		},
 		Params: []command.Param{
-			{Name: "uri", Type: command.String, Description: "Resource URI to read (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
+			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
 		},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			var a struct {
