@@ -33,7 +33,7 @@ func main() {
 
 	flag.Parse()
 
-	app, _ := tools.RegisterAll()
+	app, resProvider := tools.RegisterAll()
 
 	if flag.NArg() >= 1 && flag.Arg(0) == "generate-plugin" {
 		if err := app.HandleGeneratePlugin(flag.Args()[1:], os.Stdout); err != nil {
@@ -75,12 +75,18 @@ func main() {
 	registry := server.NewToolRegistryV1()
 	app.RegisterMCPToolsV1(registry)
 
-	srv, err := server.New(t, server.Options{
+	opts := server.Options{
 		ServerName:    app.Name,
 		ServerVersion: app.Version,
-		Instructions:  "Git MCP server exposing repository operations. Provides tools for status, diff, log, show, blame, staging, commits, branches, remotes, fetch, pull, push, rebase, and hard reset. Force push and hard reset are blocked on main/master.",
+		Instructions:  "Git MCP server exposing repository operations. Read-only operations (status, log, show, blame, branches, remotes, tags) are available as MCP resources. Mutation operations (commit, push, rebase, etc.) remain as tools.",
 		Tools:         registry,
-	})
+	}
+
+	if resProvider != nil {
+		opts.Resources = resProvider
+	}
+
+	srv, err := server.New(t, opts)
 	if err != nil {
 		log.Fatalf("creating server: %v", err)
 	}
