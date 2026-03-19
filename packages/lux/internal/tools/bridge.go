@@ -377,6 +377,212 @@ func (b *Bridge) DocumentSymbolsRaw(ctx context.Context, uri lsp.DocumentURI) ([
 	return parseSymbols(result), nil
 }
 
+func (b *Bridge) HoverRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) (*HoverResult, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentHover, lsp.TextDocumentPositionParams{
+		TextDocument: lsp.TextDocumentIdentifier{URI: uri},
+		Position:     lsp.Position{Line: line, Character: character},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if result == nil || string(result) == "null" {
+		return nil, nil
+	}
+
+	var hover struct {
+		Contents json.RawMessage `json:"contents"`
+	}
+	if err := json.Unmarshal(result, &hover); err != nil {
+		return nil, fmt.Errorf("parsing hover result: %w", err)
+	}
+
+	return &HoverResult{Content: extractMarkdownContent(hover.Contents)}, nil
+}
+
+func locationsToLocationResults(locs []lsp.Location) []LocationResult {
+	results := make([]LocationResult, len(locs))
+	for i, loc := range locs {
+		results[i] = LocationResult{
+			URI:       string(loc.URI),
+			Line:      loc.Range.Start.Line,
+			Character: loc.Range.Start.Character,
+		}
+	}
+	return results
+}
+
+func (b *Bridge) DefinitionRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) ([]LocationResult, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentDefinition, lsp.TextDocumentPositionParams{
+		TextDocument: lsp.TextDocumentIdentifier{URI: uri},
+		Position:     lsp.Position{Line: line, Character: character},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	locations := parseLocations(result)
+	return locationsToLocationResults(locations), nil
+}
+
+func (b *Bridge) ReferencesRaw(ctx context.Context, uri lsp.DocumentURI, line, character int, includeDecl bool) ([]LocationResult, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentReferences, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"position":     lsp.Position{Line: line, Character: character},
+		"context":      map[string]any{"includeDeclaration": includeDecl},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	locations := parseLocations(result)
+	return locationsToLocationResults(locations), nil
+}
+
+func (b *Bridge) CompletionRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) ([]CompletionItem, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentCompletion, lsp.TextDocumentPositionParams{
+		TextDocument: lsp.TextDocumentIdentifier{URI: uri},
+		Position:     lsp.Position{Line: line, Character: character},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseCompletionItems(result), nil
+}
+
+func (b *Bridge) DiagnosticsRaw(ctx context.Context, uri lsp.DocumentURI) ([]DiagnosticItem, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentDiagnostic, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseDiagnostics(result), nil
+}
+
+func (b *Bridge) CodeActionRaw(ctx context.Context, uri lsp.DocumentURI, startLine, startChar, endLine, endChar int) ([]CodeAction, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentCodeAction, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"range": lsp.Range{
+			Start: lsp.Position{Line: startLine, Character: startChar},
+			End:   lsp.Position{Line: endLine, Character: endChar},
+		},
+		"context": map[string]any{
+			"diagnostics": []any{},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseCodeActions(result), nil
+}
+
+func (b *Bridge) RenameRaw(ctx context.Context, uri lsp.DocumentURI, line, character int, newName string) (*WorkspaceEdit, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentRename, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"position":     lsp.Position{Line: line, Character: character},
+		"newName":      newName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var edit WorkspaceEdit
+	if err := json.Unmarshal(result, &edit); err != nil {
+		return nil, fmt.Errorf("parsing workspace edit: %w", err)
+	}
+
+	return &edit, nil
+}
+
+func (b *Bridge) WorkspaceSymbolsRaw(ctx context.Context, uri lsp.DocumentURI, query string) ([]WorkspaceSymbol, error) {
+	result, err := b.withDocument(ctx, uri, lsp.MethodWorkspaceSymbol, map[string]any{
+		"query": query,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWorkspaceSymbols(result), nil
+}
+
+func (b *Bridge) FormatRaw(ctx context.Context, uri lsp.DocumentURI) (json.RawMessage, error) {
+	if result, handled := b.tryExternalFormatRaw(ctx, uri); handled {
+		return result, nil
+	}
+
+	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentFormatting, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"options": map[string]any{
+			"tabSize":      4,
+			"insertSpaces": true,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (b *Bridge) tryExternalFormatRaw(ctx context.Context, uri lsp.DocumentURI) (json.RawMessage, bool) {
+	if b.fmtRouter == nil {
+		return nil, false
+	}
+
+	filePath := uri.Path()
+	match := b.fmtRouter.Match(filePath)
+	if match == nil {
+		return nil, false
+	}
+
+	if match.LSPFormat == "prefer" {
+		return nil, false
+	}
+
+	content, err := b.readFile(uri)
+	if err != nil {
+		return nil, false
+	}
+
+	var fmtResult *formatter.Result
+	switch match.Mode {
+	case "chain":
+		fmtResult, err = formatter.FormatChain(ctx, match.Formatters, filePath, []byte(content), b.executor)
+	case "fallback":
+		fmtResult, err = formatter.FormatFallback(ctx, match.Formatters, filePath, []byte(content), b.executor)
+	default:
+		return nil, false
+	}
+
+	if err != nil {
+		if match.LSPFormat == "fallback" {
+			return nil, false
+		}
+		return nil, true
+	}
+
+	if !fmtResult.Changed {
+		raw, _ := json.Marshal([]lsp.TextEdit{})
+		return raw, true
+	}
+
+	lines := strings.Count(content, "\n")
+	edit := lsp.TextEdit{
+		Range: lsp.Range{
+			Start: lsp.Position{Line: 0, Character: 0},
+			End:   lsp.Position{Line: lines + 1, Character: 0},
+		},
+		NewText: fmtResult.Formatted,
+	}
+
+	raw, _ := json.Marshal([]lsp.TextEdit{edit})
+	return raw, true
+}
+
 func (b *Bridge) CodeAction(ctx context.Context, uri lsp.DocumentURI, startLine, startChar, endLine, endChar int) (*command.Result, error) {
 	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentCodeAction, map[string]any{
 		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
@@ -576,6 +782,18 @@ func (b *Bridge) InferLanguageID(uri lsp.DocumentURI) string {
 	default:
 		return "plaintext"
 	}
+}
+
+// Raw result types for JSON-serializable output
+
+type HoverResult struct {
+	Content string `json:"content"`
+}
+
+type LocationResult struct {
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
 }
 
 // Helper types and functions
