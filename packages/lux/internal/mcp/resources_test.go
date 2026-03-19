@@ -155,6 +155,20 @@ func TestReadLSPResourceWorkspaceSymbolsMissingQuery(t *testing.T) {
 	}
 }
 
+func TestReadLSPResourceDiagnosticsBatchMissingGlob(t *testing.T) {
+	p := newTestResourceProvider()
+
+	_, err := p.readLSPResource(context.Background(),
+		"lux://lsp/diagnostics-batch")
+	if err == nil {
+		t.Fatal("expected error for missing glob")
+	}
+	expected := "missing required parameter 'glob'"
+	if err.Error() != expected {
+		t.Errorf("expected %q, got %q", expected, err.Error())
+	}
+}
+
 func TestReadLSPResourceAllOperationsReachBridge(t *testing.T) {
 	// Verify that all operations with valid parameters reach the bridge
 	// (get past URL parsing). With a nil pool, bridge methods panic or

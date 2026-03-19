@@ -488,6 +488,149 @@ func TestEnrichedReferencesResult_JSONSerialization(t *testing.T) {
 	}
 }
 
+func TestBatchDiagnosticsResult_JSONSerialization(t *testing.T) {
+	result := BatchDiagnosticsResult{
+		LSPs: []LSPDiagnosticGroup{
+			{
+				Name:         "gopls",
+				FilesScanned: 3,
+				Diagnostics: []DiagnosticItem{
+					{
+						URI:      "file:///project/main.go",
+						Range:    lsp.Range{Start: lsp.Position{Line: 10, Character: 0}},
+						Severity: 1,
+						Source:   "compiler",
+						Message:  "undefined: foo",
+					},
+				},
+			},
+			{
+				Name:         "rust-analyzer",
+				FilesScanned: 2,
+				Diagnostics:  nil,
+			},
+		},
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	lsps, ok := decoded["lsps"].([]any)
+	if !ok {
+		t.Fatal("expected lsps array")
+	}
+	if len(lsps) != 2 {
+		t.Fatalf("expected 2 LSP groups, got %d", len(lsps))
+	}
+
+	group0 := lsps[0].(map[string]any)
+	if group0["name"] != "gopls" {
+		t.Errorf("expected name gopls, got %v", group0["name"])
+	}
+	if group0["files_scanned"] != float64(3) {
+		t.Errorf("expected files_scanned 3, got %v", group0["files_scanned"])
+	}
+
+	diags, ok := group0["diagnostics"].([]any)
+	if !ok {
+		t.Fatal("expected diagnostics array")
+	}
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+
+	diag0 := diags[0].(map[string]any)
+	if diag0["uri"] != "file:///project/main.go" {
+		t.Errorf("expected uri in diagnostic, got %v", diag0["uri"])
+	}
+	if diag0["message"] != "undefined: foo" {
+		t.Errorf("expected message, got %v", diag0["message"])
+	}
+}
+
+func TestLSPDiagnosticGroup_EmptyDiagnostics(t *testing.T) {
+	group := LSPDiagnosticGroup{
+		Name:         "nil-lsp",
+		FilesScanned: 5,
+	}
+
+	data, err := json.Marshal(group)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded["name"] != "nil-lsp" {
+		t.Errorf("expected name nil-lsp, got %v", decoded["name"])
+	}
+	if decoded["files_scanned"] != float64(5) {
+		t.Errorf("expected files_scanned 5, got %v", decoded["files_scanned"])
+	}
+	// null diagnostics is acceptable for empty result
+}
+
+func TestDiagnosticItem_URIFieldOmittedWhenEmpty(t *testing.T) {
+	item := DiagnosticItem{
+		Range:    lsp.Range{Start: lsp.Position{Line: 1, Character: 0}},
+		Severity: 2,
+		Message:  "unused variable",
+	}
+
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["uri"]; ok {
+		t.Error("expected uri to be omitted when empty")
+	}
+}
+
+func TestDiagnosticItem_URIFieldPresentWhenSet(t *testing.T) {
+	item := DiagnosticItem{
+		URI:      "file:///test.go",
+		Range:    lsp.Range{Start: lsp.Position{Line: 1, Character: 0}},
+		Severity: 1,
+		Message:  "error",
+	}
+
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded["uri"] != "file:///test.go" {
+		t.Errorf("expected uri field, got %v", decoded["uri"])
+	}
+}
+
+func TestBatchDiagnosticsMethodSignature(t *testing.T) {
+	b := NewBridge(nil, nil, nil, nil, nil)
+	ctx := context.Background()
+	_ = func() (*BatchDiagnosticsResult, error) { return b.BatchDiagnostics(ctx, "**/*.go") }
+}
+
 // Helpers
 
 type stubDocTracker struct {

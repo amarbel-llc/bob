@@ -436,6 +436,19 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		text = string(data)
 		mimeType = "application/json"
 
+	case "diagnostics-batch":
+		pattern := q.Get("glob")
+		if pattern == "" {
+			return nil, fmt.Errorf("missing required parameter 'glob'")
+		}
+		raw, err := p.bridge.BatchDiagnostics(ctx, pattern)
+		if err != nil {
+			return nil, err
+		}
+		data, _ := json.MarshalIndent(raw, "", "  ")
+		text = string(data)
+		mimeType = "application/json"
+
 	default:
 		return nil, fmt.Errorf("unknown LSP operation: %s", operation)
 	}
@@ -597,6 +610,12 @@ func registerResources(
 			URITemplate: "lux://lsp/outgoing-calls?uri={uri}&line={line}&character={character}",
 			Name:        "Outgoing Calls",
 			Description: "Find all functions called by the function at a position. Returns one level; walk the graph by passing results back.",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/diagnostics-batch?glob={glob}",
+			Name:        "Batch Diagnostics",
+			Description: "Run diagnostics on all files matching a glob pattern. Groups by extension and fans out to multiple LSPs automatically.",
 			MimeType:    "application/json",
 		},
 	}

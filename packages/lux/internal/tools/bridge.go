@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/server"
 	"github.com/amarbel-llc/lux/internal/subprocess"
+	"github.com/gobwas/glob"
 )
 
 // DocumentTracker tracks open documents for persistent LSP sessions.
@@ -1308,10 +1310,92 @@ func formatWorkspaceSymbols(symbols []WorkspaceSymbol) string {
 }
 
 type DiagnosticItem struct {
+	URI      string    `json:"uri,omitempty"`
 	Range    lsp.Range `json:"range"`
 	Severity int       `json:"severity,omitempty"`
 	Source   string    `json:"source,omitempty"`
 	Message  string    `json:"message"`
+}
+
+type LSPDiagnosticGroup struct {
+	Name         string           `json:"name"`
+	FilesScanned int              `json:"files_scanned"`
+	Diagnostics  []DiagnosticItem `json:"diagnostics"`
+}
+
+type BatchDiagnosticsResult struct {
+	LSPs []LSPDiagnosticGroup `json:"lsps"`
+}
+
+func (b *Bridge) BatchDiagnostics(ctx context.Context, pattern string) (*BatchDiagnosticsResult, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("getting working directory: %w", err)
+	}
+
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid glob pattern %q: %w", pattern, err)
+	}
+
+	// Group matched files by LSP name
+	lspFiles := make(map[string][]string)
+	err = filepath.WalkDir(cwd, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		relPath, _ := filepath.Rel(cwd, path)
+		if !g.Match(relPath) {
+			return nil
+		}
+
+		ext := filepath.Ext(path)
+		lspName := b.router.RouteByExtension(ext)
+		if lspName == "" {
+			return nil
+		}
+
+		lspFiles[lspName] = append(lspFiles[lspName], path)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walking directory: %w", err)
+	}
+
+	result := &BatchDiagnosticsResult{}
+
+	for lspName, files := range lspFiles {
+		group := LSPDiagnosticGroup{
+			Name:         lspName,
+			FilesScanned: len(files),
+		}
+
+		for _, absPath := range files {
+			uri := lsp.DocumentURI("file://" + absPath)
+			diags, err := b.DiagnosticsRaw(ctx, uri)
+			if err != nil {
+				fmt.Fprintf(logfile.Writer(), "[lux] batch diagnostics: skipping %s: %v\n", absPath, err)
+				continue
+			}
+
+			for i := range diags {
+				diags[i].URI = string(uri)
+			}
+			group.Diagnostics = append(group.Diagnostics, diags...)
+		}
+
+		result.LSPs = append(result.LSPs, group)
+	}
+
+	return result, nil
 }
 
 func parseDiagnostics(raw json.RawMessage) []DiagnosticItem {
