@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/lux/internal/config"
@@ -77,6 +76,11 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 	}
 	q := parsed.Query()
 
+	outputFormat := q.Get("format")
+	if outputFormat == "" {
+		outputFormat = "json"
+	}
+
 	getFileURI := func() (lsp.DocumentURI, error) {
 		v := q.Get("uri")
 		if v == "" {
@@ -101,16 +105,36 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		return fileURI, line, char, nil
 	}
 
-	var result *command.Result
+	var text string
+	var mimeType string
+
 	switch operation {
 	case "hover":
 		fileURI, line, char, err := getPosition()
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.Hover(ctx, fileURI, line, char)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Hover(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.HoverRaw(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "definition":
@@ -118,9 +142,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.Definition(ctx, fileURI, line, char)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Definition(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.DefinitionRaw(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "references":
@@ -129,9 +171,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 			return nil, err
 		}
 		includeDecl := q.Get("include_declaration") != "false"
-		result, err = p.bridge.References(ctx, fileURI, line, char, includeDecl)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.References(ctx, fileURI, line, char, includeDecl)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.ReferencesRaw(ctx, fileURI, line, char, includeDecl)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "completion":
@@ -139,9 +199,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.Completion(ctx, fileURI, line, char)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Completion(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.CompletionRaw(ctx, fileURI, line, char)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "format":
@@ -149,9 +227,24 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.Format(ctx, fileURI)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Format(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.FormatRaw(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			// FormatRaw returns json.RawMessage, already JSON
+			text = string(raw)
+			mimeType = "application/json"
 		}
 
 	case "document-symbols":
@@ -159,9 +252,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.DocumentSymbols(ctx, fileURI)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.DocumentSymbols(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.DocumentSymbolsRaw(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "diagnostics":
@@ -169,9 +280,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if err != nil {
 			return nil, err
 		}
-		result, err = p.bridge.Diagnostics(ctx, fileURI)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Diagnostics(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.DiagnosticsRaw(ctx, fileURI)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "code-action":
@@ -183,9 +312,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		startChar, _ := strconv.Atoi(q.Get("start_character"))
 		endLine, _ := strconv.Atoi(q.Get("end_line"))
 		endChar, _ := strconv.Atoi(q.Get("end_character"))
-		result, err = p.bridge.CodeAction(ctx, fileURI, startLine, startChar, endLine, endChar)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.CodeAction(ctx, fileURI, startLine, startChar, endLine, endChar)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.CodeActionRaw(ctx, fileURI, startLine, startChar, endLine, endChar)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "rename":
@@ -197,9 +344,27 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if newName == "" {
 			return nil, fmt.Errorf("missing required parameter 'new_name'")
 		}
-		result, err = p.bridge.Rename(ctx, fileURI, line, char, newName)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.Rename(ctx, fileURI, line, char, newName)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.RenameRaw(ctx, fileURI, line, char, newName)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	case "workspace-symbols":
@@ -211,24 +376,38 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		if query == "" {
 			return nil, fmt.Errorf("missing required parameter 'query'")
 		}
-		result, err = p.bridge.WorkspaceSymbols(ctx, fileURI, query)
-		if err != nil {
-			return nil, err
+		if outputFormat == "text" {
+			result, err := p.bridge.WorkspaceSymbols(ctx, fileURI, query)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsErr {
+				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			}
+			text = result.Text
+			mimeType = "text/plain"
+		} else {
+			raw, err := p.bridge.WorkspaceSymbolsRaw(ctx, fileURI, query)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.MarshalIndent(raw, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text = string(data)
+			mimeType = "application/json"
 		}
 
 	default:
 		return nil, fmt.Errorf("unknown LSP operation: %s", operation)
 	}
 
-	text := result.Text
-	if result.IsErr {
-		return nil, fmt.Errorf("LSP operation failed: %s", text)
-	}
 	return &protocol.ResourceReadResult{
 		Contents: []protocol.ResourceContent{
 			{
 				URI:      uri,
-				MimeType: "text/plain",
+				MimeType: mimeType,
 				Text:     text,
 			},
 		},
