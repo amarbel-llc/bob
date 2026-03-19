@@ -5,17 +5,24 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 )
 
-func RegisterAll() *command.App {
+func RegisterAll() (*command.App, *resourceProvider) {
 	app := command.NewApp("get-hubbed", "GitHub MCP server wrapping the gh CLI")
 	app.Version = "0.1.0"
 
-	registerRepoCommands(app)
 	registerIssueCommands(app)
 	registerPRCommands(app)
-	registerRunCommands(app)
 	registerContentCommands(app)
 
-	return app
+	resProvider, err := NewResourceProvider()
+	if err != nil {
+		resProvider = nil
+	}
+
+	if resProvider != nil {
+		registerResourceToolCommands(app, resProvider)
+	}
+
+	return app, resProvider
 }
 
 func RegisterAPITools(r *server.ToolRegistryV1) {

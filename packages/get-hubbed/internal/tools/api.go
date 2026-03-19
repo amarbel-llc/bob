@@ -13,7 +13,7 @@ import (
 func registerAPITools(r *server.ToolRegistryV1) {
 	r.Register(
 		protocol.ToolV1{
-			Name:        "api_get",
+			Name:        "api-get",
 			Title:       "GitHub API GET",
 			Description: "Make an authenticated GET request to the GitHub REST API",
 			InputSchema: json.RawMessage(`{
@@ -52,7 +52,7 @@ func registerAPITools(r *server.ToolRegistryV1) {
 
 	r.Register(
 		protocol.ToolV1{
-			Name:        "graphql_query",
+			Name:        "graphql-query",
 			Title:       "GitHub GraphQL Query",
 			Description: "Execute a read-only GraphQL query against the GitHub API",
 			InputSchema: json.RawMessage(`{
@@ -86,7 +86,7 @@ func registerAPITools(r *server.ToolRegistryV1) {
 
 	r.Register(
 		protocol.ToolV1{
-			Name:        "graphql_mutation",
+			Name:        "graphql-mutation",
 			Title:       "GitHub GraphQL Mutation",
 			Description: "Execute a GraphQL mutation against the GitHub API",
 			InputSchema: json.RawMessage(`{

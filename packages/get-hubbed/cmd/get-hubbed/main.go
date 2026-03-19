@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	app := tools.RegisterAll()
+	app, resProvider := tools.RegisterAll()
 
 	if len(os.Args) >= 2 && os.Args[1] == "generate-plugin" {
 		if err := app.HandleGeneratePlugin(os.Args[2:], os.Stdout); err != nil {
@@ -74,12 +74,18 @@ func main() {
 	app.RegisterMCPToolsV1(registry)
 	tools.RegisterAPITools(registry)
 
-	srv, err := server.New(t, server.Options{
+	opts := server.Options{
 		ServerName:    app.Name,
 		ServerVersion: app.Version,
-		Instructions:  "GitHub MCP server wrapping the gh CLI. Provides tools for repositories, issues, pull requests, workflow runs, file content, and the GitHub API.",
+		Instructions:  "GitHub MCP server. Read-only operations (repo info, issues, PRs, content, runs) are available as auto-approved resources via get-hubbed:// URIs. Mutation operations (issue/PR creation, API calls) remain as tools.",
 		Tools:         registry,
-	})
+	}
+
+	if resProvider != nil {
+		opts.Resources = resProvider
+	}
+
+	srv, err := server.New(t, opts)
 	if err != nil {
 		log.Fatalf("creating server: %v", err)
 	}
