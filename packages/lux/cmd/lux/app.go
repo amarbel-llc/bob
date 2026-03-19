@@ -31,6 +31,16 @@ func buildApp() *command.App {
 	addCLICommands(app)
 
 	app.AddCommand(&command.Command{
+		Name: "install-mcp",
+		Description: command.Description{
+			Short: "Install lux as a Claude Code MCP server",
+		},
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			return app.InstallMCP()
+		},
+	})
+
+	app.AddCommand(&command.Command{
 		Name: "mcp-stdio",
 		Description: command.Description{
 			Short: "Run as MCP server over stdio",
