@@ -79,24 +79,6 @@ func registerRemoteCommands(app *command.App) {
 		Run: handleGitPush,
 	})
 
-	app.AddCommand(&command.Command{
-		Name:        "remote_list",
-		Title:       "List Remotes",
-		Description: command.Description{Short: "List remotes with their URLs"},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    protocol.BoolPtr(true),
-			DestructiveHint: protocol.BoolPtr(false),
-			IdempotentHint:  protocol.BoolPtr(true),
-			OpenWorldHint:   protocol.BoolPtr(false),
-		},
-		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-		},
-		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"git remote"}, UseWhen: "listing remotes"},
-		},
-		Run: handleGitRemoteList,
-	})
 }
 
 func handleGitFetch(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {

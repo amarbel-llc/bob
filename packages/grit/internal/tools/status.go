@@ -12,25 +12,6 @@ import (
 
 func registerStatusCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "status",
-		Title:       "Show Working Tree Status",
-		Description: command.Description{Short: "Show working tree status with machine-readable output"},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    protocol.BoolPtr(true),
-			DestructiveHint: protocol.BoolPtr(false),
-			IdempotentHint:  protocol.BoolPtr(true),
-			OpenWorldHint:   protocol.BoolPtr(false),
-		},
-		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-		},
-		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"git status"}, UseWhen: "checking repository status"},
-		},
-		Run: handleGitStatus,
-	})
-
-	app.AddCommand(&command.Command{
 		Name:        "diff",
 		Title:       "Show Changes",
 		Description: command.Description{Short: "Show changes in the working tree or between commits"},

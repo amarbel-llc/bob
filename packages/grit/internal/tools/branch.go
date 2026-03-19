@@ -12,27 +12,6 @@ import (
 
 func registerBranchCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "branch_list",
-		Title:       "List Branches",
-		Description: command.Description{Short: "List branches"},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    protocol.BoolPtr(true),
-			DestructiveHint: protocol.BoolPtr(false),
-			IdempotentHint:  protocol.BoolPtr(true),
-			OpenWorldHint:   protocol.BoolPtr(false),
-		},
-		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-			{Name: "remote", Type: command.Bool, Description: "List remote-tracking branches"},
-			{Name: "all", Type: command.Bool, Description: "List both local and remote-tracking branches"},
-		},
-		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"git branch"}, UseWhen: "listing branches"},
-		},
-		Run: handleGitBranchList,
-	})
-
-	app.AddCommand(&command.Command{
 		Name:        "branch_create",
 		Title:       "Create Branch",
 		Description: command.Description{Short: "Create a new branch"},

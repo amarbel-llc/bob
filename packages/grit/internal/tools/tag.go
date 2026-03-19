@@ -12,27 +12,6 @@ import (
 
 func registerTagCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "tag_list",
-		Title:       "List Tags",
-		Description: command.Description{Short: "List tags with metadata"},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    protocol.BoolPtr(true),
-			DestructiveHint: protocol.BoolPtr(false),
-			IdempotentHint:  protocol.BoolPtr(true),
-			OpenWorldHint:   protocol.BoolPtr(false),
-		},
-		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-			{Name: "pattern", Type: command.String, Description: "Only list tags matching pattern (e.g. 'v1.*')"},
-			{Name: "sort", Type: command.String, Description: "Sort key (e.g. '-creatordate' for newest first, 'creatordate' for oldest first)"},
-		},
-		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"git tag"}, UseWhen: "listing tags"},
-		},
-		Run: handleGitTagList,
-	})
-
-	app.AddCommand(&command.Command{
 		Name:        "tag_verify",
 		Title:       "Verify Tag Signature",
 		Description: command.Description{Short: "Verify the GPG signature of a tag"},

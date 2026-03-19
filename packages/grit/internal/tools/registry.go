@@ -7,7 +7,6 @@ func RegisterAll() (*command.App, *resourceProvider) {
 	app.Version = "0.1.0"
 
 	registerStatusCommands(app)
-	registerLogCommands(app)
 	registerStagingCommands(app)
 	registerCommitCommands(app)
 	registerTryCommitCommands(app)
