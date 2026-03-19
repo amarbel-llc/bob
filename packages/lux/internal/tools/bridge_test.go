@@ -129,7 +129,7 @@ func TestRawMethodSignatures_Exist(t *testing.T) {
 	// Each variable assignment verifies the method signature at compile time.
 	_ = func() (*HoverResult, error) { return b.HoverRaw(ctx, uri, 0, 0) }
 	_ = func() ([]LocationResult, error) { return b.DefinitionRaw(ctx, uri, 0, 0) }
-	_ = func() ([]LocationResult, error) { return b.ReferencesRaw(ctx, uri, 0, 0, true) }
+	_ = func() (*EnrichedReferencesResult, error) { return b.ReferencesRaw(ctx, uri, 0, 0, true, 0) }
 	_ = func() ([]CompletionItem, error) { return b.CompletionRaw(ctx, uri, 0, 0) }
 	_ = func() ([]DiagnosticItem, error) { return b.DiagnosticsRaw(ctx, uri) }
 	_ = func() ([]CodeAction, error) { return b.CodeActionRaw(ctx, uri, 0, 0, 0, 0) }
@@ -315,6 +315,176 @@ func TestParseIncomingCalls_EmptyResponse(t *testing.T) {
 	}
 	if len(result.Calls) != 0 {
 		t.Errorf("expected 0 calls for empty response, got %d", len(result.Calls))
+	}
+}
+
+func TestExtractSourceContext_Normal(t *testing.T) {
+	content := "line0\nline1\nline2\nline3\nline4\nline5\nline6"
+	sc := extractSourceContext(content, 3, 2)
+	if sc == nil {
+		t.Fatal("expected non-nil SourceContext")
+	}
+	if len(sc.Before) != 2 {
+		t.Errorf("expected 2 before lines, got %d", len(sc.Before))
+	}
+	if sc.Before[0] != "line1" || sc.Before[1] != "line2" {
+		t.Errorf("unexpected before: %v", sc.Before)
+	}
+	if sc.Line != "line3" {
+		t.Errorf("expected line3, got %s", sc.Line)
+	}
+	if len(sc.After) != 2 {
+		t.Errorf("expected 2 after lines, got %d", len(sc.After))
+	}
+	if sc.After[0] != "line4" || sc.After[1] != "line5" {
+		t.Errorf("unexpected after: %v", sc.After)
+	}
+}
+
+func TestExtractSourceContext_StartOfFile(t *testing.T) {
+	content := "first\nsecond\nthird"
+	sc := extractSourceContext(content, 0, 3)
+	if sc == nil {
+		t.Fatal("expected non-nil SourceContext")
+	}
+	if len(sc.Before) != 0 {
+		t.Errorf("expected 0 before lines at start, got %d", len(sc.Before))
+	}
+	if sc.Line != "first" {
+		t.Errorf("expected first, got %s", sc.Line)
+	}
+	if len(sc.After) != 2 {
+		t.Errorf("expected 2 after lines, got %d", len(sc.After))
+	}
+}
+
+func TestExtractSourceContext_EndOfFile(t *testing.T) {
+	content := "first\nsecond\nthird"
+	sc := extractSourceContext(content, 2, 3)
+	if sc == nil {
+		t.Fatal("expected non-nil SourceContext")
+	}
+	if len(sc.Before) != 2 {
+		t.Errorf("expected 2 before lines at end, got %d", len(sc.Before))
+	}
+	if sc.Line != "third" {
+		t.Errorf("expected third, got %s", sc.Line)
+	}
+	if len(sc.After) != 0 {
+		t.Errorf("expected 0 after lines at end, got %d", len(sc.After))
+	}
+}
+
+func TestExtractSourceContext_OutOfBounds(t *testing.T) {
+	content := "only\ntwo"
+	sc := extractSourceContext(content, 5, 1)
+	if sc != nil {
+		t.Error("expected nil for out-of-bounds line")
+	}
+	sc = extractSourceContext(content, -1, 1)
+	if sc != nil {
+		t.Error("expected nil for negative line")
+	}
+}
+
+func TestEnrichedLocation_JSONSerialization(t *testing.T) {
+	loc := EnrichedLocation{
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+		Hover:     "func Foo()",
+		Context: &SourceContext{
+			Before: []string{"// comment"},
+			Line:   "func Foo() {",
+			After:  []string{"  return"},
+		},
+	}
+
+	data, err := json.Marshal(loc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded["uri"] != "file:///test.go" {
+		t.Errorf("expected uri, got %v", decoded["uri"])
+	}
+	if decoded["hover"] != "func Foo()" {
+		t.Errorf("expected hover, got %v", decoded["hover"])
+	}
+	ctx, ok := decoded["context"].(map[string]any)
+	if !ok {
+		t.Fatal("expected context object")
+	}
+	if ctx["line"] != "func Foo() {" {
+		t.Errorf("expected context line, got %v", ctx["line"])
+	}
+}
+
+func TestEnrichedLocation_OmitsEmptyFields(t *testing.T) {
+	loc := EnrichedLocation{
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+	}
+
+	data, err := json.Marshal(loc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["hover"]; ok {
+		t.Error("expected hover to be omitted when empty")
+	}
+	if _, ok := decoded["context"]; ok {
+		t.Error("expected context to be omitted when nil")
+	}
+}
+
+func TestEnrichedReferencesResult_JSONSerialization(t *testing.T) {
+	result := EnrichedReferencesResult{
+		Symbol: "func Foo()",
+		Count:  1,
+		Refs: []EnrichedLocation{
+			{
+				URI:       "file:///test.go",
+				Line:      10,
+				Character: 5,
+			},
+		},
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded["symbol"] != "func Foo()" {
+		t.Errorf("expected symbol, got %v", decoded["symbol"])
+	}
+	if decoded["count"] != float64(1) {
+		t.Errorf("expected count 1, got %v", decoded["count"])
+	}
+	refs, ok := decoded["references"].([]any)
+	if !ok {
+		t.Fatal("expected references array")
+	}
+	if len(refs) != 1 {
+		t.Fatalf("expected 1 ref, got %d", len(refs))
 	}
 }
 

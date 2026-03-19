@@ -425,7 +425,52 @@ func (b *Bridge) DefinitionRaw(ctx context.Context, uri lsp.DocumentURI, line, c
 	return locationsToLocationResults(locations), nil
 }
 
-func (b *Bridge) ReferencesRaw(ctx context.Context, uri lsp.DocumentURI, line, character int, includeDecl bool) ([]LocationResult, error) {
+// SourceContext holds surrounding source lines for an enriched reference location.
+type SourceContext struct {
+	Before []string `json:"before"`
+	Line   string   `json:"line"`
+	After  []string `json:"after"`
+}
+
+// EnrichedLocation is a reference location optionally enriched with hover info and source context.
+type EnrichedLocation struct {
+	URI       string         `json:"uri"`
+	Line      int            `json:"line"`
+	Character int            `json:"character"`
+	Hover     string         `json:"hover,omitempty"`
+	Context   *SourceContext `json:"context,omitempty"`
+}
+
+// EnrichedReferencesResult wraps enriched reference locations with the queried symbol info.
+type EnrichedReferencesResult struct {
+	Symbol string             `json:"symbol"`
+	Count  int                `json:"count"`
+	Refs   []EnrichedLocation `json:"references"`
+}
+
+func extractSourceContext(content string, line, contextLines int) *SourceContext {
+	lines := strings.Split(content, "\n")
+	if line < 0 || line >= len(lines) {
+		return nil
+	}
+
+	startBefore := line - contextLines
+	if startBefore < 0 {
+		startBefore = 0
+	}
+	endAfter := line + contextLines + 1
+	if endAfter > len(lines) {
+		endAfter = len(lines)
+	}
+
+	return &SourceContext{
+		Before: lines[startBefore:line],
+		Line:   lines[line],
+		After:  lines[line+1 : endAfter],
+	}
+}
+
+func (b *Bridge) ReferencesRaw(ctx context.Context, uri lsp.DocumentURI, line, character int, includeDecl bool, contextLines int) (*EnrichedReferencesResult, error) {
 	result, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentReferences, map[string]any{
 		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
 		"position":     lsp.Position{Line: line, Character: character},
@@ -436,7 +481,49 @@ func (b *Bridge) ReferencesRaw(ctx context.Context, uri lsp.DocumentURI, line, c
 	}
 
 	locations := parseLocations(result)
-	return locationsToLocationResults(locations), nil
+
+	// Get symbol name from hover at the queried position
+	var symbol string
+	if hover, err := b.HoverRaw(ctx, uri, line, character); err == nil && hover != nil {
+		symbol = hover.Content
+	}
+
+	refs := make([]EnrichedLocation, len(locations))
+	// Cache file contents to avoid re-reading the same file for multiple refs
+	fileCache := make(map[string]string)
+
+	for i, loc := range locations {
+		refs[i] = EnrichedLocation{
+			URI:       string(loc.URI),
+			Line:      loc.Range.Start.Line,
+			Character: loc.Range.Start.Character,
+		}
+
+		if contextLines > 0 {
+			// Enrich with hover info (gracefully handle errors)
+			if hover, err := b.HoverRaw(ctx, loc.URI, loc.Range.Start.Line, loc.Range.Start.Character); err == nil && hover != nil {
+				refs[i].Hover = hover.Content
+			}
+
+			// Enrich with source context
+			content, ok := fileCache[string(loc.URI)]
+			if !ok {
+				if c, err := b.readFile(loc.URI); err == nil {
+					content = c
+					fileCache[string(loc.URI)] = content
+				}
+			}
+			if content != "" {
+				refs[i].Context = extractSourceContext(content, loc.Range.Start.Line, contextLines)
+			}
+		}
+	}
+
+	return &EnrichedReferencesResult{
+		Symbol: symbol,
+		Count:  len(refs),
+		Refs:   refs,
+	}, nil
 }
 
 func (b *Bridge) CompletionRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) ([]CompletionItem, error) {

@@ -171,18 +171,29 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 			return nil, err
 		}
 		includeDecl := q.Get("include_declaration") != "false"
+		contextLines := 3 // default
+		if v := q.Get("context"); v != "" {
+			contextLines, _ = strconv.Atoi(v)
+		}
 		if outputFormat == "text" {
-			result, err := p.bridge.References(ctx, fileURI, line, char, includeDecl)
+			raw, err := p.bridge.ReferencesRaw(ctx, fileURI, line, char, includeDecl, 0)
 			if err != nil {
 				return nil, err
 			}
-			if result.IsErr {
-				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
+			// Format as text: one location per line
+			var lines []string
+			for _, ref := range raw.Refs {
+				refURI := lsp.DocumentURI(ref.URI)
+				lines = append(lines, fmt.Sprintf("%s:%d:%d", refURI.Path(), ref.Line+1, ref.Character+1))
 			}
-			text = result.Text
+			if len(lines) == 0 {
+				text = "No references found"
+			} else {
+				text = strings.Join(lines, "\n")
+			}
 			mimeType = "text/plain"
 		} else {
-			raw, err := p.bridge.ReferencesRaw(ctx, fileURI, line, char, includeDecl)
+			raw, err := p.bridge.ReferencesRaw(ctx, fileURI, line, char, includeDecl, contextLines)
 			if err != nil {
 				return nil, err
 			}
