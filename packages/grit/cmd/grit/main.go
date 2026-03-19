@@ -33,7 +33,7 @@ func main() {
 
 	flag.Parse()
 
-	app := tools.RegisterAll()
+	app, _ := tools.RegisterAll()
 
 	if flag.NArg() >= 1 && flag.Arg(0) == "generate-plugin" {
 		if err := app.HandleGeneratePlugin(flag.Args()[1:], os.Stdout); err != nil {

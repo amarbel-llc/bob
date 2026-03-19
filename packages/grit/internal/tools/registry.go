@@ -2,7 +2,7 @@ package tools
 
 import "github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 
-func RegisterAll() *command.App {
+func RegisterAll() (*command.App, *resourceProvider) {
 	app := command.NewApp("grit", "MCP server exposing git operations")
 	app.Version = "0.1.0"
 
@@ -19,5 +19,14 @@ func RegisterAll() *command.App {
 	registerHardResetCommands(app)
 	registerTagCommands(app)
 
-	return app
+	resProvider, err := NewResourceProvider()
+	if err != nil {
+		resProvider = nil
+	}
+
+	if resProvider != nil {
+		registerResourceToolCommands(app, resProvider)
+	}
+
+	return app, resProvider
 }
