@@ -116,7 +116,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	mcpApp.AddCommand(&command.Command{
 		Name: "resource-templates",
 		Description: command.Description{
-			Short: "List available lux resource templates. Call this first to discover what LSP resources are available, then use resource-read to access them.",
+			Short: "List available lux resource templates. For subagent use only — the main conversation should use MCP resources directly via ReadMcpResourceTool. Call resource-templates to discover URIs, then use resource-read to access them.",
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    &readOnly,
@@ -156,7 +156,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	mcpApp.AddCommand(&command.Command{
 		Name: "resource-read",
 		Description: command.Description{
-			Short: "Read a lux resource by URI. This tool exists because subagents cannot access MCP resources directly (forwarded resource permissions are not yet supported). Call resource-templates to discover available URIs.",
+			Short: "Read a lux resource by URI. For subagent use only — the main conversation should use MCP resources directly via ReadMcpResourceTool. This tool exists because subagents cannot access MCP resources directly (forwarded resource permissions are not yet supported).",
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    &readOnly,
