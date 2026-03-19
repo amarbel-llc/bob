@@ -1,12 +1,16 @@
 package caldav
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
+
+const requestTimeout = 30 * time.Second
 
 // Client is a CalDAV HTTP client that supports PROPFIND, REPORT, PUT, DELETE,
 // and MKCALENDAR operations.
@@ -33,7 +37,10 @@ func NewClient(cfg *Config) *Client {
 }
 
 func (c *Client) do(method, url, body string, depth int) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +148,9 @@ func (c *Client) ListCalendars() ([]Calendar, error) {
 }
 
 // ListTasks performs a REPORT calendar-query to list all VTODOs in a calendar.
-func (c *Client) ListTasks(calendarHref string) ([]TaskWithMeta, error) {
+// Parse errors for individual tasks are collected in TaskListResult.ParseErrors
+// rather than causing the entire listing to fail.
+func (c *Client) ListTasks(calendarHref string) (*TaskListResult, error) {
 	body := `<?xml version="1.0" encoding="utf-8" ?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:prop>
@@ -172,7 +181,7 @@ func (c *Client) ListTasks(calendarHref string) ([]TaskWithMeta, error) {
 		return nil, fmt.Errorf("parsing multistatus: %w", err)
 	}
 
-	var tasks []TaskWithMeta
+	result := &TaskListResult{}
 	for _, r := range ms.Responses {
 		for _, ps := range r.PropStat {
 			if !strings.Contains(ps.Status, "200") || ps.Prop.CalendarData == "" {
@@ -180,17 +189,19 @@ func (c *Client) ListTasks(calendarHref string) ([]TaskWithMeta, error) {
 			}
 			task, err := parseIcalString(ps.Prop.CalendarData)
 			if err != nil {
+				result.ParseErrors = append(result.ParseErrors,
+					fmt.Sprintf("%s: %v", r.Href, err))
 				continue
 			}
 			task.Href = r.Href
 			task.ETag = ps.Prop.GetETag
-			tasks = append(tasks, TaskWithMeta{
+			result.Tasks = append(result.Tasks, TaskWithMeta{
 				Task: *task,
 				Raw:  ps.Prop.CalendarData,
 			})
 		}
 	}
-	return tasks, nil
+	return result, nil
 }
 
 // TaskWithMeta pairs a parsed Task with its raw iCalendar text.
@@ -199,10 +210,21 @@ type TaskWithMeta struct {
 	Raw  string
 }
 
+// TaskListResult holds the results of listing tasks, including any parse errors
+// for individual tasks that could not be parsed.
+type TaskListResult struct {
+	Tasks      []TaskWithMeta
+	ParseErrors []string
+}
+
 // GetTask fetches a single VTODO by its href.
 func (c *Client) GetTask(taskHref string) (*TaskWithMeta, error) {
 	url := c.resolveHref(taskHref)
-	req, err := http.NewRequest("GET", url, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +259,11 @@ func (c *Client) GetTask(taskHref string) (*TaskWithMeta, error) {
 // PutTask creates or updates a VTODO at the given href.
 func (c *Client) PutTask(taskHref, icalData, etag string) error {
 	url := c.resolveHref(taskHref)
-	req, err := http.NewRequest("PUT", url, strings.NewReader(icalData))
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, strings.NewReader(icalData))
 	if err != nil {
 		return err
 	}
@@ -265,7 +291,11 @@ func (c *Client) PutTask(taskHref, icalData, etag string) error {
 // DeleteTask removes a VTODO by href.
 func (c *Client) DeleteTask(taskHref, etag string) error {
 	url := c.resolveHref(taskHref)
-	req, err := http.NewRequest("DELETE", url, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return err
 	}
@@ -324,11 +354,11 @@ func (c *Client) FindTaskByUID(uid string) (*TaskWithMeta, string, error) {
 	}
 
 	for _, cal := range calendars {
-		tasks, err := c.ListTasks(cal.Href)
+		result, err := c.ListTasks(cal.Href)
 		if err != nil {
 			continue
 		}
-		for _, t := range tasks {
+		for _, t := range result.Tasks {
 			if t.Task.UID == uid {
 				return &t, cal.Href, nil
 			}

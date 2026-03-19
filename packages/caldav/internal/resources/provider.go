@@ -153,6 +153,7 @@ func (p *Provider) ReadResource(ctx context.Context, uri string) (*protocol.Reso
 type calendarsResponse struct {
 	Calendars []calendarInfo `json:"calendars"`
 	Total     int            `json:"total"`
+	Warnings  []string       `json:"warnings,omitempty"`
 }
 
 type calendarInfo struct {
@@ -172,15 +173,23 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 
 	var infos []calendarInfo
 	var allTasks []caldav.Task
+	var warnings []string
 
 	for _, cal := range calendars {
-		tasks, err := p.client.ListTasks(cal.Href)
+		result, err := p.client.ListTasks(cal.Href)
 		taskCount := 0
-		if err == nil {
-			taskCount = len(tasks)
-			for _, t := range tasks {
+		if err != nil {
+			warnings = append(warnings,
+				fmt.Sprintf("calendar %q: failed to list tasks: %v", cal.DisplayName, err))
+		} else {
+			taskCount = len(result.Tasks)
+			for _, t := range result.Tasks {
 				allTasks = append(allTasks, t.Task)
 				p.cacheTask(t, cal.Href)
+			}
+			for _, parseErr := range result.ParseErrors {
+				warnings = append(warnings,
+					fmt.Sprintf("calendar %q: skipped malformed task: %s", cal.DisplayName, parseErr))
 			}
 		}
 		infos = append(infos, calendarInfo{
@@ -196,7 +205,7 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 	// Rebuild word index with all discovered tasks
 	p.index.Build(allTasks)
 
-	resp := calendarsResponse{Calendars: infos, Total: len(infos)}
+	resp := calendarsResponse{Calendars: infos, Total: len(infos), Warnings: warnings}
 	return jsonResource(uri, resp)
 }
 
@@ -245,28 +254,30 @@ func (p *Provider) readCalendarTasks(ctx context.Context, uri, calID string) (*p
 	// Find the calendar href from the ID
 	calHref := calendarHrefFromID(calID)
 
-	tasks, err := p.client.ListTasks(calHref)
+	result, err := p.client.ListTasks(calHref)
 	if err != nil {
 		return nil, fmt.Errorf("listing tasks: %w", err)
 	}
 
 	var metadata []caldav.TaskMetadata
-	for _, t := range tasks {
+	for _, t := range result.Tasks {
 		p.cacheTask(t, calHref)
 		metadata = append(metadata, t.Task.ToMetadata())
 	}
 
 	// Resolve subtask relationships
-	resolveSubtasks(tasks)
+	resolveSubtasks(result.Tasks)
 
 	resp := struct {
 		CalendarID string                `json:"calendar_id"`
 		Tasks      []caldav.TaskMetadata `json:"tasks"`
 		Total      int                   `json:"total"`
+		Warnings   []string              `json:"warnings,omitempty"`
 	}{
 		CalendarID: calID,
 		Tasks:      metadata,
 		Total:      len(metadata),
+		Warnings:   result.ParseErrors,
 	}
 	return jsonResource(uri, resp)
 }
