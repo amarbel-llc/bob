@@ -26,7 +26,7 @@ func TestDisallowMainWorktreeOffAllowsEverything(t *testing.T) {
 	target := filepath.Join(mainRepo, "secret.go")
 	input := makeInput("Read", map[string]any{"file_path": target}, outside)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, false)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, outside, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestDisallowMainWorktreeOnDeniesMainRepoPath(t *testing.T) {
 	target := filepath.Join(mainRepo, "main.go")
 	input := makeInput("Read", map[string]any{"file_path": target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestDisallowMainWorktreeOnAllowsWorktreePath(t *testing.T) {
 	target := filepath.Join(worktreeCwd, "file.go")
 	input := makeInput("Read", map[string]any{"file_path": target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestDisallowMainWorktreeOnAllowsUnrelatedPath(t *testing.T) {
 	target := filepath.Join(unrelated, "file.go")
 	input := makeInput("Read", map[string]any{"file_path": target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestDisallowMainWorktreeEmptyMainRepoAllows(t *testing.T) {
 	target := filepath.Join(worktreeCwd, "file.go")
 	input := makeInput("Read", map[string]any{"file_path": target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, "", true)
+	err := Run(bytes.NewReader(input), &stdout, "", worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestDisallowMainWorktreeGlobInMainRepo(t *testing.T) {
 	worktreeCwd := t.TempDir()
 	input := makeInput("Glob", map[string]any{"path": mainRepo}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestDisallowMainWorktreeBashAbsolutePathInMainRepo(t *testing.T) {
 	target := filepath.Join(mainRepo, "src/main.go")
 	input := makeInput("Bash", map[string]any{"command": "cat " + target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestDisallowMainWorktreeSymlinkResolution(t *testing.T) {
 	os.Symlink(target, link)
 	input := makeInput("Read", map[string]any{"file_path": link}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -168,12 +168,96 @@ func TestDisallowMainWorktreeNonExistentFileInMainRepo(t *testing.T) {
 	target := filepath.Join(subdir, "new.go")
 	input := makeInput("Write", map[string]any{"file_path": target}, worktreeCwd)
 	var stdout bytes.Buffer
-	err := Run(bytes.NewReader(input), &stdout, mainRepo, true)
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if stdout.Len() == 0 {
 		t.Fatal("expected deny output for new file targeting main worktree")
+	}
+}
+
+func TestDisallowMainWorktreeAllowsSessionWorktreeInsideMainRepo(t *testing.T) {
+	mainRepo := t.TempDir()
+	sessionWorktree := filepath.Join(mainRepo, ".worktrees", "my-session")
+	os.MkdirAll(sessionWorktree, 0o755)
+	target := filepath.Join(sessionWorktree, "file.go")
+	input := makeInput("Read", map[string]any{"file_path": target}, sessionWorktree)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, sessionWorktree, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("expected no output for session worktree path inside main repo, got %q", stdout.String())
+	}
+}
+
+func TestDisallowMainWorktreeAllowsSessionWorktreeExactPath(t *testing.T) {
+	mainRepo := t.TempDir()
+	sessionWorktree := filepath.Join(mainRepo, ".worktrees", "my-session")
+	os.MkdirAll(sessionWorktree, 0o755)
+	input := makeInput("Glob", map[string]any{"path": sessionWorktree}, sessionWorktree)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, sessionWorktree, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("expected no output for session worktree exact path, got %q", stdout.String())
+	}
+}
+
+func TestDisallowMainWorktreeDeniesOtherWorktreeInsideMainRepo(t *testing.T) {
+	mainRepo := t.TempDir()
+	sessionWorktree := filepath.Join(mainRepo, ".worktrees", "my-session")
+	otherWorktree := filepath.Join(mainRepo, ".worktrees", "other-session")
+	os.MkdirAll(sessionWorktree, 0o755)
+	os.MkdirAll(otherWorktree, 0o755)
+	target := filepath.Join(otherWorktree, "file.go")
+	input := makeInput("Read", map[string]any{"file_path": target}, sessionWorktree)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, sessionWorktree, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for path in a different worktree")
+	}
+}
+
+func TestDisallowMainWorktreeDeniesMainRepoRootDirectly(t *testing.T) {
+	mainRepo := t.TempDir()
+	sessionWorktree := filepath.Join(mainRepo, ".worktrees", "my-session")
+	os.MkdirAll(sessionWorktree, 0o755)
+	input := makeInput("Glob", map[string]any{"path": mainRepo}, sessionWorktree)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, sessionWorktree, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for main repo root path")
+	}
+}
+
+func TestDisallowMainWorktreeDenyMessageIncludesSessionWorktree(t *testing.T) {
+	mainRepo := t.TempDir()
+	sessionWorktree := filepath.Join(mainRepo, ".worktrees", "my-session")
+	os.MkdirAll(sessionWorktree, 0o755)
+	target := filepath.Join(mainRepo, "main.go")
+	input := makeInput("Read", map[string]any{"file_path": target}, sessionWorktree)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, sessionWorktree, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var result map[string]any
+	json.Unmarshal(stdout.Bytes(), &result)
+	hso := result["hookSpecificOutput"].(map[string]any)
+	reason := hso["permissionDecisionReason"].(string)
+	if !strings.Contains(reason, sessionWorktree) {
+		t.Errorf("expected deny reason to include session worktree path %q, got %q", sessionWorktree, reason)
 	}
 }
 
@@ -185,7 +269,7 @@ func TestStopHookEventRouteApproves(t *testing.T) {
 	})
 
 	var out bytes.Buffer
-	err := Run(bytes.NewReader(input), &out, "", false)
+	err := Run(bytes.NewReader(input), &out, "", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,7 +295,7 @@ func TestStopHookBlocksOnFailure(t *testing.T) {
 	})
 
 	var out bytes.Buffer
-	err := Run(bytes.NewReader(input), &out, "", false)
+	err := Run(bytes.NewReader(input), &out, "", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -251,7 +335,7 @@ func TestStopHookApprovesOnSecondInvocation(t *testing.T) {
 	})
 
 	var out bytes.Buffer
-	err := Run(bytes.NewReader(input), &out, "", false)
+	err := Run(bytes.NewReader(input), &out, "", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +360,7 @@ func TestStopHookApprovesOnSuccess(t *testing.T) {
 	})
 
 	var out bytes.Buffer
-	err := Run(bytes.NewReader(input), &out, "", false)
+	err := Run(bytes.NewReader(input), &out, "", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -20,7 +20,7 @@ type hookInput struct {
 	CWD           string         `json:"cwd"`
 }
 
-func Run(r io.Reader, w io.Writer, mainRepoRoot string, disallowMainWorktree bool) error {
+func Run(r io.Reader, w io.Writer, mainRepoRoot, sessionWorktree string, disallowMainWorktree bool) error {
 	var input hookInput
 	if err := json.NewDecoder(r).Decode(&input); err != nil {
 		return fmt.Errorf("decoding hook input: %w", err)
@@ -30,7 +30,7 @@ func Run(r io.Reader, w io.Writer, mainRepoRoot string, disallowMainWorktree boo
 	case "Stop":
 		return runStopHook(input, w)
 	default:
-		return runPreToolUse(input, w, mainRepoRoot, disallowMainWorktree)
+		return runPreToolUse(input, w, mainRepoRoot, sessionWorktree, disallowMainWorktree)
 	}
 }
 
@@ -79,12 +79,13 @@ func runStopHook(input hookInput, w io.Writer) error {
 	return json.NewEncoder(w).Encode(decision)
 }
 
-func runPreToolUse(input hookInput, w io.Writer, mainRepoRoot string, disallowMainWorktree bool) error {
+func runPreToolUse(input hookInput, w io.Writer, mainRepoRoot, sessionWorktree string, disallowMainWorktree bool) error {
 	if !disallowMainWorktree || mainRepoRoot == "" {
 		return nil
 	}
 
 	mainRepoRoot = resolvePath(mainRepoRoot)
+	sessionWorktree = resolvePath(sessionWorktree)
 
 	paths := extractPaths(input)
 	if paths == nil {
@@ -92,14 +93,14 @@ func runPreToolUse(input hookInput, w io.Writer, mainRepoRoot string, disallowMa
 	}
 
 	for _, p := range paths {
-		if isInsideMainWorktree(p, mainRepoRoot) {
+		if isInsideMainWorktree(p, mainRepoRoot, sessionWorktree) {
 			output := map[string]any{
 				"hookSpecificOutput": map[string]any{
 					"hookEventName":      "PreToolUse",
 					"permissionDecision": "deny",
 					"permissionDecisionReason": fmt.Sprintf(
-						"Path %s is in the main worktree (%s). Restrict operations to the session worktree.",
-						p, mainRepoRoot,
+						"Path %s is in the main worktree (%s). Restrict operations to the session worktree (%s).",
+						p, mainRepoRoot, sessionWorktree,
 					),
 				},
 			}
@@ -173,7 +174,13 @@ func resolvePath(path string) string {
 	return cleaned
 }
 
-func isInsideMainWorktree(path, mainRepoRoot string) bool {
+func isInsideMainWorktree(path, mainRepoRoot, sessionWorktree string) bool {
 	resolved := resolvePath(path)
+
+	if sessionWorktree != "" &&
+		(resolved == sessionWorktree || strings.HasPrefix(resolved, sessionWorktree+string(filepath.Separator))) {
+		return false
+	}
+
 	return resolved == mainRepoRoot || strings.HasPrefix(resolved, mainRepoRoot+string(filepath.Separator))
 }

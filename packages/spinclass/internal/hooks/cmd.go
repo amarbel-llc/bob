@@ -31,7 +31,7 @@ func NewHooksCmd() *cobra.Command {
 				}
 				if !worktree.IsWorktree(toplevel) {
 					// Not in a worktree — run with flag off
-					return Run(os.Stdin, os.Stdout, "", false)
+					return Run(os.Stdin, os.Stdout, "", "", false)
 				}
 				cwd = toplevel
 			}
@@ -50,7 +50,7 @@ func NewHooksCmd() *cobra.Command {
 				}
 			}
 
-			return Run(os.Stdin, os.Stdout, mainRepoRoot, disallowMainWorktree)
+			return Run(os.Stdin, os.Stdout, mainRepoRoot, cwd, disallowMainWorktree)
 		},
 	}
 
