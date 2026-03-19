@@ -113,6 +113,10 @@
             src = ./packages/spinclass;
           };
 
+          caldavPkg = import ./lib/packages/caldav.nix {
+            inherit pkgs goWorkspaceSrc goVendorHash;
+          };
+
           gritPkg = import ./lib/packages/grit.nix {
             inherit pkgs goWorkspaceSrc goVendorHash;
           };
@@ -176,6 +180,7 @@
         in
         {
           inherit
+            caldavPkg
             gritPkg
             get-hubbed-wrapped
             luxPkg
@@ -206,6 +211,7 @@
             pkgs = buildPackages system;
           in
           [
+            pkgs.caldavPkg
             pkgs.gritPkg
             pkgs.luxPkg
             pkgs.mgpPkg
@@ -268,6 +274,7 @@
                 name = "bob-all";
                 paths = [ marketplacePkgs.default ] ++ nonPluginPkgs;
               };
+              caldav = localPkgs.caldavPkg;
               grit = localPkgs.gritPkg;
               get-hubbed = localPkgs.get-hubbed-wrapped;
               lux = localPkgs.luxPkg;
@@ -283,6 +290,7 @@
               mcp-all = pkgs.symlinkJoin {
                 name = "mcp-all";
                 paths = [
+                  localPkgs.caldavPkg
                   localPkgs.gritPkg
                   localPkgs.get-hubbed-wrapped
                   localPkgs.luxPkg

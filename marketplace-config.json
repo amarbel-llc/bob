@@ -7,6 +7,13 @@
     "email": "sasha@friedenberg.me"
   },
   "plugins": {
+    "caldav": {
+      "description": "CalDAV MCP server — manage tasks, calendars, and VTODO items with progressive disclosure",
+      "version": "0.1.0",
+      "homepage": "https://github.com/amarbel-llc/bob",
+      "category": "productivity",
+      "tags": ["caldav", "tasks", "calendar", "vtodo", "mcp"]
+    },
     "grit": {
       "description": "Git operations via MCP — stage, commit, push, log, blame, and more",
       "version": "0.1.0",
