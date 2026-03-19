@@ -399,6 +399,32 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 			mimeType = "application/json"
 		}
 
+	case "incoming-calls":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		raw, err := p.bridge.IncomingCallsRaw(ctx, fileURI, line, char)
+		if err != nil {
+			return nil, err
+		}
+		data, _ := json.MarshalIndent(raw, "", "  ")
+		text = string(data)
+		mimeType = "application/json"
+
+	case "outgoing-calls":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		raw, err := p.bridge.OutgoingCallsRaw(ctx, fileURI, line, char)
+		if err != nil {
+			return nil, err
+		}
+		data, _ := json.MarshalIndent(raw, "", "  ")
+		text = string(data)
+		mimeType = "application/json"
+
 	default:
 		return nil, fmt.Errorf("unknown LSP operation: %s", operation)
 	}
@@ -549,6 +575,18 @@ func registerResources(
 			Name:        "Workspace Symbols",
 			Description: "Search for symbols (functions, types, constants) across the workspace by name pattern",
 			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/incoming-calls?uri={uri}&line={line}&character={character}",
+			Name:        "Incoming Calls",
+			Description: "Find all callers of a function at a position. Returns one level; walk the graph by passing results back.",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/outgoing-calls?uri={uri}&line={line}&character={character}",
+			Name:        "Outgoing Calls",
+			Description: "Find all functions called by the function at a position. Returns one level; walk the graph by passing results back.",
+			MimeType:    "application/json",
 		},
 	}
 

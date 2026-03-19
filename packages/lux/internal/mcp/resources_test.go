@@ -185,6 +185,8 @@ func TestReadLSPResourceAllOperationsReachBridge(t *testing.T) {
 		{"rename-text", "lux://lsp/rename?uri=file:///t.go&line=0&character=0&new_name=foo&format=text"},
 		{"workspace-symbols-json", "lux://lsp/workspace-symbols?uri=file:///t.go&query=foo"},
 		{"workspace-symbols-text", "lux://lsp/workspace-symbols?uri=file:///t.go&query=foo&format=text"},
+		{"incoming-calls", "lux://lsp/incoming-calls?uri=file:///t.go&line=0&character=0"},
+		{"outgoing-calls", "lux://lsp/outgoing-calls?uri=file:///t.go&line=0&character=0"},
 	}
 
 	for _, tt := range tests {
