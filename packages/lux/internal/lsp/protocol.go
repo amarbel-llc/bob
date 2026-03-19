@@ -41,8 +41,12 @@ const (
 	MethodTextDocumentSemanticTokensFull  = "textDocument/semanticTokens/full"
 	MethodTextDocumentSemanticTokensDelta = "textDocument/semanticTokens/full/delta"
 	MethodTextDocumentSemanticTokensRange = "textDocument/semanticTokens/range"
-	MethodTextDocumentInlayHint           = "textDocument/inlayHint"
-	MethodTextDocumentDiagnostic          = "textDocument/diagnostic"
+	MethodTextDocumentInlayHint                = "textDocument/inlayHint"
+	MethodTextDocumentDiagnostic               = "textDocument/diagnostic"
+	MethodTextDocumentPrepareCallHierarchy     = "textDocument/prepareCallHierarchy"
+
+	MethodCallHierarchyIncomingCalls = "callHierarchy/incomingCalls"
+	MethodCallHierarchyOutgoingCalls = "callHierarchy/outgoingCalls"
 
 	MethodWorkspaceSymbol                 = "workspace/symbol"
 	MethodWorkspaceExecuteCommand         = "workspace/executeCommand"
@@ -148,7 +152,12 @@ type TextDocumentClientCapabilities struct {
 	SelectionRange     *SelectionRangeClientCaps     `json:"selectionRange,omitempty"`
 	PublishDiagnostics *PublishDiagnosticsClientCaps `json:"publishDiagnostics,omitempty"`
 	SemanticTokens     *SemanticTokensClientCaps     `json:"semanticTokens,omitempty"`
+	CallHierarchy      *CallHierarchyClientCaps      `json:"callHierarchy,omitempty"`
 	InlayHint          *InlayHintClientCaps          `json:"inlayHint,omitempty"`
+}
+
+type CallHierarchyClientCaps struct {
+	DynamicRegistration bool `json:"dynamicRegistration,omitempty"`
 }
 
 type TextDocumentSyncClientCaps struct {
@@ -321,6 +330,7 @@ type ServerCapabilities struct {
 	Workspace                        *ServerWorkspaceCaps             `json:"workspace,omitempty"`
 	SemanticTokensProvider           any                              `json:"semanticTokensProvider,omitempty"`
 	MonikerProvider                  any                              `json:"monikerProvider,omitempty"`
+	CallHierarchyProvider            any                              `json:"callHierarchyProvider,omitempty"`
 	InlayHintProvider                any                              `json:"inlayHintProvider,omitempty"`
 	DiagnosticProvider               any                              `json:"diagnosticProvider,omitempty"`
 	Experimental                     json.RawMessage                  `json:"experimental,omitempty"`

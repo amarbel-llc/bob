@@ -137,6 +137,185 @@ func TestRawMethodSignatures_Exist(t *testing.T) {
 	_ = func() ([]WorkspaceSymbol, error) { return b.WorkspaceSymbolsRaw(ctx, uri, "q") }
 	_ = func() (json.RawMessage, error) { return b.FormatRaw(ctx, uri) }
 	_ = func() ([]Symbol, error) { return b.DocumentSymbolsRaw(ctx, uri) }
+	_ = func() (*CallHierarchyResult, error) { return b.IncomingCallsRaw(ctx, uri, 0, 0) }
+	_ = func() (*CallHierarchyResult, error) { return b.OutgoingCallsRaw(ctx, uri, 0, 0) }
+}
+
+func TestParseIncomingCalls(t *testing.T) {
+	prepared := CallHierarchyItem{
+		Name:           "handleRequest",
+		Kind:           12, // Function
+		URI:            "file:///home/user/server.go",
+		SelectionRange: json.RawMessage(`{"start":{"line":10,"character":5},"end":{"line":10,"character":18}}`),
+	}
+
+	incomingRaw := json.RawMessage(`[
+		{
+			"from": {
+				"name": "main",
+				"kind": 12,
+				"uri": "file:///home/user/main.go",
+				"range": {"start":{"line":0,"character":0},"end":{"line":20,"character":0}},
+				"selectionRange": {"start":{"line":5,"character":6},"end":{"line":5,"character":10}}
+			},
+			"fromRanges": [{"start":{"line":15,"character":1},"end":{"line":15,"character":14}}]
+		},
+		{
+			"from": {
+				"name": "TestHandler",
+				"kind": 12,
+				"uri": "file:///home/user/server_test.go",
+				"range": {"start":{"line":0,"character":0},"end":{"line":10,"character":0}},
+				"selectionRange": {"start":{"line":3,"character":6},"end":{"line":3,"character":17}}
+			},
+			"fromRanges": [{"start":{"line":7,"character":1},"end":{"line":7,"character":14}}]
+		}
+	]`)
+
+	result := parseIncomingCalls(prepared, incomingRaw)
+
+	if result.Symbol.Name != "handleRequest" {
+		t.Errorf("expected symbol name handleRequest, got %s", result.Symbol.Name)
+	}
+	if result.Symbol.Kind != "Function" {
+		t.Errorf("expected symbol kind Function, got %s", result.Symbol.Kind)
+	}
+	if result.Symbol.Line != 10 {
+		t.Errorf("expected symbol line 10, got %d", result.Symbol.Line)
+	}
+	if result.Symbol.Character != 5 {
+		t.Errorf("expected symbol character 5, got %d", result.Symbol.Character)
+	}
+
+	if len(result.Calls) != 2 {
+		t.Fatalf("expected 2 incoming calls, got %d", len(result.Calls))
+	}
+
+	if result.Calls[0].Name != "main" {
+		t.Errorf("expected first caller main, got %s", result.Calls[0].Name)
+	}
+	if result.Calls[0].Line != 5 {
+		t.Errorf("expected first caller line 5, got %d", result.Calls[0].Line)
+	}
+
+	if result.Calls[1].Name != "TestHandler" {
+		t.Errorf("expected second caller TestHandler, got %s", result.Calls[1].Name)
+	}
+}
+
+func TestParseOutgoingCalls(t *testing.T) {
+	prepared := CallHierarchyItem{
+		Name:           "processData",
+		Kind:           6, // Method
+		URI:            "file:///home/user/processor.go",
+		SelectionRange: json.RawMessage(`{"start":{"line":20,"character":10},"end":{"line":20,"character":21}}`),
+	}
+
+	outgoingRaw := json.RawMessage(`[
+		{
+			"to": {
+				"name": "validate",
+				"kind": 12,
+				"uri": "file:///home/user/validator.go",
+				"range": {"start":{"line":0,"character":0},"end":{"line":15,"character":0}},
+				"selectionRange": {"start":{"line":2,"character":6},"end":{"line":2,"character":14}}
+			},
+			"fromRanges": [{"start":{"line":22,"character":1},"end":{"line":22,"character":9}}]
+		}
+	]`)
+
+	result := parseOutgoingCalls(prepared, outgoingRaw)
+
+	if result.Symbol.Name != "processData" {
+		t.Errorf("expected symbol name processData, got %s", result.Symbol.Name)
+	}
+	if result.Symbol.Kind != "Method" {
+		t.Errorf("expected symbol kind Method, got %s", result.Symbol.Kind)
+	}
+
+	if len(result.Calls) != 1 {
+		t.Fatalf("expected 1 outgoing call, got %d", len(result.Calls))
+	}
+
+	if result.Calls[0].Name != "validate" {
+		t.Errorf("expected callee validate, got %s", result.Calls[0].Name)
+	}
+	if result.Calls[0].Kind != "Function" {
+		t.Errorf("expected callee kind Function, got %s", result.Calls[0].Kind)
+	}
+	if result.Calls[0].Line != 2 {
+		t.Errorf("expected callee line 2, got %d", result.Calls[0].Line)
+	}
+}
+
+func TestCallHierarchyResult_JSONStructure(t *testing.T) {
+	result := CallHierarchyResult{
+		Symbol: CallHierarchyCall{
+			Name:      "Foo",
+			Kind:      "Function",
+			URI:       "file:///test.go",
+			Line:      5,
+			Character: 10,
+		},
+		Calls: []CallHierarchyCall{
+			{
+				Name:      "Bar",
+				Kind:      "Method",
+				URI:       "file:///other.go",
+				Line:      20,
+				Character: 3,
+			},
+		},
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	symbol, ok := decoded["symbol"].(map[string]any)
+	if !ok {
+		t.Fatal("expected symbol to be an object")
+	}
+	if symbol["name"] != "Foo" {
+		t.Errorf("expected symbol name Foo, got %v", symbol["name"])
+	}
+
+	calls, ok := decoded["calls"].([]any)
+	if !ok {
+		t.Fatal("expected calls to be an array")
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(calls))
+	}
+
+	call := calls[0].(map[string]any)
+	if call["name"] != "Bar" {
+		t.Errorf("expected call name Bar, got %v", call["name"])
+	}
+}
+
+func TestParseIncomingCalls_EmptyResponse(t *testing.T) {
+	prepared := CallHierarchyItem{
+		Name:           "isolated",
+		Kind:           12,
+		URI:            "file:///test.go",
+		SelectionRange: json.RawMessage(`{"start":{"line":0,"character":0},"end":{"line":0,"character":8}}`),
+	}
+
+	result := parseIncomingCalls(prepared, json.RawMessage(`[]`))
+
+	if result.Symbol.Name != "isolated" {
+		t.Errorf("expected symbol name isolated, got %s", result.Symbol.Name)
+	}
+	if len(result.Calls) != 0 {
+		t.Errorf("expected 0 calls for empty response, got %d", len(result.Calls))
+	}
 }
 
 // Helpers

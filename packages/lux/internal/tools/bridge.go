@@ -660,6 +660,148 @@ func (b *Bridge) Diagnostics(ctx context.Context, uri lsp.DocumentURI) (*command
 	return command.TextResult(text), nil
 }
 
+// Call hierarchy types
+
+type CallHierarchyItem struct {
+	Name           string          `json:"name"`
+	Kind           int             `json:"kind"`
+	URI            string          `json:"uri"`
+	Range          json.RawMessage `json:"range"`
+	SelectionRange json.RawMessage `json:"selectionRange"`
+	Detail         string          `json:"detail,omitempty"`
+	Data           json.RawMessage `json:"data,omitempty"`
+}
+
+type CallHierarchyCall struct {
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+}
+
+type CallHierarchyResult struct {
+	Symbol CallHierarchyCall   `json:"symbol"`
+	Calls  []CallHierarchyCall `json:"calls"`
+}
+
+func (b *Bridge) IncomingCallsRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) (*CallHierarchyResult, error) {
+	prepareResult, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentPrepareCallHierarchy, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"position":     lsp.Position{Line: line, Character: character},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var items []CallHierarchyItem
+	if err := json.Unmarshal(prepareResult, &items); err != nil || len(items) == 0 {
+		return nil, fmt.Errorf("no callable symbol at this position")
+	}
+
+	lspName := b.router.RouteByURI(uri)
+	inst, ok := b.pool.Get(lspName)
+	if !ok {
+		return nil, fmt.Errorf("LSP %s not running", lspName)
+	}
+
+	incomingRaw, err := inst.Call(ctx, lsp.MethodCallHierarchyIncomingCalls, map[string]any{
+		"item": items[0],
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseIncomingCalls(items[0], incomingRaw), nil
+}
+
+func (b *Bridge) OutgoingCallsRaw(ctx context.Context, uri lsp.DocumentURI, line, character int) (*CallHierarchyResult, error) {
+	prepareResult, err := b.withDocument(ctx, uri, lsp.MethodTextDocumentPrepareCallHierarchy, map[string]any{
+		"textDocument": lsp.TextDocumentIdentifier{URI: uri},
+		"position":     lsp.Position{Line: line, Character: character},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var items []CallHierarchyItem
+	if err := json.Unmarshal(prepareResult, &items); err != nil || len(items) == 0 {
+		return nil, fmt.Errorf("no callable symbol at this position")
+	}
+
+	lspName := b.router.RouteByURI(uri)
+	inst, ok := b.pool.Get(lspName)
+	if !ok {
+		return nil, fmt.Errorf("LSP %s not running", lspName)
+	}
+
+	outgoingRaw, err := inst.Call(ctx, lsp.MethodCallHierarchyOutgoingCalls, map[string]any{
+		"item": items[0],
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return parseOutgoingCalls(items[0], outgoingRaw), nil
+}
+
+func callHierarchyItemToCall(item CallHierarchyItem) CallHierarchyCall {
+	call := CallHierarchyCall{
+		Name: item.Name,
+		Kind: symbolKindName(item.Kind),
+		URI:  item.URI,
+	}
+
+	var selRange struct {
+		Start struct {
+			Line      int `json:"line"`
+			Character int `json:"character"`
+		} `json:"start"`
+	}
+	if err := json.Unmarshal(item.SelectionRange, &selRange); err == nil {
+		call.Line = selRange.Start.Line
+		call.Character = selRange.Start.Character
+	}
+
+	return call
+}
+
+func parseIncomingCalls(prepared CallHierarchyItem, raw json.RawMessage) *CallHierarchyResult {
+	result := &CallHierarchyResult{
+		Symbol: callHierarchyItemToCall(prepared),
+	}
+
+	var entries []struct {
+		From       CallHierarchyItem `json:"from"`
+		FromRanges json.RawMessage   `json:"fromRanges"`
+	}
+	if err := json.Unmarshal(raw, &entries); err == nil {
+		for _, entry := range entries {
+			result.Calls = append(result.Calls, callHierarchyItemToCall(entry.From))
+		}
+	}
+
+	return result
+}
+
+func parseOutgoingCalls(prepared CallHierarchyItem, raw json.RawMessage) *CallHierarchyResult {
+	result := &CallHierarchyResult{
+		Symbol: callHierarchyItemToCall(prepared),
+	}
+
+	var entries []struct {
+		To         CallHierarchyItem `json:"to"`
+		FromRanges json.RawMessage   `json:"fromRanges"`
+	}
+	if err := json.Unmarshal(raw, &entries); err == nil {
+		for _, entry := range entries {
+			result.Calls = append(result.Calls, callHierarchyItemToCall(entry.To))
+		}
+	}
+
+	return result
+}
+
 func (b *Bridge) readFile(uri lsp.DocumentURI) (string, error) {
 	path := uri.Path()
 	if path == "" {
@@ -707,6 +849,7 @@ func (b *Bridge) DefaultInitParams(uri lsp.DocumentURI) *lsp.InitializeParams {
 				CodeAction:     &lsp.CodeActionClientCaps{},
 				Formatting:     &lsp.FormattingClientCaps{},
 				Rename:             &lsp.RenameClientCaps{},
+				CallHierarchy:     &lsp.CallHierarchyClientCaps{},
 				PublishDiagnostics: &lsp.PublishDiagnosticsClientCaps{},
 			},
 			Window: &lsp.WindowClientCapabilities{
