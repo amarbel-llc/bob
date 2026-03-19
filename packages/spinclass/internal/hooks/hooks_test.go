@@ -127,6 +127,20 @@ func TestDisallowMainWorktreeGlobInMainRepo(t *testing.T) {
 	}
 }
 
+func TestDisallowMainWorktreeFindInMainRepo(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	input := makeInput("Find", map[string]any{"path": mainRepo}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for Find targeting main worktree")
+	}
+}
+
 func TestDisallowMainWorktreeBashAbsolutePathInMainRepo(t *testing.T) {
 	mainRepo := t.TempDir()
 	worktreeCwd := t.TempDir()

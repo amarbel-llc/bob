@@ -117,7 +117,7 @@ func extractPaths(input hookInput) []string {
 		if fp, ok := input.ToolInput["file_path"].(string); ok && fp != "" {
 			return []string{fp}
 		}
-	case "Glob", "Grep":
+	case "Glob", "Grep", "Find":
 		if p, ok := input.ToolInput["path"].(string); ok && p != "" {
 			return []string{p}
 		}
