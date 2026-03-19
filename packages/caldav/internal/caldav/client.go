@@ -202,6 +202,63 @@ func (c *Client) ListTasks(calendarHref string) (*TaskListResult, error) {
 	return result, nil
 }
 
+// ListEvents performs a REPORT calendar-query to list all VEVENTs in a calendar.
+// Parse errors for individual events are collected in EventListResult.ParseErrors
+// rather than causing the entire listing to fail.
+func (c *Client) ListEvents(calendarHref string) (*EventListResult, error) {
+	body := `<?xml version="1.0" encoding="utf-8" ?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag />
+    <c:calendar-data />
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VEVENT" />
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`
+
+	url := c.resolveHref(calendarHref)
+	resp, err := c.do("REPORT", url, body, 1)
+	if err != nil {
+		return nil, fmt.Errorf("REPORT: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	var ms multistatusResponse
+	if err := xml.Unmarshal(data, &ms); err != nil {
+		return nil, fmt.Errorf("parsing multistatus: %w", err)
+	}
+
+	result := &EventListResult{}
+	for _, r := range ms.Responses {
+		for _, ps := range r.PropStat {
+			if !strings.Contains(ps.Status, "200") || ps.Prop.CalendarData == "" {
+				continue
+			}
+			event, err := ParseVEVENT(ps.Prop.CalendarData)
+			if err != nil {
+				result.ParseErrors = append(result.ParseErrors,
+					fmt.Sprintf("%s: %v", r.Href, err))
+				continue
+			}
+			event.Href = r.Href
+			event.ETag = ps.Prop.GetETag
+			result.Events = append(result.Events, EventWithMeta{
+				Event: *event,
+				Raw:   ps.Prop.CalendarData,
+			})
+		}
+	}
+	return result, nil
+}
+
 // TaskWithMeta pairs a parsed Task with its raw iCalendar text.
 type TaskWithMeta struct {
 	Task Task
