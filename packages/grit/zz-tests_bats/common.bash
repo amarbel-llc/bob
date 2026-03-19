@@ -71,3 +71,30 @@ run_grit_mcp() {
   # Extract the text content from the result
   echo "$response" | jq -r '.result.content[0].text'
 }
+
+# Send a JSON-RPC resources/read request to grit and capture the response.
+# Usage: read_grit_resource <uri>
+# Sets $output to the parsed resource content text (JSON), and $status to exit code.
+read_grit_resource() {
+  local uri="$1"
+  local grit_bin="${GRIT_BIN:-grit}"
+
+  local init_request='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.0.1"}}}'
+  local initialized_notification='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  local read_request
+  read_request=$(printf '{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"%s"}}' "$uri")
+
+  local response
+  response=$(printf '%s\n%s\n%s\n' "$init_request" "$initialized_notification" "$read_request" \
+    | timeout --preserve-status 5s "$grit_bin" 2>/dev/null \
+    | grep -F '"id":2' \
+    | head -1)
+
+  if [ -z "$response" ]; then
+    echo "no response from grit"
+    return 1
+  fi
+
+  # Extract the text content from the result
+  echo "$response" | jq -r '.result.contents[0].text'
+}

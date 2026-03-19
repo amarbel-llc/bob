@@ -11,7 +11,7 @@ teardown() {
 
 function mcp_status_clean_repo { # @test
   setup_test_repo
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
   local head
   head=$(echo "$output" | jq -r '.branch.head')
@@ -28,7 +28,7 @@ function mcp_status_during_rebase_conflict_shows_unmerged_entries { # @test
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
   # Now check status
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   # Entries should have UU state (both modified)
@@ -41,7 +41,7 @@ function mcp_status_during_rebase_shows_operation { # @test
   setup_conflict_scenario
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   local operation
@@ -53,7 +53,7 @@ function mcp_status_during_rebase_shows_branch { # @test
   setup_conflict_scenario
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   local branch
@@ -65,7 +65,7 @@ function mcp_status_during_rebase_shows_detached_head { # @test
   setup_conflict_scenario
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   local head
@@ -77,7 +77,7 @@ function mcp_status_during_rebase_shows_step_progress { # @test
   setup_conflict_scenario
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   local step
@@ -90,7 +90,7 @@ function mcp_status_no_state_after_rebase_abort { # @test
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","abort":true}' "$TEST_REPO")"
 
-  run run_grit_mcp "status" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run read_grit_resource "grit://status?repo_path=$TEST_REPO"
   assert_success
 
   local state
