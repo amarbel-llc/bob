@@ -9,6 +9,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 	"github.com/amarbel-llc/lux/internal/config"
@@ -108,10 +109,19 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	mcpApp.Version = "0.1.0"
 	mcpApp.MCPArgs = []string{"mcp-stdio"}
 
+	readOnly := true
+	notDestructive := false
+	idempotent := true
+
 	mcpApp.AddCommand(&command.Command{
 		Name: "resource-templates",
 		Description: command.Description{
 			Short: "List available lux resource templates. Call this first to discover what LSP resources are available, then use resource-read to access them.",
+		},
+		Annotations: &protocol.ToolAnnotations{
+			ReadOnlyHint:    &readOnly,
+			DestructiveHint: &notDestructive,
+			IdempotentHint:  &idempotent,
 		},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			templates, err := resProvider.ListResourceTemplates(ctx)
@@ -147,6 +157,11 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 		Name: "resource-read",
 		Description: command.Description{
 			Short: "Read a lux resource by URI. This tool exists because subagents cannot access MCP resources directly (forwarded resource permissions are not yet supported). Call resource-templates to discover available URIs.",
+		},
+		Annotations: &protocol.ToolAnnotations{
+			ReadOnlyHint:    &readOnly,
+			DestructiveHint: &notDestructive,
+			IdempotentHint:  &idempotent,
 		},
 		Params: []command.Param{
 			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
