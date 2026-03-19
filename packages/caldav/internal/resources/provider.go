@@ -73,6 +73,17 @@ func (p *Provider) registerResources() {
 		nil, // Handled by ReadResource prefix matching
 	)
 
+	// Tier 0: Discovery — recurring tasks
+	p.registry.RegisterResource(
+		protocol.Resource{
+			URI:         "caldav://tasks/recurring",
+			Name:        "Recurring Tasks",
+			Description: "All tasks with RRULE recurrence rules across all calendars. Returns metadata-tier results. Read caldav://calendars first to populate the cache.",
+			MimeType:    "application/json",
+		},
+		p.readRecurringTasks,
+	)
+
 	// Tier 1: Metadata — tasks in a calendar
 	p.registry.RegisterTemplate(
 		protocol.ResourceTemplate{
@@ -206,6 +217,28 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 	p.index.Build(allTasks)
 
 	resp := calendarsResponse{Calendars: infos, Total: len(infos), Warnings: warnings}
+	return jsonResource(uri, resp)
+}
+
+// --- Tier 0: Recurring Tasks ---
+
+func (p *Provider) readRecurringTasks(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
+	var results []caldav.TaskMetadata
+	p.mu.RLock()
+	for _, tm := range p.taskMap {
+		if tm.Task.RRule != "" {
+			results = append(results, tm.Task.ToMetadata())
+		}
+	}
+	p.mu.RUnlock()
+
+	resp := struct {
+		Tasks []caldav.TaskMetadata `json:"tasks"`
+		Total int                   `json:"total"`
+	}{
+		Tasks: results,
+		Total: len(results),
+	}
 	return jsonResource(uri, resp)
 }
 

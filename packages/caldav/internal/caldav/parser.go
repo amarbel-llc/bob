@@ -55,6 +55,7 @@ type TaskMetadata struct {
 	Priority          int      `json:"priority,omitempty"`
 	Due               string   `json:"due,omitempty"`
 	Categories        []string `json:"categories,omitempty"`
+	RRule             string   `json:"rrule,omitempty"`
 	HasDescription    bool     `json:"has_description"`
 	DescriptionTokens int      `json:"description_tokens"`
 	ParentUID         string   `json:"parent_uid,omitempty"`
@@ -69,6 +70,7 @@ func (t *Task) ToMetadata() TaskMetadata {
 		Priority:          t.Priority,
 		Due:               t.Due,
 		Categories:        t.Categories,
+		RRule:             t.RRule,
 		HasDescription:    t.HasDescription,
 		DescriptionTokens: t.DescriptionTokens,
 		ParentUID:         t.ParentUID,
