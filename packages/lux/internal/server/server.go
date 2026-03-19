@@ -10,7 +10,6 @@ import (
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/config/filetype"
-	"github.com/amarbel-llc/lux/internal/control"
 	"github.com/amarbel-llc/lux/internal/formatter"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/subprocess"
@@ -25,7 +24,6 @@ type Server struct {
 	filetypes   []*filetype.Config
 	executor    subprocess.Executor
 	clientConn  *jsonrpc.Conn
-	controlSrv  *control.Server
 	initParams  *lsp.InitializeParams
 	projectRoot string
 	initialized bool
@@ -61,7 +59,6 @@ func New(cfg *config.Config) (*Server, error) {
 	})
 
 	for _, l := range cfg.LSPs {
-		// Convert config.CapabilityOverride to subprocess.CapabilityOverride
 		var capOverrides *subprocess.CapabilityOverride
 		if l.Capabilities != nil {
 			capOverrides = &subprocess.CapabilityOverride{
@@ -104,14 +101,6 @@ func (s *Server) Run(ctx context.Context) error {
 	handler := NewHandler(s)
 	s.clientConn = jsonrpc.NewConn(os.Stdin, os.Stdout, handler.Handle)
 
-	controlSrv, err := control.NewServer(s.cfg.SocketPath(), s.pool, s.cfg, s.filetypes, s.executor)
-	if err != nil {
-		fmt.Fprintf(logfile.Writer(), "warning: could not start control socket: %v\n", err)
-	} else {
-		s.controlSrv = controlSrv
-		go s.controlSrv.Run(ctx)
-	}
-
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.clientConn.Run(ctx)
@@ -131,10 +120,6 @@ func (s *Server) Run(ctx context.Context) error {
 
 func (s *Server) shutdown() {
 	s.pool.StopAll()
-
-	if s.controlSrv != nil {
-		s.controlSrv.Close()
-	}
 }
 
 func (s *Server) Close() {
@@ -152,9 +137,7 @@ func (s *Server) Router() *Router {
 func (s *Server) reloadPool(cfg *config.Config) error {
 	s.cfg = cfg
 
-	// Re-register all LSPs with updated config
 	for _, l := range cfg.LSPs {
-		// Convert config.CapabilityOverride to subprocess.CapabilityOverride
 		var capOverrides *subprocess.CapabilityOverride
 		if l.Capabilities != nil {
 			capOverrides = &subprocess.CapabilityOverride{

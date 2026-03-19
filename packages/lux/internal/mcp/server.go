@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/lux/internal/logfile"
@@ -15,19 +16,17 @@ import (
 	"github.com/amarbel-llc/lux/internal/formatter"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/server"
-	"github.com/amarbel-llc/lux/internal/service"
 	"github.com/amarbel-llc/lux/internal/subprocess"
 	"github.com/amarbel-llc/lux/internal/tools"
 	"github.com/amarbel-llc/lux/internal/warmup"
 )
 
 type Server struct {
-	inner         *mcpserver.Server
-	pool          *subprocess.Pool
-	docMgr        *DocumentManager
-	serviceDocMgr *service.ServiceDocumentManager
-	diagStore     *DiagnosticsStore
-	transport     transport.Transport
+	inner     *mcpserver.Server
+	pool      *subprocess.Pool
+	docMgr    *DocumentManager
+	diagStore *DiagnosticsStore
+	transport transport.Transport
 }
 
 func New(cfg *config.Config, t transport.Transport) (*Server, error) {
@@ -96,25 +95,80 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	s.docMgr = NewDocumentManager(s.pool, router, bridge)
 	bridge.SetDocumentManager(s.docMgr)
 
-	app := command.NewApp("lux", "MCP server exposing LSP capabilities as tools")
-	app.Version = "0.1.0"
-	app.MCPArgs = []string{"mcp", "stdio"}
-	tools.RegisterAll(app, bridge)
-
-	toolRegistry := mcpserver.NewToolRegistry()
-	app.RegisterMCPTools(toolRegistry)
-
 	resourceRegistry := mcpserver.NewResourceRegistry()
 	registerResources(resourceRegistry, s.pool, bridge, cfg, ftConfigs, s.diagStore)
+
+	resProvider := newResourceProvider(resourceRegistry, bridge, s.diagStore)
+
+	// Create a minimal MCP app with only the read_resource tool.
+	// LSP operations are exposed as resource templates for progressive disclosure:
+	// clients list templates to discover capabilities, then read resources through
+	// this single tool.
+	mcpApp := command.NewApp("lux", "MCP server exposing LSP capabilities as resources")
+	mcpApp.Version = "0.1.0"
+	mcpApp.MCPArgs = []string{"mcp-stdio"}
+
+	mcpApp.AddCommand(&command.Command{
+		Name: "read_resource",
+		Description: command.Description{
+			Short: `Read an LSP resource by URI. Use resources/list and resources/templates/list to discover available resources.
+
+Available resource templates:
+- lux://lsp/hover?uri={file_uri}&line={line}&character={character} — type info, docs, signatures
+- lux://lsp/definition?uri={file_uri}&line={line}&character={character} — jump to definition
+- lux://lsp/references?uri={file_uri}&line={line}&character={character} — find all usages
+- lux://lsp/completion?uri={file_uri}&line={line}&character={character} — code completions
+- lux://lsp/document-symbols?uri={file_uri} — file outline (functions, types, etc.)
+- lux://lsp/diagnostics?uri={file_uri} — compiler/linter errors and warnings
+- lux://lsp/format?uri={file_uri} — formatting edits
+- lux://lsp/code-action?uri={file_uri}&start_line={sl}&start_character={sc}&end_line={el}&end_character={ec} — suggested fixes
+- lux://lsp/rename?uri={file_uri}&line={line}&character={character}&new_name={name} — semantic rename
+- lux://lsp/workspace-symbols?uri={file_uri}&query={pattern} — search symbols by name
+- lux://status — LSP server status
+- lux://languages — supported languages
+- lux://files — project files matching LSP extensions
+
+File URIs must be file:// URIs (e.g., file:///path/to/file.go). Line and character are 0-indexed.`,
+		},
+		Params: []command.Param{
+			{Name: "uri", Type: command.String, Description: "Resource URI to read (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
+		},
+		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+			var a struct {
+				URI string `json:"uri"`
+			}
+			if err := json.Unmarshal(args, &a); err != nil {
+				return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
+			}
+
+			result, err := resProvider.ReadResource(ctx, a.URI)
+			if err != nil {
+				return command.TextErrorResult(err.Error()), nil
+			}
+
+			var sb strings.Builder
+			for i, c := range result.Contents {
+				if i > 0 {
+					sb.WriteString("\n---\n")
+				}
+				sb.WriteString(c.Text)
+			}
+
+			return command.TextResult(sb.String()), nil
+		},
+	})
+
+	toolRegistry := mcpserver.NewToolRegistry()
+	mcpApp.RegisterMCPTools(toolRegistry)
 
 	promptRegistry := mcpserver.NewPromptRegistry()
 	registerPrompts(promptRegistry)
 
 	inner, err := mcpserver.New(t, mcpserver.Options{
-		ServerName:    app.Name,
-		ServerVersion: app.Version,
+		ServerName:    mcpApp.Name,
+		ServerVersion: mcpApp.Version,
 		Tools:         toolRegistry,
-		Resources:     newResourceProvider(resourceRegistry, bridge, s.diagStore),
+		Resources:     resProvider,
 		Prompts:       promptRegistry,
 	})
 	if err != nil {
@@ -128,91 +182,8 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	return s, nil
 }
 
-// NewWithService creates an MCP server that routes all LSP operations through
-// the daemon socket instead of managing a local subprocess pool. The daemon
-// handles LSP lifecycle, routing, and readiness.
-func NewWithService(t transport.Transport, serviceConn *jsonrpc.Conn, sessionID string) (*Server, error) {
-	ftConfigs, err := filetype.LoadMerged()
-	if err != nil {
-		fmt.Fprintf(logfile.Writer(), "warning: could not load filetype config: %v\n", err)
-		ftConfigs = []*filetype.Config{}
-	}
-
-	var fmtRouter *formatter.Router
-	fmtCfg, err := config.LoadMergedFormatters()
-	if err != nil {
-		fmt.Fprintf(logfile.Writer(), "warning: could not load formatter config: %v\n", err)
-	} else {
-		fmtMap := make(map[string]*config.Formatter)
-		for i := range fmtCfg.Formatters {
-			f := &fmtCfg.Formatters[i]
-			if !f.Disabled {
-				fmtMap[f.Name] = f
-			}
-		}
-
-		fmtRouter, err = formatter.NewRouter(ftConfigs, fmtMap)
-		if err != nil {
-			fmt.Fprintf(logfile.Writer(), "warning: could not create formatter router: %v\n", err)
-			fmtRouter = nil
-		}
-	}
-
-	executor := subprocess.NewNixExecutor()
-
-	bridge := tools.NewServiceBridge(serviceConn, sessionID, fmtRouter, executor, func(lspName, message string) {
-		notification, err := jsonrpc.NewNotification("notifications/message", map[string]any{
-			"level": "info",
-			"data":  fmt.Sprintf("%s: %s", lspName, message),
-		})
-		if err == nil {
-			t.Write(notification)
-		}
-	})
-
-	serviceDocMgr := service.NewServiceDocumentManager(serviceConn, sessionID, bridge.InferLanguageID)
-	bridge.SetDocumentManager(serviceDocMgr)
-
-	app := command.NewApp("lux", "MCP server exposing LSP capabilities as tools")
-	app.Version = "0.1.0"
-	app.MCPArgs = []string{"mcp", "stdio"}
-	tools.RegisterAll(app, bridge)
-
-	toolRegistry := mcpserver.NewToolRegistry()
-	app.RegisterMCPTools(toolRegistry)
-
-	s := &Server{
-		serviceDocMgr: serviceDocMgr,
-		transport:     t,
-		diagStore:     NewDiagnosticsStore(),
-	}
-
-	resourceRegistry := mcpserver.NewResourceRegistry()
-	registerResources(resourceRegistry, nil, bridge, nil, ftConfigs, s.diagStore)
-
-	promptRegistry := mcpserver.NewPromptRegistry()
-	registerPrompts(promptRegistry)
-
-	inner, err := mcpserver.New(t, mcpserver.Options{
-		ServerName:    app.Name,
-		ServerVersion: app.Version,
-		Tools:         toolRegistry,
-		Resources:     newResourceProvider(resourceRegistry, bridge, s.diagStore),
-		Prompts:       promptRegistry,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating MCP server: %w", err)
-	}
-
-	s.inner = inner
-	return s, nil
-}
-
 func (s *Server) Run(ctx context.Context) error {
 	defer func() {
-		if s.serviceDocMgr != nil {
-			s.serviceDocMgr.CloseAll()
-		}
 		if s.docMgr != nil {
 			s.docMgr.CloseAll()
 		}
@@ -227,13 +198,8 @@ func (s *Server) Close() {
 	s.inner.Close()
 }
 
-func (s *Server) DocumentManager() *DocumentManager {
-	return s.docMgr
-}
-
 func (s *Server) lspNotificationHandler(lspName string) jsonrpc.Handler {
 	return func(ctx context.Context, msg *jsonrpc.Message) (*jsonrpc.Message, error) {
-		// Intercept window/workDoneProgress/create requests
 		if msg.IsRequest() && msg.Method == lsp.MethodWindowWorkDoneProgressCreate {
 			if inst, ok := s.pool.Get(lspName); ok && inst.Progress != nil {
 				var params lsp.WorkDoneProgressCreateParams
@@ -244,7 +210,6 @@ func (s *Server) lspNotificationHandler(lspName string) jsonrpc.Handler {
 			return jsonrpc.NewResponse(*msg.ID, nil)
 		}
 
-		// Intercept $/progress notifications — update tracker, log to stderr
 		if msg.IsNotification() && msg.Method == lsp.MethodProgress {
 			if inst, ok := s.pool.Get(lspName); ok && inst.Progress != nil {
 				var params lsp.ProgressParams

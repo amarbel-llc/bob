@@ -17,7 +17,6 @@ import (
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/server"
-	"github.com/amarbel-llc/lux/internal/service"
 	"github.com/amarbel-llc/lux/internal/subprocess"
 )
 
@@ -34,28 +33,12 @@ type Bridge struct {
 	executor         subprocess.Executor
 	docMgr           DocumentTracker
 	progressReporter func(lspName, message string)
-
-	// Service mode: route LSP operations through the daemon socket.
-	serviceConn *jsonrpc.Conn
-	sessionID   string
 }
 
 func NewBridge(pool *subprocess.Pool, router *server.Router, fmtRouter *formatter.Router, executor subprocess.Executor, progressReporter func(lspName, message string)) *Bridge {
 	return &Bridge{
 		pool:             pool,
 		router:           router,
-		fmtRouter:        fmtRouter,
-		executor:         executor,
-		progressReporter: progressReporter,
-	}
-}
-
-// NewServiceBridge creates a Bridge that routes all LSP operations through
-// the daemon socket instead of managing a local subprocess pool.
-func NewServiceBridge(serviceConn *jsonrpc.Conn, sessionID string, fmtRouter *formatter.Router, executor subprocess.Executor, progressReporter func(lspName, message string)) *Bridge {
-	return &Bridge{
-		serviceConn:      serviceConn,
-		sessionID:        sessionID,
 		fmtRouter:        fmtRouter,
 		executor:         executor,
 		progressReporter: progressReporter,
@@ -141,13 +124,6 @@ func (b *Bridge) callWithRetry(ctx context.Context, fn func() (json.RawMessage, 
 }
 
 func (b *Bridge) withDocument(ctx context.Context, uri lsp.DocumentURI, method string, params any) (json.RawMessage, error) {
-	if b.serviceConn != nil {
-		return b.withDocumentRemote(ctx, uri, method, params)
-	}
-	return b.withDocumentLocal(ctx, uri, method, params)
-}
-
-func (b *Bridge) withDocumentLocal(ctx context.Context, uri lsp.DocumentURI, method string, params any) (json.RawMessage, error) {
 	lspName := b.router.RouteByURI(uri)
 	if lspName == "" {
 		return nil, fmt.Errorf("no LSP configured for %s", uri)
@@ -208,29 +184,6 @@ func (b *Bridge) withDocumentLocal(ctx context.Context, uri lsp.DocumentURI, met
 
 	return b.callWithRetry(ctx, func() (json.RawMessage, error) {
 		return inst.Call(ctx, method, params)
-	})
-}
-
-func (b *Bridge) withDocumentRemote(ctx context.Context, uri lsp.DocumentURI, method string, params any) (json.RawMessage, error) {
-	if b.docMgr != nil {
-		if !b.docMgr.IsOpen(uri) {
-			if err := b.docMgr.Open(ctx, uri); err != nil {
-				return nil, fmt.Errorf("opening document: %w", err)
-			}
-		}
-	}
-
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling params: %w", err)
-	}
-
-	return b.callWithRetry(ctx, func() (json.RawMessage, error) {
-		return b.serviceConn.Call(ctx, service.MethodLSPRequest, service.LSPRequestParams{
-			SessionID: b.sessionID,
-			LSPMethod: method,
-			LSPParams: paramsJSON,
-		})
 	})
 }
 

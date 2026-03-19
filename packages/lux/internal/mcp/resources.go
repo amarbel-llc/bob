@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/lux/internal/config"
@@ -20,8 +22,8 @@ import (
 	"github.com/amarbel-llc/lux/pkg/filematch"
 )
 
-// resourceProvider wraps a ResourceRegistry to handle the symbols resource
-// template which uses prefix matching on URIs rather than exact lookup.
+// resourceProvider wraps a ResourceRegistry to handle template-based resources
+// that use prefix matching on URIs rather than exact lookup.
 type resourceProvider struct {
 	registry  *mcpserver.ResourceRegistry
 	bridge    *tools.Bridge
@@ -41,6 +43,11 @@ func (p *resourceProvider) ListResources(ctx context.Context) ([]protocol.Resour
 }
 
 func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
+	// LSP operation resources
+	if strings.HasPrefix(uri, "lux://lsp/") {
+		return p.readLSPResource(ctx, uri)
+	}
+	// Legacy symbol/diagnostic templates
 	if strings.HasPrefix(uri, "lux://symbols/") {
 		fileURI := strings.TrimPrefix(uri, "lux://symbols/")
 		return readSymbols(ctx, p.bridge, uri, fileURI)
@@ -54,6 +61,178 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 
 func (p *resourceProvider) ListResourceTemplates(ctx context.Context) ([]protocol.ResourceTemplate, error) {
 	return p.registry.ListResourceTemplates(ctx)
+}
+
+// readLSPResource dispatches lux://lsp/* resource reads to the bridge.
+func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("invalid resource URI: %w", err)
+	}
+
+	// For lux://lsp/hover?..., url.Parse gives Host="lsp", Path="/hover"
+	operation := strings.TrimPrefix(parsed.Path, "/")
+	if operation == "" {
+		return nil, fmt.Errorf("missing operation in resource URI")
+	}
+	q := parsed.Query()
+
+	getFileURI := func() (lsp.DocumentURI, error) {
+		v := q.Get("uri")
+		if v == "" {
+			return "", fmt.Errorf("missing required parameter 'uri'")
+		}
+		return lsp.DocumentURI(v), nil
+	}
+
+	getPosition := func() (lsp.DocumentURI, int, int, error) {
+		fileURI, err := getFileURI()
+		if err != nil {
+			return "", 0, 0, err
+		}
+		line, err := strconv.Atoi(q.Get("line"))
+		if err != nil {
+			return "", 0, 0, fmt.Errorf("invalid or missing 'line' parameter")
+		}
+		char, err := strconv.Atoi(q.Get("character"))
+		if err != nil {
+			return "", 0, 0, fmt.Errorf("invalid or missing 'character' parameter")
+		}
+		return fileURI, line, char, nil
+	}
+
+	var result *command.Result
+	switch operation {
+	case "hover":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.Hover(ctx, fileURI, line, char)
+		if err != nil {
+			return nil, err
+		}
+
+	case "definition":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.Definition(ctx, fileURI, line, char)
+		if err != nil {
+			return nil, err
+		}
+
+	case "references":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		includeDecl := q.Get("include_declaration") != "false"
+		result, err = p.bridge.References(ctx, fileURI, line, char, includeDecl)
+		if err != nil {
+			return nil, err
+		}
+
+	case "completion":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.Completion(ctx, fileURI, line, char)
+		if err != nil {
+			return nil, err
+		}
+
+	case "format":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.Format(ctx, fileURI)
+		if err != nil {
+			return nil, err
+		}
+
+	case "document-symbols":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.DocumentSymbols(ctx, fileURI)
+		if err != nil {
+			return nil, err
+		}
+
+	case "diagnostics":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		result, err = p.bridge.Diagnostics(ctx, fileURI)
+		if err != nil {
+			return nil, err
+		}
+
+	case "code-action":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		startLine, _ := strconv.Atoi(q.Get("start_line"))
+		startChar, _ := strconv.Atoi(q.Get("start_character"))
+		endLine, _ := strconv.Atoi(q.Get("end_line"))
+		endChar, _ := strconv.Atoi(q.Get("end_character"))
+		result, err = p.bridge.CodeAction(ctx, fileURI, startLine, startChar, endLine, endChar)
+		if err != nil {
+			return nil, err
+		}
+
+	case "rename":
+		fileURI, line, char, err := getPosition()
+		if err != nil {
+			return nil, err
+		}
+		newName := q.Get("new_name")
+		if newName == "" {
+			return nil, fmt.Errorf("missing required parameter 'new_name'")
+		}
+		result, err = p.bridge.Rename(ctx, fileURI, line, char, newName)
+		if err != nil {
+			return nil, err
+		}
+
+	case "workspace-symbols":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		query := q.Get("query")
+		if query == "" {
+			return nil, fmt.Errorf("missing required parameter 'query'")
+		}
+		result, err = p.bridge.WorkspaceSymbols(ctx, fileURI, query)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown LSP operation: %s", operation)
+	}
+
+	text := result.Text
+	if result.IsErr {
+		return nil, fmt.Errorf("LSP operation failed: %s", text)
+	}
+	return &protocol.ResourceReadResult{
+		Contents: []protocol.ResourceContent{
+			{
+				URI:      uri,
+				MimeType: "text/plain",
+				Text:     text,
+			},
+		},
+	}, nil
 }
 
 func registerResources(
@@ -73,19 +252,17 @@ func registerResources(
 		}
 	}
 
-	if pool != nil {
-		registry.RegisterResource(
-			protocol.Resource{
-				URI:         "lux://status",
-				Name:        "LSP Status",
-				Description: "Current status of configured language servers including which are running",
-				MimeType:    "application/json",
-			},
-			func(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
-				return readStatus(pool, cfg, ftConfigs)
-			},
-		)
-	}
+	registry.RegisterResource(
+		protocol.Resource{
+			URI:         "lux://status",
+			Name:        "LSP Status",
+			Description: "Current status of configured language servers including which are running",
+			MimeType:    "application/json",
+		},
+		func(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
+			return readStatus(pool, cfg, ftConfigs)
+		},
+	)
 
 	registry.RegisterResource(
 		protocol.Resource{
@@ -111,6 +288,7 @@ func registerResources(
 		},
 	)
 
+	// Template resources for data inspection
 	registry.RegisterTemplate(
 		protocol.ResourceTemplate{
 			URITemplate: "lux://symbols/{uri}",
@@ -130,6 +308,74 @@ func registerResources(
 		},
 		nil, // Template URIs are handled by the resourceProvider wrapper
 	)
+
+	// LSP operation resource templates — accessed via read_resource tool
+	lspTemplates := []protocol.ResourceTemplate{
+		{
+			URITemplate: "lux://lsp/hover?uri={uri}&line={line}&character={character}",
+			Name:        "Hover",
+			Description: "Get type information, documentation, and signatures for a symbol at a position",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/definition?uri={uri}&line={line}&character={character}",
+			Name:        "Go to Definition",
+			Description: "Jump to the definition of a symbol at a position using semantic analysis",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/references?uri={uri}&line={line}&character={character}",
+			Name:        "Find References",
+			Description: "Find all usages of a symbol throughout the codebase. Optional: &include_declaration=false",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/completion?uri={uri}&line={line}&character={character}",
+			Name:        "Completion",
+			Description: "Get context-aware code completions at a cursor position",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/format?uri={uri}",
+			Name:        "Format",
+			Description: "Get formatting edits for a document according to language-standard style",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/document-symbols?uri={uri}",
+			Name:        "Document Symbols",
+			Description: "Get a structured outline of all symbols in a file (functions, types, constants)",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/diagnostics?uri={uri}",
+			Name:        "Diagnostics",
+			Description: "Get compiler/linter diagnostics (errors, warnings, hints) for a file",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/code-action?uri={uri}&start_line={start_line}&start_character={start_character}&end_line={end_line}&end_character={end_character}",
+			Name:        "Code Action",
+			Description: "Get suggested fixes, refactorings, and improvements for a code range",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/rename?uri={uri}&line={line}&character={character}&new_name={new_name}",
+			Name:        "Rename",
+			Description: "Rename a symbol across the entire codebase with semantic accuracy",
+			MimeType:    "text/plain",
+		},
+		{
+			URITemplate: "lux://lsp/workspace-symbols?uri={uri}&query={query}",
+			Name:        "Workspace Symbols",
+			Description: "Search for symbols (functions, types, constants) across the workspace by name pattern",
+			MimeType:    "text/plain",
+		},
+	}
+
+	for _, tmpl := range lspTemplates {
+		registry.RegisterTemplate(tmpl, nil)
+	}
 }
 
 type statusResponse struct {
@@ -153,7 +399,6 @@ func readStatus(pool *subprocess.Pool, cfg *config.Config, ftConfigs []*filetype
 		statusMap[s.Name] = s.State
 	}
 
-	// Build lookup from LSP name to extensions/patterns from filetype configs
 	lspExts := make(map[string][]string)
 	lspPatterns := make(map[string][]string)
 	var allExts, allLangs []string
@@ -167,7 +412,6 @@ func readStatus(pool *subprocess.Pool, cfg *config.Config, ftConfigs []*filetype
 	}
 
 	var lsps []lspStatus
-
 	for _, l := range cfg.LSPs {
 		state := statusMap[l.Name]
 		if state == "" {

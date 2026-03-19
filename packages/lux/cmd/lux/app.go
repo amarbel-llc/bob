@@ -4,28 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/BurntSushi/toml"
 
 	"github.com/amarbel-llc/lux/internal/capabilities"
-	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/config/filetype"
 	"github.com/amarbel-llc/lux/internal/formatter"
 	"github.com/amarbel-llc/lux/internal/mcp"
-	"github.com/amarbel-llc/lux/internal/service"
 	"github.com/amarbel-llc/lux/internal/subprocess"
 	"github.com/amarbel-llc/lux/internal/tools"
-	luxtransport "github.com/amarbel-llc/lux/internal/transport"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 )
 
@@ -37,25 +30,24 @@ func buildApp() *command.App {
 
 	addCLICommands(app)
 
-	mcpApp := buildMCPTransportApp()
-	app.MergeWithPrefix(mcpApp, "mcp")
-
-	serviceApp := buildServiceApp()
-	app.MergeWithPrefix(serviceApp, "service")
-
 	app.AddCommand(&command.Command{
-		Name: "mcp",
+		Name: "mcp-stdio",
 		Description: command.Description{
-			Short: "Run as MCP server",
-			Long:  "Run Lux as an MCP server, exposing LSP capabilities as MCP tools.",
+			Short: "Run as MCP server over stdio",
+			Long:  "Run Lux as an MCP server, exposing LSP capabilities as MCP tools. Reads from stdin and writes to stdout.",
 		},
-	})
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
 
-	app.AddCommand(&command.Command{
-		Name: "service",
-		Description: command.Description{
-			Short: "Manage the lux background service",
-			Long:  "Commands for managing the lux background service daemon.",
+			t := transport.NewStdio(os.Stdin, os.Stdout)
+			srv, err := mcp.New(cfg, t)
+			if err != nil {
+				return fmt.Errorf("creating MCP server: %w", err)
+			}
+			return srv.Run(ctx)
 		},
 	})
 
@@ -100,29 +92,6 @@ With --force, overwrites existing files.`,
 				return fmt.Errorf("invalid arguments: %w", err)
 			}
 			return runInit(p.Default, p.Force)
-		},
-	})
-
-	app.AddCommand(&command.Command{
-		Name: "lsp",
-		Description: command.Description{
-			Short: "Start the LSP proxy client",
-			Long:  "Start the Lux LSP proxy, connecting to the service daemon over a Unix socket.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			workspaceRoot, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("getting working directory: %w", err)
-			}
-
-			client := service.NewLSPClient(cfg.SocketPath(), workspaceRoot)
-
-			return client.Run(ctx)
 		},
 	})
 
@@ -225,128 +194,6 @@ With --formatter, adds a formatter to formatters.toml:
 	})
 
 	app.AddCommand(&command.Command{
-		Name: "status",
-		Description: command.Description{
-			Short: "Show status of running LSPs",
-			Long:  "Connect to the service daemon and show the status of all LSPs.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			result, err := callService(ctx, cfg.SocketPath(), service.MethodPoolStatus, nil, nil)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(result))
-			return nil
-		},
-	})
-
-	app.AddCommand(&command.Command{
-		Name: "start",
-		Description: command.Description{
-			Short: "Eagerly start an LSP",
-			Long:  "Start a configured LSP without waiting for a matching request.",
-		},
-		Params: []command.Param{
-			{Name: "name", Type: command.String, Description: "LSP name", Required: true},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Name string `json:"name"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			_, err = callService(ctx, cfg.SocketPath(), service.MethodPoolStart, service.PoolStartParams{
-				Name: p.Name,
-			}, nil)
-
-			return err
-		},
-	})
-
-	app.AddCommand(&command.Command{
-		Name: "stop",
-		Description: command.Description{
-			Short: "Stop a running LSP",
-			Long:  "Stop a running LSP to free resources.",
-		},
-		Params: []command.Param{
-			{Name: "name", Type: command.String, Description: "LSP name", Required: true},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Name string `json:"name"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			_, err = callService(ctx, cfg.SocketPath(), service.MethodPoolStop, service.PoolStopParams{
-				Name: p.Name,
-			}, nil)
-
-			return err
-		},
-	})
-
-	app.AddCommand(&command.Command{
-		Name: "warmup",
-		Description: command.Description{
-			Short: "Pre-start LSPs for a directory",
-			Long:  "Scan a directory for matching files and eagerly start the relevant LSPs.",
-		},
-		Params: []command.Param{
-			{Name: "dir", Type: command.String, Description: "Directory to scan", Default: "."},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Dir string `json:"dir"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			dir := p.Dir
-			if dir == "" {
-				dir = "."
-			}
-
-			absDir, err := filepath.Abs(dir)
-			if err != nil {
-				return fmt.Errorf("resolving path: %w", err)
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			_, err = callService(ctx, cfg.SocketPath(), service.MethodWarmup, service.WarmupParams{
-				Dir: absDir,
-			}, nil)
-
-			return err
-		},
-	})
-
-	app.AddCommand(&command.Command{
 		Name: "fmt",
 		Description: command.Description{
 			Short: "Format a file using configured formatters",
@@ -438,382 +285,6 @@ With --formatter, adds a formatter to formatters.toml:
 			return nil
 		},
 	})
-}
-
-func buildServiceApp() *command.App {
-	serviceApp := command.NewApp("service", "Service management")
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "run",
-		Description: command.Description{
-			Short: "Run the service daemon",
-			Long:  "Run the lux service daemon in the foreground, listening on a Unix socket.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			d := service.NewDaemon(cfg.SocketPath(), cfg, 30*time.Minute)
-
-			return d.Run(ctx)
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "run-systemd",
-		Description: command.Description{
-			Short: "Run the daemon with systemd socket activation",
-			Long:  "Run the lux service daemon using a socket inherited from systemd. Called by the systemd service unit.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			listener, err := service.SystemdListener()
-			if err != nil {
-				return fmt.Errorf("systemd socket activation: %w", err)
-			}
-			if listener == nil {
-				return fmt.Errorf("LISTEN_PID/LISTEN_FDS not set (not launched by systemd?)")
-			}
-
-			d := service.NewDaemon(cfg.SocketPath(), cfg, 30*time.Minute)
-			return d.RunWithListener(ctx, listener)
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "run-launchd",
-		Description: command.Description{
-			Short: "Run the daemon with launchd socket activation",
-			Long:  "Run the lux service daemon using a socket inherited from launchd. Called by the launchd plist.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			listener, err := service.LaunchdListener()
-			if err != nil {
-				return fmt.Errorf("launchd socket activation: %w", err)
-			}
-			if listener == nil {
-				return fmt.Errorf("launch_activate_socket failed (not launched by launchd?)")
-			}
-
-			d := service.NewDaemon(cfg.SocketPath(), cfg, 30*time.Minute)
-			return d.RunWithListener(ctx, listener)
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "install",
-		Description: command.Description{
-			Short: "Install the service for automatic startup",
-			Long:  "Install the lux service so it starts automatically on login.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			binaryPath, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("resolving binary path: %w", err)
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			if err := service.InstallService(binaryPath, cfg.SocketPath()); err != nil {
-				return fmt.Errorf("installing service: %w", err)
-			}
-
-			fmt.Println("Service installed successfully.")
-			return nil
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "uninstall",
-		Description: command.Description{
-			Short: "Remove the service from automatic startup",
-			Long:  "Remove the lux service from automatic startup.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			if err := service.UninstallService(); err != nil {
-				return fmt.Errorf("uninstalling service: %w", err)
-			}
-
-			fmt.Println("Service uninstalled successfully.")
-			return nil
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "status",
-		Description: command.Description{
-			Short: "Show service and LSP pool status",
-			Long:  "Connect to the service daemon and show the status of all LSPs as JSON.",
-		},
-		Params: []command.Param{
-			{Name: "verbose", Short: 'v', Type: command.Bool, Description: "Print diagnostic output to stderr"},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Verbose bool `json:"verbose"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			var verbose io.Writer = io.Discard
-			if p.Verbose {
-				verbose = os.Stderr
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			fmt.Fprintf(verbose, "socket: %s\n", cfg.SocketPath())
-
-			result, err := callService(ctx, cfg.SocketPath(), service.MethodPoolStatus, nil, verbose)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(result))
-			return nil
-		},
-	})
-
-	serviceApp.AddCommand(&command.Command{
-		Name: "logs",
-		Description: command.Description{
-			Short: "Show service logs",
-			Long:  "Show logs from the lux service daemon.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			return fmt.Errorf("not implemented")
-		},
-	})
-
-	return serviceApp
-}
-
-func buildMCPTransportApp() *command.App {
-	mcpApp := command.NewApp("mcp", "MCP transports")
-
-	mcpApp.AddCommand(&command.Command{
-		Name: "stdio",
-		Description: command.Description{
-			Short: "MCP over stdio",
-			Long:  "Run MCP server reading from stdin and writing to stdout.",
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			t := transport.NewStdio(os.Stdin, os.Stdout)
-
-			serviceConn, sessionID, rawConn, err := connectToService(ctx, cfg.SocketPath())
-			if err != nil {
-				fmt.Fprintf(logfile.Writer(), "[lux] service unavailable, falling back to in-process: %v\n", err)
-				srv, err := mcp.New(cfg, t)
-				if err != nil {
-					return fmt.Errorf("creating MCP server: %w", err)
-				}
-				return srv.Run(ctx)
-			}
-			defer rawConn.Close()
-			defer deregisterSession(ctx, serviceConn, sessionID)
-
-			srv, err := mcp.NewWithService(t, serviceConn, sessionID)
-			if err != nil {
-				return fmt.Errorf("creating MCP server: %w", err)
-			}
-
-			return srv.Run(ctx)
-		},
-	})
-
-	mcpApp.AddCommand(&command.Command{
-		Name: "sse",
-		Description: command.Description{
-			Short: "MCP over SSE",
-			Long:  "Run MCP server using Server-Sent Events over HTTP.",
-		},
-		Params: []command.Param{
-			{Name: "addr", Short: 'a', Type: command.String, Description: "Address to listen on", Default: ":8080"},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Addr string `json:"addr"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			addr := p.Addr
-			if addr == "" {
-				addr = ":8080"
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			t := luxtransport.NewSSE(addr)
-			srv, err := mcp.New(cfg, t)
-			if err != nil {
-				return fmt.Errorf("creating MCP server: %w", err)
-			}
-
-			t.SetDocumentLifecycle(srv.DocumentManager())
-
-			go func() {
-				if err := t.Start(ctx); err != nil {
-					fmt.Fprintf(logfile.Writer(), "SSE server error: %v\n", err)
-				}
-			}()
-
-			fmt.Fprintf(logfile.Writer(), "MCP SSE server listening on %s\n", addr)
-			return srv.Run(ctx)
-		},
-	})
-
-	mcpApp.AddCommand(&command.Command{
-		Name: "http",
-		Description: command.Description{
-			Short: "MCP over streamable HTTP",
-			Long:  "Run MCP server using streamable HTTP transport.",
-		},
-		Params: []command.Param{
-			{Name: "addr", Short: 'a', Type: command.String, Description: "Address to listen on", Default: ":8081"},
-		},
-		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			var p struct {
-				Addr string `json:"addr"`
-			}
-			if err := json.Unmarshal(args, &p); err != nil {
-				return fmt.Errorf("invalid arguments: %w", err)
-			}
-
-			addr := p.Addr
-			if addr == "" {
-				addr = ":8081"
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			t := luxtransport.NewStreamableHTTP(addr)
-			srv, err := mcp.New(cfg, t)
-			if err != nil {
-				return fmt.Errorf("creating MCP server: %w", err)
-			}
-
-			go func() {
-				if err := t.Start(ctx); err != nil {
-					fmt.Fprintf(logfile.Writer(), "HTTP server error: %v\n", err)
-				}
-			}()
-
-			fmt.Fprintf(logfile.Writer(), "MCP HTTP server listening on %s\n", addr)
-			return srv.Run(ctx)
-		},
-	})
-
-	return mcpApp
-}
-
-// connectToService dials the daemon socket, registers an MCP session, and
-// returns the JSON-RPC connection, session ID, and raw net.Conn for cleanup.
-func connectToService(ctx context.Context, socketPath string) (*jsonrpc.Conn, string, net.Conn, error) {
-	workspaceRoot, err := os.Getwd()
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("getting working directory: %w", err)
-	}
-
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("connecting to service: %w", err)
-	}
-
-	serviceConn := jsonrpc.NewConn(conn, conn, nil)
-	go serviceConn.Run(ctx)
-
-	result, err := serviceConn.Call(ctx, service.MethodSessionRegister, service.RegisterParams{
-		WorkspaceRoot: workspaceRoot,
-		ClientType:    service.ClientTypeMCP,
-	})
-	if err != nil {
-		conn.Close()
-		return nil, "", nil, fmt.Errorf("registering session: %w", err)
-	}
-
-	var reg service.RegisterResult
-	if err := json.Unmarshal(result, &reg); err != nil {
-		conn.Close()
-		return nil, "", nil, fmt.Errorf("unmarshaling register result: %w", err)
-	}
-
-	fmt.Fprintf(logfile.Writer(), "[lux] MCP session registered: %s (workspace: %s)\n", reg.SessionID, workspaceRoot)
-
-	return serviceConn, reg.SessionID, conn, nil
-}
-
-func deregisterSession(ctx context.Context, serviceConn *jsonrpc.Conn, sessionID string) {
-	serviceConn.Call(ctx, service.MethodSessionDeregister, service.DeregisterParams{
-		SessionID: sessionID,
-	})
-}
-
-func callService(ctx context.Context, socketPath string, method string, params any, verbose io.Writer) (json.RawMessage, error) {
-	if verbose == nil {
-		verbose = io.Discard
-	}
-
-	fmt.Fprintf(verbose, "dialing %s\n", socketPath)
-
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to service (is the daemon running?): %w", err)
-	}
-	defer conn.Close()
-
-	fmt.Fprintf(verbose, "connected, sending %s\n", method)
-
-	rpcConn := jsonrpc.NewConn(conn, conn, func(_ context.Context, _ *jsonrpc.Message) (*jsonrpc.Message, error) {
-		return nil, nil
-	})
-
-	go rpcConn.Run(ctx)
-
-	callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	result, err := rpcConn.Call(callCtx, method, params)
-	if err != nil {
-		if callCtx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("service call %s timed out (daemon may not be responding)", method)
-		}
-		return nil, fmt.Errorf("service call %s: %w", method, err)
-	}
-
-	fmt.Fprintf(verbose, "received %d bytes\n", len(result))
-
-	return result, nil
 }
 
 func addFiletypeConfig(name string, extensions, languageIDs []string, lsp string, formatters []string, formatterMode string) error {

@@ -144,21 +144,6 @@ func (dm *DocumentManager) IsOpen(uri lsp.DocumentURI) bool {
 	return ok
 }
 
-// OpenURI implements transport.DocumentLifecycle.
-func (dm *DocumentManager) OpenURI(ctx context.Context, uri string) error {
-	return dm.Open(ctx, lsp.DocumentURI(uri))
-}
-
-// CloseURI implements transport.DocumentLifecycle.
-func (dm *DocumentManager) CloseURI(uri string) error {
-	return dm.Close(lsp.DocumentURI(uri))
-}
-
-// CloseAllDocs implements transport.DocumentLifecycle.
-func (dm *DocumentManager) CloseAllDocs() {
-	dm.CloseAll()
-}
-
 func readFileContent(uri lsp.DocumentURI) (string, error) {
 	path := uri.Path()
 	if path == "" {

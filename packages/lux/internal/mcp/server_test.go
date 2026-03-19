@@ -64,32 +64,12 @@ func TestMCPToolsList(t *testing.T) {
 		t.Fatalf("failed to parse result: %v", err)
 	}
 
-	expectedTools := []string{
-		"hover",
-		"definition",
-		"references",
-		"completion",
-		"format",
-		"document_symbols",
-		"code_action",
-		"rename",
-		"workspace_symbols",
-		"diagnostics",
+	if len(result.Tools) != 1 {
+		t.Errorf("expected 1 tool (read_resource), got %d", len(result.Tools))
 	}
 
-	if len(result.Tools) != len(expectedTools) {
-		t.Errorf("expected %d tools, got %d", len(expectedTools), len(result.Tools))
-	}
-
-	toolNames := make(map[string]bool)
-	for _, tool := range result.Tools {
-		toolNames[tool.Name] = true
-	}
-
-	for _, name := range expectedTools {
-		if !toolNames[name] {
-			t.Errorf("missing expected tool: %s", name)
-		}
+	if len(result.Tools) > 0 && result.Tools[0].Name != "read_resource" {
+		t.Errorf("expected tool name 'read_resource', got %q", result.Tools[0].Name)
 	}
 }
 
