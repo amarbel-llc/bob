@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
+	"github.com/friedenberg/grit/internal/hooks"
 	"github.com/friedenberg/grit/internal/tools"
 	intTransport "github.com/friedenberg/grit/internal/transport"
 )
@@ -43,9 +46,22 @@ func main() {
 	}
 
 	if flag.NArg() >= 1 && flag.Arg(0) == "hook" {
-		if err := app.HandleHook(os.Stdin, os.Stdout); err != nil {
-			log.Fatalf("handling hook: %v", err)
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("reading hook input: %v", err)
 		}
+
+		handled, err := hooks.HandleResourceHook(input, os.Stdout)
+		if err != nil {
+			log.Fatalf("handling resource hook: %v", err)
+		}
+
+		if !handled {
+			if err := app.HandleHook(bytes.NewReader(input), os.Stdout); err != nil {
+				log.Fatalf("handling hook: %v", err)
+			}
+		}
+
 		return
 	}
 
