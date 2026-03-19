@@ -66,6 +66,27 @@ func TestWordIndex_BuildAndSearch(t *testing.T) {
 	})
 }
 
+func TestWordIndex_BuildFromItems(t *testing.T) {
+	idx := NewWordIndex()
+
+	items := []IndexItem{
+		{UID: "e1", Text: "Team standup meeting"},
+		{UID: "e2", Text: "Dentist appointment downtown"},
+		{UID: "e3", Text: "Team offsite planning"},
+	}
+
+	idx.BuildFromItems(items)
+
+	results := idx.Search("team")
+	sort.Strings(results)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d: %v", len(results), results)
+	}
+	if results[0] != "e1" || results[1] != "e3" {
+		t.Errorf("expected [e1, e3], got %v", results)
+	}
+}
+
 func TestWordIndex_Empty(t *testing.T) {
 	idx := NewWordIndex()
 	results := idx.Search("anything")

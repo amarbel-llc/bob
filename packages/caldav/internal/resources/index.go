@@ -21,24 +21,26 @@ func NewWordIndex() *WordIndex {
 	}
 }
 
-// Build rebuilds the index from a list of tasks.
-func (idx *WordIndex) Build(tasks []caldav.Task) {
-	newIndex := make(map[string][]string)
-	seen := make(map[string]map[string]bool) // word → uid → bool
+// IndexItem is a generic item for word indexing.
+type IndexItem struct {
+	UID  string
+	Text string
+}
 
-	for _, t := range tasks {
-		text := t.Summary + " " + t.Description
-		if len(t.Categories) > 0 {
-			text += " " + strings.Join(t.Categories, " ")
-		}
-		words := extractWords(text)
+// BuildFromItems rebuilds the index from generic items.
+func (idx *WordIndex) BuildFromItems(items []IndexItem) {
+	newIndex := make(map[string][]string)
+	seen := make(map[string]map[string]bool)
+
+	for _, item := range items {
+		words := extractWords(item.Text)
 		for _, w := range words {
 			if seen[w] == nil {
 				seen[w] = make(map[string]bool)
 			}
-			if !seen[w][t.UID] {
-				seen[w][t.UID] = true
-				newIndex[w] = append(newIndex[w], t.UID)
+			if !seen[w][item.UID] {
+				seen[w][item.UID] = true
+				newIndex[w] = append(newIndex[w], item.UID)
 			}
 		}
 	}
@@ -46,6 +48,19 @@ func (idx *WordIndex) Build(tasks []caldav.Task) {
 	idx.mu.Lock()
 	idx.index = newIndex
 	idx.mu.Unlock()
+}
+
+// Build rebuilds the index from a list of tasks.
+func (idx *WordIndex) Build(tasks []caldav.Task) {
+	items := make([]IndexItem, len(tasks))
+	for i, t := range tasks {
+		text := t.Summary + " " + t.Description
+		if len(t.Categories) > 0 {
+			text += " " + strings.Join(t.Categories, " ")
+		}
+		items[i] = IndexItem{UID: t.UID, Text: text}
+	}
+	idx.BuildFromItems(items)
 }
 
 // Search returns task UIDs matching the given word.
