@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
+	"github.com/amarbel-llc/lux/internal/hooks"
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/tools"
 )
@@ -28,6 +30,16 @@ func main() {
 			fmt.Fprintf(logfile.Writer(), "Error: %v\n", err)
 			os.Exit(1)
 		}
+
+		outDir := generatePluginOutputDir(os.Args[2:])
+		if outDir != "" {
+			pluginDir := filepath.Join(outDir, "share", "purse-first", "lux")
+			if err := hooks.GeneratePostToolUseHooks(pluginDir); err != nil {
+				fmt.Fprintf(logfile.Writer(), "Error generating PostToolUse hooks: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
 		return
 	}
 
@@ -38,5 +50,31 @@ func main() {
 		}
 		fmt.Fprintf(logfile.Writer(), "Error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+// generatePluginOutputDir determines where HandleGeneratePlugin wrote its
+// output. Returns "" for stdout-only mode ("-").
+func generatePluginOutputDir(args []string) string {
+	// Skip --skills-dir flag and its value
+	var remaining []string
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--skills-dir" || args[i] == "-skills-dir" {
+			i++ // skip the value
+			continue
+		}
+		remaining = append(remaining, args[i])
+	}
+
+	switch len(remaining) {
+	case 0:
+		return "."
+	case 1:
+		if remaining[0] == "-" {
+			return ""
+		}
+		return remaining[0]
+	default:
+		return "."
 	}
 }
