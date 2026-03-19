@@ -32,41 +32,6 @@ func registerTagCommands(app *command.App) {
 	})
 }
 
-func handleGitTagList(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-	var params struct {
-		RepoPath string `json:"repo_path"`
-		Pattern  string `json:"pattern"`
-		Sort     string `json:"sort"`
-	}
-
-	if err := json.Unmarshal(args, &params); err != nil {
-		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-	}
-
-	gitArgs := []string{
-		"tag",
-		"--list",
-		fmt.Sprintf("--format=%s", git.TagListFormat),
-	}
-
-	if params.Sort != "" {
-		gitArgs = append(gitArgs, fmt.Sprintf("--sort=%s", params.Sort))
-	}
-
-	if params.Pattern != "" {
-		gitArgs = append(gitArgs, params.Pattern)
-	}
-
-	out, err := git.Run(ctx, params.RepoPath, gitArgs...)
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("git tag: %v", err)), nil
-	}
-
-	tags := git.ParseTagList(out)
-
-	return command.JSONResult(tags), nil
-}
-
 func handleGitTagVerify(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
 		RepoPath string `json:"repo_path"`

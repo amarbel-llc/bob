@@ -37,30 +37,6 @@ func registerStatusCommands(app *command.App) {
 	})
 }
 
-func handleGitStatus(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-	var params struct {
-		RepoPath string `json:"repo_path"`
-	}
-
-	if err := json.Unmarshal(args, &params); err != nil {
-		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-	}
-
-	out, err := git.Run(ctx, params.RepoPath, "status", "--porcelain=v2", "--branch")
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("git status: %v", err)), nil
-	}
-
-	result := git.ParseStatus(out)
-
-	state, err := git.DetectInProgressState(ctx, params.RepoPath)
-	if err == nil && state != nil {
-		result.State = state
-	}
-
-	return command.JSONResult(result), nil
-}
-
 func handleGitDiff(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
 		RepoPath      string   `json:"repo_path"`

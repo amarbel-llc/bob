@@ -225,21 +225,3 @@ func handleGitPush(ctx context.Context, args json.RawMessage, _ command.Prompter
 	}), nil
 }
 
-func handleGitRemoteList(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-	var params struct {
-		RepoPath string `json:"repo_path"`
-	}
-
-	if err := json.Unmarshal(args, &params); err != nil {
-		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-	}
-
-	out, err := git.Run(ctx, params.RepoPath, "remote", "-v")
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("git remote: %v", err)), nil
-	}
-
-	remotes := git.ParseRemoteList(out)
-
-	return command.JSONResult(remotes), nil
-}

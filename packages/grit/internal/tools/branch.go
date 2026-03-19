@@ -51,38 +51,6 @@ func registerBranchCommands(app *command.App) {
 	})
 }
 
-func handleGitBranchList(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-	var params struct {
-		RepoPath string `json:"repo_path"`
-		Remote   bool   `json:"remote"`
-		All      bool   `json:"all"`
-	}
-
-	if err := json.Unmarshal(args, &params); err != nil {
-		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-	}
-
-	gitArgs := []string{
-		"branch",
-		"--format=%(HEAD)\x1f%(refname:short)\x1f%(objectname:short)\x1f%(subject)\x1f%(upstream:short)\x1f%(upstream:track)\x1e",
-	}
-
-	if params.All {
-		gitArgs = append(gitArgs, "-a")
-	} else if params.Remote {
-		gitArgs = append(gitArgs, "-r")
-	}
-
-	out, err := git.Run(ctx, params.RepoPath, gitArgs...)
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("git branch: %v", err)), nil
-	}
-
-	branches := git.ParseBranchList(out)
-
-	return command.JSONResult(branches), nil
-}
-
 func handleGitBranchCreate(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
 		RepoPath   string `json:"repo_path"`
