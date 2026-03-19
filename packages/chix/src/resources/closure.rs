@@ -80,7 +80,7 @@ pub async fn read_closure(parsed: &ParsedUri) -> Result<ResourceContent, String>
     };
 
     Ok(ResourceContent {
-        uri: format!("nix://closure/{}", parsed.path),
+        uri: format!("chix://closure/{}", parsed.path),
         mime_type: "application/json".to_string(),
         text: serde_json::to_string_pretty(&response).map_err(|e| e.to_string())?,
     })

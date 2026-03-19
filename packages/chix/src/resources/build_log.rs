@@ -75,7 +75,7 @@ pub async fn read_build_log(parsed: &ParsedUri) -> Result<ResourceContent, Strin
     };
 
     Ok(ResourceContent {
-        uri: format!("nix://build-log/{}", parsed.path),
+        uri: format!("chix://build-log/{}", parsed.path),
         mime_type: "application/json".to_string(),
         text: serde_json::to_string_pretty(&response).map_err(|e| e.to_string())?,
     })

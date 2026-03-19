@@ -2,14 +2,14 @@ use async_trait::async_trait;
 use mcp_server::resources::{Resource, ResourceContent, ResourceError};
 use mcp_server::server::Context;
 
-use super::parse_nix_uri;
+use super::parse_chix_uri;
 
 pub struct DerivationResource;
 
 #[async_trait]
 impl Resource for DerivationResource {
     fn uri_template(&self) -> &str {
-        "nix://derivation/{drv-path}"
+        "chix://derivation/{drv-path}"
     }
 
     fn name(&self) -> &str {
@@ -25,7 +25,7 @@ impl Resource for DerivationResource {
     }
 
     async fn read(&self, uri: &str, _ctx: &Context) -> Result<ResourceContent, ResourceError> {
-        let parsed = parse_nix_uri(uri).map_err(ResourceError::InvalidUri)?;
+        let parsed = parse_chix_uri(uri).map_err(ResourceError::InvalidUri)?;
         let result = super::read_derivation(&parsed)
             .await
             .map_err(ResourceError::ReadFailed)?;

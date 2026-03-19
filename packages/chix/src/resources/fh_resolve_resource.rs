@@ -4,29 +4,29 @@ use mcp_server::server::Context;
 
 use super::parse_chix_uri;
 
-pub struct BuildLogResource;
+pub struct FhResolveResource;
 
 #[async_trait]
-impl Resource for BuildLogResource {
+impl Resource for FhResolveResource {
     fn uri_template(&self) -> &str {
-        "chix://build-log/{store-path}"
+        "chix://flakehub/resolve/{flake_ref}"
     }
 
     fn name(&self) -> &str {
-        "Build Log"
+        "FlakeHub Resolve"
     }
 
     fn description(&self) -> &str {
-        "Access build logs for a store path with pagination. Query params: offset, limit"
+        "Resolve a FlakeHub flake reference to a specific version"
     }
 
     fn mime_type(&self) -> &str {
-        "text/plain"
+        "application/json"
     }
 
     async fn read(&self, uri: &str, _ctx: &Context) -> Result<ResourceContent, ResourceError> {
         let parsed = parse_chix_uri(uri).map_err(ResourceError::InvalidUri)?;
-        let result = super::read_build_log(&parsed)
+        let result = super::read_fh_resolve(&parsed)
             .await
             .map_err(ResourceError::ReadFailed)?;
 

@@ -22,6 +22,7 @@ mod flakehub_tools;
 mod hash_tools;
 mod log_tool;
 mod lsp_tools;
+mod resource_tools;
 mod run_tools;
 mod search_tool;
 mod store_tools;
@@ -63,6 +64,7 @@ pub use flakehub_tools::{
 pub use hash_tools::{HashFileTool, HashPathTool};
 pub use log_tool::LogTool;
 pub use lsp_tools::{NilCompletionsTool, NilDefinitionTool, NilDiagnosticsTool, NilHoverTool};
+pub use resource_tools::{ResourceReadTool, ResourceTemplatesTool};
 pub use run_tools::{DevelopRunTool, RunTool};
 pub use search_tool::SearchTool;
 pub use store_tools::{StoreCatTool, StoreGcTool, StoreLsTool, StorePathInfoTool};

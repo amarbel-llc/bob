@@ -4,29 +4,29 @@ use mcp_server::server::Context;
 
 use super::parse_chix_uri;
 
-pub struct BuildLogResource;
+pub struct CachixStatusResource;
 
 #[async_trait]
-impl Resource for BuildLogResource {
+impl Resource for CachixStatusResource {
     fn uri_template(&self) -> &str {
-        "chix://build-log/{store-path}"
+        "chix://cachix/status"
     }
 
     fn name(&self) -> &str {
-        "Build Log"
+        "Cachix Status"
     }
 
     fn description(&self) -> &str {
-        "Access build logs for a store path with pagination. Query params: offset, limit"
+        "Get Cachix cache status"
     }
 
     fn mime_type(&self) -> &str {
-        "text/plain"
+        "application/json"
     }
 
     async fn read(&self, uri: &str, _ctx: &Context) -> Result<ResourceContent, ResourceError> {
         let parsed = parse_chix_uri(uri).map_err(ResourceError::InvalidUri)?;
-        let result = super::read_build_log(&parsed)
+        let result = super::read_cachix_status(&parsed)
             .await
             .map_err(ResourceError::ReadFailed)?;
 

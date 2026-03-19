@@ -171,7 +171,7 @@ pub async fn read_derivation(parsed: &ParsedUri) -> Result<ResourceContent, Stri
     };
 
     Ok(ResourceContent {
-        uri: format!("nix://derivation/{}", parsed.path),
+        uri: format!("chix://derivation/{}", parsed.path),
         mime_type: "application/json".to_string(),
         text: serde_json::to_string_pretty(&response).map_err(|e| e.to_string())?,
     })
