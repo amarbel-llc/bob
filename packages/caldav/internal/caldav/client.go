@@ -1,7 +1,6 @@
 package caldav
 
 import (
-	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -31,16 +30,15 @@ type Calendar struct {
 // NewClient creates a CalDAV client from the given configuration.
 func NewClient(cfg *Config) *Client {
 	return &Client{
-		cfg:  cfg,
-		http: &http.Client{},
+		cfg: cfg,
+		http: &http.Client{
+			Timeout: requestTimeout,
+		},
 	}
 }
 
 func (c *Client) do(method, url, body string, depth int) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(body))
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -220,11 +218,7 @@ type TaskListResult struct {
 // GetTask fetches a single VTODO by its href.
 func (c *Client) GetTask(taskHref string) (*TaskWithMeta, error) {
 	url := c.resolveHref(taskHref)
-
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -259,11 +253,7 @@ func (c *Client) GetTask(taskHref string) (*TaskWithMeta, error) {
 // PutTask creates or updates a VTODO at the given href.
 func (c *Client) PutTask(taskHref, icalData, etag string) error {
 	url := c.resolveHref(taskHref)
-
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, strings.NewReader(icalData))
+	req, err := http.NewRequest("PUT", url, strings.NewReader(icalData))
 	if err != nil {
 		return err
 	}
@@ -291,11 +281,7 @@ func (c *Client) PutTask(taskHref, icalData, etag string) error {
 // DeleteTask removes a VTODO by href.
 func (c *Client) DeleteTask(taskHref, etag string) error {
 	url := c.resolveHref(taskHref)
-
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return err
 	}

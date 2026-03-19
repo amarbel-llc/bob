@@ -126,7 +126,7 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
-			DestructiveHint: protocol.BoolPtr(false),
+			DestructiveHint: protocol.BoolPtr(true),
 			IdempotentHint:  protocol.BoolPtr(true),
 			OpenWorldHint:   protocol.BoolPtr(true),
 		},
