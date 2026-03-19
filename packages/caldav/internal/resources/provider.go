@@ -49,7 +49,7 @@ func (p *Provider) registerResources() {
 		protocol.Resource{
 			URI:         "caldav://calendars",
 			Name:        "Calendars",
-			Description: "List all CalDAV calendar collections with display name, color, component types, and task count",
+			Description: "List all CalDAV calendar collections with display name, color, component types, task count, and event count",
 			MimeType:    "application/json",
 		},
 		p.readCalendars,
