@@ -38,11 +38,19 @@ Client (editor/Claude) connects via MCP over stdio. The **Bridge** (`internal/to
 
 ### MCP Resources
 
-LSP capabilities are exposed as MCP resource templates, accessed via a single `read_resource` tool. This enables progressive disclosure — clients list available resource templates to discover capabilities, then read specific resources. Resource URI patterns:
+LSP capabilities are exposed as MCP resource templates. The main conversation
+should use `ReadMcpResourceTool` (server `plugin:lux:lux`) to access static
+resources directly. Subagents use the `resource-templates` and `resource-read`
+tools since they cannot access MCP resources directly.
+
+All resources default to JSON output (`format=json`). Pass `&format=text` for
+human-readable text output.
+
+Resource URI patterns:
 
 - `lux://lsp/hover?uri={file_uri}&line={line}&character={character}`
 - `lux://lsp/definition?uri={file_uri}&line={line}&character={character}`
-- `lux://lsp/references?uri={file_uri}&line={line}&character={character}`
+- `lux://lsp/references?uri={file_uri}&line={line}&character={character}&context={n}` (context defaults to 3, enriches with hover + surrounding lines)
 - `lux://lsp/completion?uri={file_uri}&line={line}&character={character}`
 - `lux://lsp/document-symbols?uri={file_uri}`
 - `lux://lsp/diagnostics?uri={file_uri}`
@@ -50,6 +58,9 @@ LSP capabilities are exposed as MCP resource templates, accessed via a single `r
 - `lux://lsp/code-action?uri={file_uri}&start_line={sl}&start_character={sc}&end_line={el}&end_character={ec}`
 - `lux://lsp/rename?uri={file_uri}&line={line}&character={character}&new_name={name}`
 - `lux://lsp/workspace-symbols?uri={file_uri}&query={pattern}`
+- `lux://lsp/incoming-calls?uri={file_uri}&line={line}&character={character}` (call hierarchy — who calls this?)
+- `lux://lsp/outgoing-calls?uri={file_uri}&line={line}&character={character}` (call hierarchy — what does this call?)
+- `lux://lsp/diagnostics-batch?glob={pattern}` (multi-file, multi-LSP diagnostics via glob)
 - `lux://status`, `lux://languages`, `lux://files`
 
 ### Key Packages
