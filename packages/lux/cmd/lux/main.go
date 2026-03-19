@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -56,15 +58,15 @@ func main() {
 // generatePluginOutputDir determines where HandleGeneratePlugin wrote its
 // output. Returns "" for stdout-only mode ("-").
 func generatePluginOutputDir(args []string) string {
-	// Skip --skills-dir flag and its value
-	var remaining []string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--skills-dir" || args[i] == "-skills-dir" {
-			i++ // skip the value
-			continue
-		}
-		remaining = append(remaining, args[i])
+	fs := flag.NewFlagSet("", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.String("skills-dir", "", "")
+
+	if err := fs.Parse(args); err != nil {
+		return "."
 	}
+
+	remaining := fs.Args()
 
 	switch len(remaining) {
 	case 0:
