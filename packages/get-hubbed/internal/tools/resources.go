@@ -109,6 +109,13 @@ func NewResourceProvider() (*resourceProvider, error) {
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
+		URITemplate: "get-hubbed://runs?repo={repo}&branch={branch}&status={status}&workflow={workflow}&event={event}&commit={commit}&user={user}&limit={limit}",
+		Name:        "Workflow Run List",
+		Description: "List recent workflow runs. Optional: repo, branch, status, workflow, event, commit, user, limit",
+		MimeType:    "application/json",
+	}, nil)
+
+	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "get-hubbed://runs/{run_id}",
 		Name:        "Workflow Run",
 		Description: "View a workflow run with jobs and steps. Required: run_id. Optional: ?repo=, ?attempt=",
@@ -205,7 +212,7 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 	case "runs":
 		path := strings.TrimPrefix(parsed.Path, "/")
 		if path == "" {
-			return nil, fmt.Errorf("missing run_id in runs URI")
+			return p.readRunList(ctx, uri, parsed.Query())
 		}
 		if strings.HasSuffix(path, "/log") {
 			runID := strings.TrimSuffix(path, "/log")
@@ -697,6 +704,54 @@ func (p *resourceProvider) readCommits(ctx context.Context, uri, path string, q 
 	out, err := gh.Run(ctx, ghArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("gh api commits: %w", err)
+	}
+
+	return textResourceResult(uri, out), nil
+}
+
+func (p *resourceProvider) readRunList(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	repo, err := p.resolveRepo(q.Get("repo"))
+	if err != nil {
+		return nil, err
+	}
+
+	ghArgs := []string{
+		"run", "list",
+		"-R", repo,
+		"--json", "attempt,conclusion,createdAt,databaseId,displayTitle,event,headBranch,headSha,name,number,startedAt,status,updatedAt,url,workflowName",
+	}
+
+	if branch := q.Get("branch"); branch != "" {
+		ghArgs = append(ghArgs, "--branch", branch)
+	}
+
+	if status := q.Get("status"); status != "" {
+		ghArgs = append(ghArgs, "--status", status)
+	}
+
+	if workflow := q.Get("workflow"); workflow != "" {
+		ghArgs = append(ghArgs, "--workflow", workflow)
+	}
+
+	if event := q.Get("event"); event != "" {
+		ghArgs = append(ghArgs, "--event", event)
+	}
+
+	if commit := q.Get("commit"); commit != "" {
+		ghArgs = append(ghArgs, "--commit", commit)
+	}
+
+	if user := q.Get("user"); user != "" {
+		ghArgs = append(ghArgs, "--user", user)
+	}
+
+	if limit := q.Get("limit"); limit != "" {
+		ghArgs = append(ghArgs, "--limit", limit)
+	}
+
+	out, err := gh.Run(ctx, ghArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("gh run list: %w", err)
 	}
 
 	return textResourceResult(uri, out), nil
