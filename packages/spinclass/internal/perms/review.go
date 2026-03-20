@@ -16,7 +16,10 @@ type ReviewDecision struct {
 	Action string
 }
 
-func RouteDecisions(tiersDir, repo, settingsPath string, decisions []ReviewDecision) error {
+func RouteDecisions(
+	tiersDir, repo, settingsPath string,
+	decisions []ReviewDecision,
+) error {
 	var toRemove []string
 
 	for _, d := range decisions {
@@ -43,16 +46,28 @@ func RouteDecisions(tiersDir, repo, settingsPath string, decisions []ReviewDecis
 		}
 	}
 
-	if len(toRemove) == 0 {
-		return nil
+	if len(toRemove) > 0 {
+		current, err := LoadClaudeSettings(settingsPath)
+		if err != nil {
+			return err
+		}
+
+		remaining := RemoveRules(current, toRemove)
+
+		if err := SaveClaudeSettings(settingsPath, remaining); err != nil {
+			return err
+		}
 	}
 
+	// Update the snapshot to match current settings so the next review
+	// only surfaces rules added after this point.
+	snapshotPath := filepath.Join(
+		filepath.Dir(settingsPath),
+		".settings-snapshot.json",
+	)
 	current, err := LoadClaudeSettings(settingsPath)
 	if err != nil {
 		return err
 	}
-
-	remaining := RemoveRules(current, toRemove)
-
-	return SaveClaudeSettings(settingsPath, remaining)
+	return SaveClaudeSettings(snapshotPath, current)
 }

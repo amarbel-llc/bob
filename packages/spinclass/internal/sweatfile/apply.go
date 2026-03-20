@@ -198,7 +198,11 @@ func (sf Sweatfile) RunPreMergeHook(worktreePath string) error {
 }
 
 func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
-	settingsPath := filepath.Join(worktreePath, ".claude", "settings.local.json")
+	settingsPath := filepath.Join(
+		worktreePath,
+		".claude",
+		"settings.local.json",
+	)
 
 	doc := make(map[string]any)
 
@@ -225,7 +229,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 		hooksMap := map[string]any{
 			"PreToolUse": []any{
 				map[string]any{
-					"matcher": "Read|Write|Edit|Glob|Grep|Bash|Task",
+					"matcher": "*",
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
@@ -262,5 +266,16 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 		return err
 	}
 
-	return os.WriteFile(settingsPath, append(data, '\n'), 0o644)
+	if err := os.WriteFile(settingsPath, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+
+	// Write a snapshot so that `perms review` can diff against the baseline
+	// and only surface rules added during the session.
+	snapshotPath := filepath.Join(
+		worktreePath,
+		".claude",
+		".settings-snapshot.json",
+	)
+	return os.WriteFile(snapshotPath, append(data, '\n'), 0o644)
 }

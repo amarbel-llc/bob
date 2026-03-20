@@ -17,7 +17,11 @@ func TestHardcodedDefaultsGitExcludes(t *testing.T) {
 	}
 
 	if len(defaults.GitSkipIndex) != 0 {
-		t.Fatalf("expected 0 git excludes, got %d: %v", len(defaults.GitSkipIndex), defaults.GitSkipIndex)
+		t.Fatalf(
+			"expected 0 git excludes, got %d: %v",
+			len(defaults.GitSkipIndex),
+			defaults.GitSkipIndex,
+		)
 	}
 }
 
@@ -27,18 +31,29 @@ func TestHardcodedDefaultsClaudeAllow(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	if home == "" {
 		if defaults.ClaudeAllow != nil {
-			t.Errorf("expected nil ClaudeAllow when HOME is empty, got %v", defaults.ClaudeAllow)
+			t.Errorf(
+				"expected nil ClaudeAllow when HOME is empty, got %v",
+				defaults.ClaudeAllow,
+			)
 		}
 		return
 	}
 
 	if len(defaults.ClaudeAllow) != 1 {
-		t.Fatalf("expected 1 claude allow rule, got %d: %v", len(defaults.ClaudeAllow), defaults.ClaudeAllow)
+		t.Fatalf(
+			"expected 1 claude allow rule, got %d: %v",
+			len(defaults.ClaudeAllow),
+			defaults.ClaudeAllow,
+		)
 	}
 
 	wantRule := "Read(" + filepath.Join(home, ".claude") + "/*)"
 	if defaults.ClaudeAllow[0] != wantRule {
-		t.Errorf("ClaudeAllow[0]: got %q, want %q", defaults.ClaudeAllow[0], wantRule)
+		t.Errorf(
+			"ClaudeAllow[0]: got %q, want %q",
+			defaults.ClaudeAllow[0],
+			wantRule,
+		)
 	}
 }
 
@@ -51,7 +66,9 @@ func TestApplyClaudeSettings(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.local.json"))
+	data, err := os.ReadFile(
+		filepath.Join(dir, ".claude", "settings.local.json"),
+	)
 	if err != nil {
 		t.Fatalf("reading settings: %v", err)
 	}
@@ -73,7 +90,11 @@ func TestApplyClaudeSettings(t *testing.T) {
 
 	allowRaw, _ := permsMap["allow"].([]any)
 	if len(allowRaw) != 6 {
-		t.Fatalf("expected 6 rules (3 passed + 3 scoped), got %d: %v", len(allowRaw), allowRaw)
+		t.Fatalf(
+			"expected 6 rules (3 passed + 3 scoped), got %d: %v",
+			len(allowRaw),
+			allowRaw,
+		)
 	}
 
 	// First 3 are from the passed rules
@@ -111,7 +132,9 @@ func TestApplyClaudeSettingsEmpty(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.local.json"))
+	data, err := os.ReadFile(
+		filepath.Join(dir, ".claude", "settings.local.json"),
+	)
 	if err != nil {
 		t.Fatalf("reading settings: %v", err)
 	}
@@ -163,7 +186,9 @@ func TestApplyClaudeSettingsWritesHooksForWorktree(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.local.json"))
+	data, err := os.ReadFile(
+		filepath.Join(dir, ".claude", "settings.local.json"),
+	)
 	if err != nil {
 		t.Fatalf("reading settings: %v", err)
 	}
@@ -189,7 +214,7 @@ func TestApplyClaudeSettingsWritesHooksForWorktree(t *testing.T) {
 
 	entry := entries[0].(map[string]any)
 	matcher := entry["matcher"].(string)
-	if matcher != "Read|Write|Edit|Glob|Grep|Bash|Task" {
+	if matcher != "*" {
 		t.Errorf("matcher: got %q", matcher)
 	}
 
@@ -385,7 +410,11 @@ func TestPrepareDirenvOverwritesExistingEnvrc(t *testing.T) {
 	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
 	want := "source_up\nuse flake\n" + wantPathAdd
 	if string(data) != want {
-		t.Errorf(".envrc content: got %q, want %q (old content should be replaced)", string(data), want)
+		t.Errorf(
+			".envrc content: got %q, want %q (old content should be replaced)",
+			string(data),
+			want,
+		)
 	}
 }
 
@@ -393,7 +422,11 @@ func TestWriteEnvrcWithDirectives(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{EnvrcDirectives: []string{"source_up", "dotenv_if_exists"}}
@@ -418,7 +451,11 @@ func TestWriteEnvrcDefaultFallbackWithFlake(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "flake.nix"), []byte("{}"), 0o644)
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{}
@@ -442,7 +479,11 @@ func TestWriteEnvrcDefaultFallbackWithoutFlake(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{}
@@ -466,7 +507,11 @@ func TestWriteSpinclassEnv(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{
@@ -495,7 +540,11 @@ func TestWriteSpinclassEnvInterpolatesWorktree(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{
@@ -511,7 +560,11 @@ func TestWriteSpinclassEnvInterpolatesWorktree(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".spinclass.env"))
 	want := fmt.Sprintf("INCLUDE_PATH=%s/lib:.\n", dir)
 	if string(data) != want {
-		t.Errorf(".spinclass.env content:\ngot  %q\nwant %q", string(data), want)
+		t.Errorf(
+			".spinclass.env content:\ngot  %q\nwant %q",
+			string(data),
+			want,
+		)
 	}
 }
 
@@ -519,7 +572,11 @@ func TestEnvAutoDotenvDirective(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{
@@ -541,7 +598,11 @@ func TestNoEnvNoDotenvDirective(t *testing.T) {
 	dir := t.TempDir()
 
 	fakeBin := t.TempDir()
-	os.WriteFile(filepath.Join(fakeBin, "direnv"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	os.WriteFile(
+		filepath.Join(fakeBin, "direnv"),
+		[]byte("#!/bin/sh\nexit 0\n"),
+		0o755,
+	)
 	t.Setenv("PATH", fakeBin)
 
 	sf := Sweatfile{}
@@ -553,7 +614,10 @@ func TestNoEnvNoDotenvDirective(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".envrc"))
 	content := string(data)
 	if strings.Contains(content, "dotenv") {
-		t.Errorf("expected no dotenv in .envrc when env is empty, got %q", content)
+		t.Errorf(
+			"expected no dotenv in .envrc when env is empty, got %q",
+			content,
+		)
 	}
 }
 
