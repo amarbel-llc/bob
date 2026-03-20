@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,19 +23,37 @@ func registerIssueCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(true),
 		},
 		Params: []command.Param{
-			{Name: "repo", Type: command.String, Description: "Repository in OWNER/REPO format", Required: true},
-			{Name: "title", Type: command.String, Description: "Issue title", Required: true},
+			{
+				Name:        "repo",
+				Type:        command.String,
+				Description: "Repository in OWNER/REPO format",
+				Required:    true,
+			},
+			{
+				Name:        "title",
+				Type:        command.String,
+				Description: "Issue title",
+				Required:    true,
+			},
 			{Name: "body", Type: command.String, Description: "Issue body"},
 			{Name: "labels", Type: command.Array, Description: "Labels to add"},
 		},
 		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"gh issue create"}, UseWhen: "creating issues"},
+			{
+				Replaces:        "Bash",
+				CommandPrefixes: []string{"gh issue create"},
+				UseWhen:         "creating issues",
+			},
 		},
 		Run: handleIssueCreate,
 	})
 }
 
-func handleIssueCreate(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+func handleIssueCreate(
+	ctx context.Context,
+	args json.RawMessage,
+	_ command.Prompter,
+) (*command.Result, error) {
 	var params struct {
 		Repo   string   `json:"repo"`
 		Title  string   `json:"title"`
@@ -43,27 +62,54 @@ func handleIssueCreate(ctx context.Context, args json.RawMessage, _ command.Prom
 	}
 
 	if err := json.Unmarshal(args, &params); err != nil {
-		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
+		return command.TextErrorResult(
+			fmt.Sprintf("invalid arguments: %v", err),
+		), nil
+	}
+
+	// Use the REST API directly to avoid gh's fork-to-parent resolution,
+	// which silently creates issues on the upstream repo instead of the
+	// specified one.
+	reqBody := map[string]any{
+		"title": params.Title,
+	}
+	if params.Body != "" {
+		reqBody["body"] = params.Body
+	}
+	if len(params.Labels) > 0 {
+		reqBody["labels"] = params.Labels
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return command.TextErrorResult(
+			fmt.Sprintf("marshaling request body: %v", err),
+		), nil
 	}
 
 	ghArgs := []string{
-		"issue", "create",
-		"-R", params.Repo,
-		"--title", params.Title,
+		"api",
+		fmt.Sprintf("repos/%s/issues", params.Repo),
+		"--method", "POST",
+		"--input", "-",
 	}
 
-	if params.Body != "" {
-		ghArgs = append(ghArgs, "--body", params.Body)
-	}
-
-	for _, label := range params.Labels {
-		ghArgs = append(ghArgs, "--label", label)
-	}
-
-	out, err := gh.Run(ctx, ghArgs...)
+	out, err := gh.RunWithInput(ctx, bytes.NewReader(bodyJSON), ghArgs...)
 	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("gh issue create: %v", err)), nil
+		return command.TextErrorResult(
+			fmt.Sprintf("gh api issue create: %v", err),
+		), nil
 	}
 
-	return command.TextResult(out), nil
+	// Extract the URL from the API response for a clean result
+	var result struct {
+		HTMLURL string `json:"html_url"`
+		Number  int    `json:"number"`
+		Title   string `json:"title"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return command.TextResult(out), nil
+	}
+
+	return command.TextResult(fmt.Sprintf("%s\n", result.HTMLURL)), nil
 }

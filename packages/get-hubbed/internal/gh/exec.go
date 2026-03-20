@@ -4,19 +4,36 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"unicode/utf8"
 )
 
 func Run(ctx context.Context, args ...string) (string, error) {
+	return RunWithInput(ctx, nil, args...)
+}
+
+func RunWithInput(
+	ctx context.Context,
+	stdin io.Reader,
+	args ...string,
+) (string, error) {
 	cmd := exec.CommandContext(ctx, "gh", args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("gh %v: %w: %s", args, err, truncateStderr(stderr.String()))
+		return "", fmt.Errorf(
+			"gh %v: %w: %s",
+			args,
+			err,
+			truncateStderr(stderr.String()),
+		)
 	}
 
 	return stdout.String(), nil
