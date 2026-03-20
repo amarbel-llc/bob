@@ -298,6 +298,13 @@ filtering via `--filter-tags` - Sandcastle isolation is automatic --- batman's
 `bats` binary handles it - `--bin-dir` flags pass through from the root justfile
 via `{{targets}}`
 
+## MCP Server Testing
+
+When testing an MCP server, run `purse-first validate-mcp <binary>` as a
+pre-step before writing BATS tests. This validates the initialize handshake,
+tools/list, and resources/list responses, catching protocol-level issues that
+BATS tests would miss.
+
 ## Setup Checklist
 
 When setting up BATS in a new repo:
