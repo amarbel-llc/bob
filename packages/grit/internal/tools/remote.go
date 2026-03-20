@@ -23,7 +23,7 @@ func registerRemoteCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(true),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "remote", Type: command.String, Description: "Remote name (default origin)"},
 			{Name: "prune", Type: command.Bool, Description: "Prune remote-tracking branches no longer on remote"},
 			{Name: "all", Type: command.Bool, Description: "Fetch from all remotes"},
@@ -45,7 +45,7 @@ func registerRemoteCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(true),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "remote", Type: command.String, Description: "Remote name (default origin)"},
 			{Name: "branch", Type: command.String, Description: "Remote branch to pull"},
 			{Name: "rebase", Type: command.Bool, Description: "Rebase instead of merge"},
@@ -67,7 +67,7 @@ func registerRemoteCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(true),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "remote", Type: command.String, Description: "Remote name (default origin)"},
 			{Name: "branch", Type: command.String, Description: "Branch to push"},
 			{Name: "set_upstream", Type: command.Bool, Description: "Set upstream tracking reference (-u)"},

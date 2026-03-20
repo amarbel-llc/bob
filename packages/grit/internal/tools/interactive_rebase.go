@@ -24,7 +24,7 @@ func registerInteractiveRebaseCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "upstream", Type: command.String, Description: "Ref to rebase onto (branch, tag, commit)", Required: true},
 		},
 		Run: handleInteractiveRebasePlan,
@@ -41,7 +41,7 @@ func registerInteractiveRebaseCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "upstream", Type: command.String, Description: "Ref to rebase onto", Required: true},
 			{
 				Name: "todo", Type: command.Array,

@@ -22,7 +22,7 @@ func registerBranchCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "name", Type: command.String, Description: "Name for the new branch", Required: true},
 			{Name: "start_point", Type: command.String, Description: "Starting point for the new branch (commit, branch, tag)"},
 		},
@@ -31,8 +31,8 @@ func registerBranchCommands(app *command.App) {
 
 	app.AddCommand(&command.Command{
 		Name:        "checkout",
-		Title:       "Switch Branches",
-		Description: command.Description{Short: "Switch branches or restore working tree files"},
+		Title:       "Switch Branches or Restore Files",
+		Description: command.Description{Short: "Switch branches or restore individual files from a ref. Use paths to restore specific files; omit paths to switch branches."},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
 			DestructiveHint: protocol.BoolPtr(false),
@@ -40,12 +40,13 @@ func registerBranchCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-			{Name: "ref", Type: command.String, Description: "Branch name or ref to check out", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
+			{Name: "ref", Type: command.String, Description: "Branch name or ref to check out or restore files from (defaults to HEAD when used with paths)"},
 			{Name: "create", Type: command.Bool, Description: "Create a new branch and check it out (-b)"},
+			{Name: "paths", Type: command.Array, Description: "File paths to restore from ref (e.g. [\"src/main.go\", \"README.md\"]). When provided, restores these files instead of switching branches."},
 		},
 		MapsTools: []command.ToolMapping{
-			{Replaces: "Bash", CommandPrefixes: []string{"git checkout", "git switch"}, UseWhen: "switching branches"},
+			{Replaces: "Bash", CommandPrefixes: []string{"git checkout", "git switch", "git restore"}, UseWhen: "switching branches or restoring files"},
 		},
 		Run: handleGitCheckout,
 	})
@@ -81,13 +82,40 @@ func handleGitBranchCreate(ctx context.Context, args json.RawMessage, _ command.
 
 func handleGitCheckout(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
-		RepoPath string `json:"repo_path"`
-		Ref      string `json:"ref"`
-		Create   bool   `json:"create"`
+		RepoPath string   `json:"repo_path"`
+		Ref      string   `json:"ref"`
+		Create   bool     `json:"create"`
+		Paths    []string `json:"paths"`
 	}
 
 	if err := json.Unmarshal(args, &params); err != nil {
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
+	}
+
+	if len(params.Paths) > 0 {
+		// File restore mode: git checkout <ref> -- <paths>
+		ref := params.Ref
+		if ref == "" {
+			ref = "HEAD"
+		}
+
+		gitArgs := []string{"checkout", ref, "--"}
+		gitArgs = append(gitArgs, params.Paths...)
+
+		if _, err := git.Run(ctx, params.RepoPath, gitArgs...); err != nil {
+			return command.TextErrorResult(fmt.Sprintf("git checkout: %v", err)), nil
+		}
+
+		return command.JSONResult(git.MutationResult{
+			Status: "restored",
+			Ref:    ref,
+			Paths:  params.Paths,
+		}), nil
+	}
+
+	// Branch switch mode
+	if params.Ref == "" {
+		return command.TextErrorResult("ref is required when not restoring specific files"), nil
 	}
 
 	gitArgs := []string{"checkout"}

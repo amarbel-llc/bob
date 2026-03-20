@@ -22,7 +22,7 @@ func registerStatusCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "staged", Type: command.Bool, Description: "Show staged changes (--cached)"},
 			{Name: "ref", Type: command.String, Description: "Diff against a specific ref (commit, branch, tag)"},
 			{Name: "paths", Type: command.Array, Description: "Limit diff to specific paths"},

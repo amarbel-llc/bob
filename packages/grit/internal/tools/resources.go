@@ -63,21 +63,21 @@ func NewResourceProvider() (*resourceProvider, error) {
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "grit://log?repo_path={repo_path}&max_count={max_count}&ref={ref}&paths={paths}&all={all}",
 		Name:        "Commit Log",
-		Description: "Commit history. Optional: repo_path, max_count (default 10), ref, paths (comma-separated), all (bool)",
+		Description: "Commit history. All params optional: max_count (default 10), ref, paths (comma-separated), all (bool). repo_path defaults to cwd — almost never needed.",
 		MimeType:    "application/json",
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "grit://commits/{ref}?repo_path={repo_path}&context_lines={context_lines}&max_patch_lines={max_patch_lines}",
 		Name:        "Commit Detail",
-		Description: "Show a commit with metadata and patch. Required: ref. Optional: repo_path, context_lines, max_patch_lines",
+		Description: "Show a commit with metadata and patch. Required: ref. Optional: context_lines, max_patch_lines. repo_path defaults to cwd — almost never needed.",
 		MimeType:    "application/json",
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "grit://blame/{path}?repo_path={repo_path}&ref={ref}&line_range={line_range}",
 		Name:        "Line Authorship",
-		Description: "Line-by-line authorship of a file. Required: path. Optional: repo_path, ref, line_range (START,END)",
+		Description: "Line-by-line authorship of a file. Required: path. Optional: ref, line_range (START,END). repo_path defaults to cwd — almost never needed.",
 		MimeType:    "application/json",
 	}, nil)
 

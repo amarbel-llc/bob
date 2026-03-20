@@ -22,8 +22,8 @@ func registerStagingCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
-			{Name: "paths", Type: command.Array, Description: "File paths to stage (relative to repo root)", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
+			{Name: "paths", Type: command.Array, Description: "Array of file path strings to stage, e.g. [\"src/main.go\", \"README.md\"] (relative to repo root)", Required: true},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git add"}, UseWhen: "staging files for commit"},
@@ -42,7 +42,7 @@ func registerStagingCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "paths", Type: command.Array, Description: "File paths to unstage (relative to repo root)"},
 			{Name: "soft", Type: command.Bool, Description: "Soft reset: move HEAD back without changing index or working tree (use with ref)"},
 			{Name: "ref", Type: command.String, Description: "Target ref for soft reset (e.g. HEAD~1, HEAD~3, a branch). Defaults to HEAD~1"},

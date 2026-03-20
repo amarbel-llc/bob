@@ -23,7 +23,7 @@ func registerRevParseCommands(app *command.App) {
 			OpenWorldHint:   protocol.BoolPtr(false),
 		},
 		Params: []command.Param{
-			{Name: "repo_path", Type: command.String, Description: "Path to the git repository", Required: true},
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "ref", Type: command.String, Description: "Ref to resolve (e.g. HEAD, main, v1.0, HEAD~3, abc1234)", Required: true},
 		},
 		MapsTools: []command.ToolMapping{

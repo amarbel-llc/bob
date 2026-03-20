@@ -68,7 +68,7 @@ func TestResourceHookCatchAllGit(t *testing.T) {
 	if !handled {
 		t.Fatal("expected hook to deny git commit via catch-all")
 	}
-	if !strings.Contains(out.String(), "All git commands are blocked") {
+	if !strings.Contains(out.String(), "ALL git CLI commands are blocked") {
 		t.Errorf("expected catch-all deny message, got %q", out.String())
 	}
 }
