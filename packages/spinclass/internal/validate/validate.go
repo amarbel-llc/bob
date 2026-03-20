@@ -114,7 +114,10 @@ func CheckMerged(sf sweatfile.Sweatfile) []Issue {
 
 	if dups := findDuplicates(sf.GitSkipIndex); len(dups) > 0 {
 		issues = append(issues, Issue{
-			Message:  fmt.Sprintf("duplicate git-excludes: %s", strings.Join(dups, ", ")),
+			Message: fmt.Sprintf(
+				"duplicate git-excludes: %s",
+				strings.Join(dups, ", "),
+			),
 			Severity: SeverityWarning,
 			Field:    "git-excludes",
 		})
@@ -122,7 +125,10 @@ func CheckMerged(sf sweatfile.Sweatfile) []Issue {
 
 	if dups := findDuplicates(sf.ClaudeAllow); len(dups) > 0 {
 		issues = append(issues, Issue{
-			Message:  fmt.Sprintf("duplicate claude-allow: %s", strings.Join(dups, ", ")),
+			Message: fmt.Sprintf(
+				"duplicate claude-allow: %s",
+				strings.Join(dups, ", "),
+			),
 			Severity: SeverityWarning,
 			Field:    "claude-allow",
 		})
@@ -193,7 +199,8 @@ func Run(w io.Writer, home, repoDir string) int {
 			continue
 		}
 
-		_, parseErr := sweatfile.Parse(data)
+		var parsed sweatfile.Sweatfile
+		parseErr := parsed.Parse(data)
 		if parseErr != nil {
 			sub.NotOk("valid TOML", map[string]string{
 				"severity": SeverityError,
@@ -278,8 +285,10 @@ func Run(w io.Writer, home, repoDir string) int {
 	tw.EndSubtest("merged result", sub)
 
 	applySub := tw.Subtest("apply (dry-run)")
-	merged := sweatfile.Merge(result.Merged, sweatfile.GetDefault())
-	if issues := CheckGitExcludes(sweatfile.Sweatfile{GitSkipIndex: merged.GitSkipIndex}); len(issues) > 0 {
+	merged := result.Merged.MergeWith(sweatfile.GetDefault())
+	if issues := CheckGitExcludes(sweatfile.Sweatfile{GitSkipIndex: merged.GitSkipIndex}); len(
+		issues,
+	) > 0 {
 		for _, iss := range issues {
 			applySub.NotOk("git excludes structure valid", map[string]string{
 				"severity": iss.Severity,
@@ -295,10 +304,13 @@ func Run(w io.Writer, home, repoDir string) int {
 		for _, iss := range issues {
 			if iss.Severity == SeverityError {
 				hasErrors = true
-				applySub.NotOk("claude settings structure valid", map[string]string{
-					"severity": iss.Severity,
-					"message":  iss.Message,
-				})
+				applySub.NotOk(
+					"claude settings structure valid",
+					map[string]string{
+						"severity": iss.Severity,
+						"message":  iss.Message,
+					},
+				)
 			}
 		}
 		if !hasErrors {

@@ -5,15 +5,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 )
 
 func TestResolvePathBranchName(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoPath, []string{"feature-x"})
+	rp, err := ResolvePath(repoPath, []string{"feature-x"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,7 +32,7 @@ func TestResolvePathSessionKey(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoPath, []string{"feature-x"})
+	rp, err := ResolvePath(repoPath, []string{"feature-x"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +84,11 @@ func TestDetectRepoSkipsGitFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != parentRepo {
-		t.Errorf("DetectRepo() = %q, want %q (should skip .git file and find parent)", got, parentRepo)
+		t.Errorf(
+			"DetectRepo() = %q, want %q (should skip .git file and find parent)",
+			got,
+			parentRepo,
+		)
 	}
 }
 
@@ -345,7 +347,10 @@ func TestResolvePathMultipleArgs(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoPath, []string{"this", "is", "the", "branch-name"})
+	rp, err := ResolvePath(
+		repoPath,
+		[]string{"this", "is", "the", "branch-name"},
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -354,7 +359,10 @@ func TestResolvePathMultipleArgs(t *testing.T) {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "this-is-the-branch_name")
 	}
 	if rp.ExistingBranch != "" {
-		t.Errorf("ExistingBranch = %q, want empty for new branch", rp.ExistingBranch)
+		t.Errorf(
+			"ExistingBranch = %q, want empty for new branch",
+			rp.ExistingBranch,
+		)
 	}
 }
 
@@ -379,13 +387,17 @@ func TestResolvePathDetectsLocalBranch(t *testing.T) {
 	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
 	runGit(repoDir, "branch", "existing_branch")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoDir, []string{"existing-branch"})
+	rp, err := ResolvePath(repoDir, []string{"existing-branch"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if rp.ExistingBranch != "existing_branch" {
-		t.Errorf("ExistingBranch = %q, want %q", rp.ExistingBranch, "existing_branch")
+		t.Errorf(
+			"ExistingBranch = %q, want %q",
+			rp.ExistingBranch,
+			"existing_branch",
+		)
 	}
 	if rp.Branch != "existing_branch" {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "existing_branch")
@@ -428,13 +440,17 @@ func TestResolvePathDetectsRemoteBranch(t *testing.T) {
 	runGit(repoDir, "branch", "-d", "remote_only_branch")
 	runGit(repoDir, "fetch", "origin")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoDir, []string{"remote-only-branch"})
+	rp, err := ResolvePath(repoDir, []string{"remote-only-branch"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if rp.ExistingBranch != "remote_only_branch" {
-		t.Errorf("ExistingBranch = %q, want %q", rp.ExistingBranch, "remote_only_branch")
+		t.Errorf(
+			"ExistingBranch = %q, want %q",
+			rp.ExistingBranch,
+			"remote_only_branch",
+		)
 	}
 	if rp.Branch != "remote_only_branch" {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "remote_only_branch")
@@ -461,18 +477,23 @@ func TestResolvePathPrefersUnsanitizedBranch(t *testing.T) {
 	runGit(repoDir, "config", "user.name", "Test")
 	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
 
-	// Create a branch with the hyphenated name (as if created outside spinclass)
+	// Create a branch with the hyphenated name (as if created outside
+	// spinclass)
 	runGit(repoDir, "branch", "quiet-pecan")
 
 	// User passes "quiet-pecan" — should find the hyphenated branch,
 	// NOT normalize to "quiet_pecan" and miss it.
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoDir, []string{"quiet-pecan"})
+	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if rp.ExistingBranch != "quiet-pecan" {
-		t.Errorf("ExistingBranch = %q, want %q", rp.ExistingBranch, "quiet-pecan")
+		t.Errorf(
+			"ExistingBranch = %q, want %q",
+			rp.ExistingBranch,
+			"quiet-pecan",
+		)
 	}
 	if rp.Branch != "quiet-pecan" {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet-pecan")
@@ -508,13 +529,17 @@ func TestResolvePathFallsBackToSanitizedBranch(t *testing.T) {
 
 	// User passes "quiet-pecan" — unsanitized won't match, should fall back
 	// to sanitized "quiet_pecan".
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoDir, []string{"quiet-pecan"})
+	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if rp.ExistingBranch != "quiet_pecan" {
-		t.Errorf("ExistingBranch = %q, want %q", rp.ExistingBranch, "quiet_pecan")
+		t.Errorf(
+			"ExistingBranch = %q, want %q",
+			rp.ExistingBranch,
+			"quiet_pecan",
+		)
 	}
 	if rp.Branch != "quiet_pecan" {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet_pecan")
@@ -546,13 +571,17 @@ func TestResolvePathBothFormsExistPrefersUnsanitized(t *testing.T) {
 	runGit(repoDir, "branch", "quiet_pecan")
 
 	// Should prefer the unsanitized (user's literal input) form
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoDir, []string{"quiet-pecan"})
+	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if rp.ExistingBranch != "quiet-pecan" {
-		t.Errorf("ExistingBranch = %q, want %q", rp.ExistingBranch, "quiet-pecan")
+		t.Errorf(
+			"ExistingBranch = %q, want %q",
+			rp.ExistingBranch,
+			"quiet-pecan",
+		)
 	}
 	if rp.Branch != "quiet-pecan" {
 		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet-pecan")
@@ -563,7 +592,7 @@ func TestResolvePathRandomNameWhenNoArgs(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(sweatfile.Sweatfile{}, repoPath, []string{})
+	rp, err := ResolvePath(repoPath, []string{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -572,7 +601,10 @@ func TestResolvePathRandomNameWhenNoArgs(t *testing.T) {
 		t.Error("expected non-empty random branch name")
 	}
 	if rp.ExistingBranch != "" {
-		t.Errorf("ExistingBranch = %q, want empty for random name", rp.ExistingBranch)
+		t.Errorf(
+			"ExistingBranch = %q, want empty for random name",
+			rp.ExistingBranch,
+		)
 	}
 }
 

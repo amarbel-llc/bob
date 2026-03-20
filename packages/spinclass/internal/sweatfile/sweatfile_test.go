@@ -10,7 +10,8 @@ func TestParseMinimal(t *testing.T) {
 	input := `
 git-excludes = [".claude/"]
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -20,7 +21,8 @@ git-excludes = [".claude/"]
 }
 
 func TestParseEmpty(t *testing.T) {
-	sf, err := Parse([]byte(""))
+	var sf Sweatfile
+	err := sf.Parse([]byte(""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,7 +36,8 @@ func TestLoadFromPath(t *testing.T) {
 	path := filepath.Join(dir, "sweatfile")
 	os.WriteFile(path, []byte(`git-excludes = [".direnv/"]`), 0o644)
 
-	sf, err := Load(path)
+	var sf Sweatfile
+	err := sf.Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,7 +47,8 @@ func TestLoadFromPath(t *testing.T) {
 }
 
 func TestLoadMissing(t *testing.T) {
-	sf, err := Load("/nonexistent/sweatfile")
+	var sf Sweatfile
+	err := sf.Load("/nonexistent/sweatfile")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,11 +64,12 @@ func TestMergeConcatenatesArrays(t *testing.T) {
 	repo := Sweatfile{
 		GitSkipIndex: []string{".direnv/"},
 	}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.GitSkipIndex) != 2 {
 		t.Fatalf("expected 2 git-excludes, got %v", merged.GitSkipIndex)
 	}
-	if merged.GitSkipIndex[0] != ".claude/" || merged.GitSkipIndex[1] != ".direnv/" {
+	if merged.GitSkipIndex[0] != ".claude/" ||
+		merged.GitSkipIndex[1] != ".direnv/" {
 		t.Errorf("git-excludes: got %v", merged.GitSkipIndex)
 	}
 }
@@ -76,7 +81,7 @@ func TestMergeClearSentinel(t *testing.T) {
 	repo := Sweatfile{
 		GitSkipIndex: []string{},
 	}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.GitSkipIndex) != 0 {
 		t.Errorf("expected cleared git-excludes, got %v", merged.GitSkipIndex)
 	}
@@ -84,7 +89,7 @@ func TestMergeClearSentinel(t *testing.T) {
 
 func TestMergeBaseOnly(t *testing.T) {
 	base := Sweatfile{GitSkipIndex: []string{".claude/"}}
-	merged := Merge(base, Sweatfile{})
+	merged := base.MergeWith(Sweatfile{})
 	if len(merged.GitSkipIndex) != 1 || merged.GitSkipIndex[0] != ".claude/" {
 		t.Errorf("expected inherited git-excludes, got %v", merged.GitSkipIndex)
 	}
@@ -98,12 +103,13 @@ func TestSaveRoundTrip(t *testing.T) {
 		GitSkipIndex: []string{".claude/"},
 	}
 
-	err := Save(path, sf)
+	err := sf.Save(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	loaded, err := Load(path)
+	var loaded Sweatfile
+	err = loaded.Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error loading: %v", err)
 	}
@@ -116,7 +122,8 @@ func TestParseClaudeAllow(t *testing.T) {
 	input := `
 claude-allow = ["Read", "Bash(git *)"]
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +138,7 @@ claude-allow = ["Read", "Bash(git *)"]
 func TestMergeClaudeAllowAppends(t *testing.T) {
 	base := Sweatfile{ClaudeAllow: []string{"Read", "Glob"}}
 	repo := Sweatfile{ClaudeAllow: []string{"Bash(go test:*)"}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.ClaudeAllow) != 3 {
 		t.Fatalf("expected 3 claude-allow rules, got %v", merged.ClaudeAllow)
 	}
@@ -143,7 +150,7 @@ func TestMergeClaudeAllowAppends(t *testing.T) {
 func TestMergeClaudeAllowClear(t *testing.T) {
 	base := Sweatfile{ClaudeAllow: []string{"Read", "Glob"}}
 	repo := Sweatfile{ClaudeAllow: []string{}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.ClaudeAllow) != 0 {
 		t.Errorf("expected cleared claude-allow, got %v", merged.ClaudeAllow)
 	}
@@ -177,7 +184,8 @@ claude-allow = ["/docs"]
 		t.Fatalf("LoadHierarchy returned error: %v", err)
 	}
 
-	// Should have checked: global, eng/sweatfile, eng/repos/sweatfile, myrepo/sweatfile
+	// Should have checked: global, eng/sweatfile, eng/repos/sweatfile,
+	// myrepo/sweatfile
 	if len(result.Sources) != 4 {
 		t.Fatalf("expected 4 sources, got %d", len(result.Sources))
 	}
@@ -188,15 +196,27 @@ claude-allow = ["/docs"]
 	}
 	for i := 1; i < len(result.Sources); i++ {
 		if result.Sources[i].Found {
-			t.Errorf("expected source %d (%s) to not be found", i, result.Sources[i].Path)
+			t.Errorf(
+				"expected source %d (%s) to not be found",
+				i,
+				result.Sources[i].Path,
+			)
 		}
 	}
 
-	if len(result.Merged.GitSkipIndex) != 1 || result.Merged.GitSkipIndex[0] != ".DS_Store" {
-		t.Errorf("expected GitExcludes=[.DS_Store], got %v", result.Merged.GitSkipIndex)
+	if len(result.Merged.GitSkipIndex) != 1 ||
+		result.Merged.GitSkipIndex[0] != ".DS_Store" {
+		t.Errorf(
+			"expected GitExcludes=[.DS_Store], got %v",
+			result.Merged.GitSkipIndex,
+		)
 	}
-	if len(result.Merged.ClaudeAllow) != 1 || result.Merged.ClaudeAllow[0] != "/docs" {
-		t.Errorf("expected ClaudeAllow=[/docs], got %v", result.Merged.ClaudeAllow)
+	if len(result.Merged.ClaudeAllow) != 1 ||
+		result.Merged.ClaudeAllow[0] != "/docs" {
+		t.Errorf(
+			"expected ClaudeAllow=[/docs], got %v",
+			result.Merged.ClaudeAllow,
+		)
 	}
 }
 
@@ -227,13 +247,21 @@ claude-allow = ["/src"]
 	if len(result.Merged.GitSkipIndex) != 2 {
 		t.Fatalf("expected 2 GitExcludes, got %v", result.Merged.GitSkipIndex)
 	}
-	if result.Merged.GitSkipIndex[0] != ".DS_Store" || result.Merged.GitSkipIndex[1] != ".idea" {
-		t.Errorf("expected GitExcludes=[.DS_Store, .idea], got %v", result.Merged.GitSkipIndex)
+	if result.Merged.GitSkipIndex[0] != ".DS_Store" ||
+		result.Merged.GitSkipIndex[1] != ".idea" {
+		t.Errorf(
+			"expected GitExcludes=[.DS_Store, .idea], got %v",
+			result.Merged.GitSkipIndex,
+		)
 	}
 
 	// ClaudeAllow from repo only
-	if len(result.Merged.ClaudeAllow) != 1 || result.Merged.ClaudeAllow[0] != "/src" {
-		t.Errorf("expected ClaudeAllow=[/src], got %v", result.Merged.ClaudeAllow)
+	if len(result.Merged.ClaudeAllow) != 1 ||
+		result.Merged.ClaudeAllow[0] != "/src" {
+		t.Errorf(
+			"expected ClaudeAllow=[/src], got %v",
+			result.Merged.ClaudeAllow,
+		)
 	}
 }
 
@@ -270,19 +298,28 @@ claude-allow = ["/src"]
 	if len(result.Merged.GitSkipIndex) != 2 {
 		t.Fatalf("expected 2 GitExcludes, got %v", result.Merged.GitSkipIndex)
 	}
-	if result.Merged.GitSkipIndex[0] != ".DS_Store" || result.Merged.GitSkipIndex[1] != ".envrc" {
-		t.Errorf("expected GitExcludes=[.DS_Store, .envrc], got %v", result.Merged.GitSkipIndex)
+	if result.Merged.GitSkipIndex[0] != ".DS_Store" ||
+		result.Merged.GitSkipIndex[1] != ".envrc" {
+		t.Errorf(
+			"expected GitExcludes=[.DS_Store, .envrc], got %v",
+			result.Merged.GitSkipIndex,
+		)
 	}
 
 	// claude-allow: parent /eng-docs + repo /src = [/eng-docs, /src]
 	if len(result.Merged.ClaudeAllow) != 2 {
 		t.Fatalf("expected 2 ClaudeAllow, got %v", result.Merged.ClaudeAllow)
 	}
-	if result.Merged.ClaudeAllow[0] != "/eng-docs" || result.Merged.ClaudeAllow[1] != "/src" {
-		t.Errorf("expected ClaudeAllow=[/eng-docs, /src], got %v", result.Merged.ClaudeAllow)
+	if result.Merged.ClaudeAllow[0] != "/eng-docs" ||
+		result.Merged.ClaudeAllow[1] != "/src" {
+		t.Errorf(
+			"expected ClaudeAllow=[/eng-docs, /src], got %v",
+			result.Merged.ClaudeAllow,
+		)
 	}
 
-	// Verify sources: global found, eng/sweatfile found, eng/repos/sweatfile not found, myrepo/sweatfile found
+	// Verify sources: global found, eng/sweatfile found, eng/repos/sweatfile
+	// not found, myrepo/sweatfile found
 	if !result.Sources[0].Found {
 		t.Error("expected global source to be found")
 	}
@@ -330,11 +367,13 @@ func TestParseHooksCreate(t *testing.T) {
 [hooks]
 create = "composer install"
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sf.Hooks == nil || sf.Hooks.Create == nil || *sf.Hooks.Create != "composer install" {
+	if sf.Hooks == nil || sf.Hooks.Create == nil ||
+		*sf.Hooks.Create != "composer install" {
 		t.Errorf("hooks.create: got %v", sf.Hooks)
 	}
 }
@@ -344,11 +383,13 @@ func TestParseHooksStop(t *testing.T) {
 [hooks]
 stop = "just test"
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sf.Hooks == nil || sf.Hooks.Stop == nil || *sf.Hooks.Stop != "just test" {
+	if sf.Hooks == nil || sf.Hooks.Stop == nil ||
+		*sf.Hooks.Stop != "just test" {
 		t.Errorf("hooks.stop: got %v", sf.Hooks)
 	}
 }
@@ -359,7 +400,8 @@ func TestParseHooksBoth(t *testing.T) {
 create = "npm install"
 stop = "just lint"
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -375,7 +417,8 @@ stop = "just lint"
 }
 
 func TestParseHooksAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -388,8 +431,9 @@ func TestMergeHooksCreateInherit(t *testing.T) {
 	cmd := "npm install"
 	base := Sweatfile{Hooks: &Hooks{Create: &cmd}}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Create == nil || *merged.Hooks.Create != "npm install" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Create == nil ||
+		*merged.Hooks.Create != "npm install" {
 		t.Errorf("expected inherited hooks.create, got %v", merged.Hooks)
 	}
 }
@@ -399,8 +443,9 @@ func TestMergeHooksCreateOverride(t *testing.T) {
 	repoCmd := "composer install"
 	base := Sweatfile{Hooks: &Hooks{Create: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{Create: &repoCmd}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Create == nil || *merged.Hooks.Create != "composer install" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Create == nil ||
+		*merged.Hooks.Create != "composer install" {
 		t.Errorf("expected overridden hooks.create, got %v", merged.Hooks)
 	}
 }
@@ -410,8 +455,9 @@ func TestMergeHooksCreateClear(t *testing.T) {
 	empty := ""
 	base := Sweatfile{Hooks: &Hooks{Create: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{Create: &empty}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Create == nil || *merged.Hooks.Create != "" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Create == nil ||
+		*merged.Hooks.Create != "" {
 		t.Errorf("expected cleared hooks.create, got %v", merged.Hooks)
 	}
 }
@@ -420,8 +466,9 @@ func TestMergeHooksStopInherit(t *testing.T) {
 	cmd := "just test"
 	base := Sweatfile{Hooks: &Hooks{Stop: &cmd}}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Stop == nil || *merged.Hooks.Stop != "just test" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Stop == nil ||
+		*merged.Hooks.Stop != "just test" {
 		t.Errorf("expected inherited hooks.stop, got %v", merged.Hooks)
 	}
 }
@@ -431,8 +478,9 @@ func TestMergeHooksStopOverride(t *testing.T) {
 	repoCmd := "just lint"
 	base := Sweatfile{Hooks: &Hooks{Stop: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{Stop: &repoCmd}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Stop == nil || *merged.Hooks.Stop != "just lint" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Stop == nil ||
+		*merged.Hooks.Stop != "just lint" {
 		t.Errorf("expected overridden hooks.stop, got %v", merged.Hooks)
 	}
 }
@@ -442,8 +490,9 @@ func TestMergeHooksStopClear(t *testing.T) {
 	empty := ""
 	base := Sweatfile{Hooks: &Hooks{Stop: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{Stop: &empty}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.Stop == nil || *merged.Hooks.Stop != "" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.Stop == nil ||
+		*merged.Hooks.Stop != "" {
 		t.Errorf("expected cleared hooks.stop, got %v", merged.Hooks)
 	}
 }
@@ -453,7 +502,7 @@ func TestMergeHooksIndependentFields(t *testing.T) {
 	stopCmd := "just test"
 	base := Sweatfile{Hooks: &Hooks{Create: &createCmd}}
 	repo := Sweatfile{Hooks: &Hooks{Stop: &stopCmd}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.Hooks == nil {
 		t.Fatal("expected non-nil hooks")
 	}
@@ -470,11 +519,13 @@ func TestParseHooksPreMerge(t *testing.T) {
 [hooks]
 pre-merge = "just test"
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sf.Hooks == nil || sf.Hooks.PreMerge == nil || *sf.Hooks.PreMerge != "just test" {
+	if sf.Hooks == nil || sf.Hooks.PreMerge == nil ||
+		*sf.Hooks.PreMerge != "just test" {
 		t.Errorf("hooks.pre-merge: got %v", sf.Hooks)
 	}
 }
@@ -483,8 +534,9 @@ func TestMergeHooksPreMergeInherit(t *testing.T) {
 	cmd := "just test"
 	base := Sweatfile{Hooks: &Hooks{PreMerge: &cmd}}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "just test" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil ||
+		*merged.Hooks.PreMerge != "just test" {
 		t.Errorf("expected inherited hooks.pre-merge, got %v", merged.Hooks)
 	}
 }
@@ -494,8 +546,9 @@ func TestMergeHooksPreMergeOverride(t *testing.T) {
 	repoCmd := "just lint"
 	base := Sweatfile{Hooks: &Hooks{PreMerge: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{PreMerge: &repoCmd}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "just lint" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil ||
+		*merged.Hooks.PreMerge != "just lint" {
 		t.Errorf("expected overridden hooks.pre-merge, got %v", merged.Hooks)
 	}
 }
@@ -505,8 +558,9 @@ func TestMergeHooksPreMergeClear(t *testing.T) {
 	empty := ""
 	base := Sweatfile{Hooks: &Hooks{PreMerge: &baseCmd}}
 	repo := Sweatfile{Hooks: &Hooks{PreMerge: &empty}}
-	merged := Merge(base, repo)
-	if merged.Hooks == nil || merged.Hooks.PreMerge == nil || *merged.Hooks.PreMerge != "" {
+	merged := base.MergeWith(repo)
+	if merged.Hooks == nil || merged.Hooks.PreMerge == nil ||
+		*merged.Hooks.PreMerge != "" {
 		t.Errorf("expected cleared hooks.pre-merge, got %v", merged.Hooks)
 	}
 }
@@ -537,11 +591,18 @@ claude-allow = []
 	}
 
 	// Empty arrays should clear parent values
-	if result.Merged.GitSkipIndex == nil || len(result.Merged.GitSkipIndex) != 0 {
-		t.Errorf("expected empty GitExcludes (cleared by repo), got %v", result.Merged.GitSkipIndex)
+	if result.Merged.GitSkipIndex == nil ||
+		len(result.Merged.GitSkipIndex) != 0 {
+		t.Errorf(
+			"expected empty GitExcludes (cleared by repo), got %v",
+			result.Merged.GitSkipIndex,
+		)
 	}
 	if result.Merged.ClaudeAllow == nil || len(result.Merged.ClaudeAllow) != 0 {
-		t.Errorf("expected empty ClaudeAllow (cleared by repo), got %v", result.Merged.ClaudeAllow)
+		t.Errorf(
+			"expected empty ClaudeAllow (cleared by repo), got %v",
+			result.Merged.ClaudeAllow,
+		)
 	}
 }
 
@@ -558,14 +619,16 @@ func TestLoadHierarchyHooksStopInherited(t *testing.T) {
 		t.Fatalf("LoadHierarchy returned error: %v", err)
 	}
 
-	if result.Merged.StopHookCommand() == nil || *result.Merged.StopHookCommand() != "just test" {
+	if result.Merged.StopHookCommand() == nil ||
+		*result.Merged.StopHookCommand() != "just test" {
 		t.Errorf("expected inherited hooks.stop, got %v", result.Merged.Hooks)
 	}
 }
 
 func TestParseSystemPrompt(t *testing.T) {
 	input := `system-prompt = "do stuff"`
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -576,7 +639,8 @@ func TestParseSystemPrompt(t *testing.T) {
 
 func TestParseSystemPromptEmpty(t *testing.T) {
 	input := `system-prompt = ""`
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -589,7 +653,8 @@ func TestParseSystemPromptEmpty(t *testing.T) {
 }
 
 func TestParseSystemPromptAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -600,22 +665,28 @@ func TestParseSystemPromptAbsent(t *testing.T) {
 
 func TestParseSystemPromptAppend(t *testing.T) {
 	input := `system-prompt-append = "extra instructions"`
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sf.SystemPromptAppend == nil || *sf.SystemPromptAppend != "extra instructions" {
+	if sf.SystemPromptAppend == nil ||
+		*sf.SystemPromptAppend != "extra instructions" {
 		t.Errorf("system-prompt-append: got %v", sf.SystemPromptAppend)
 	}
 }
 
 func TestParseSystemPromptAppendAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if sf.SystemPromptAppend != nil {
-		t.Errorf("expected nil system-prompt-append, got %v", sf.SystemPromptAppend)
+		t.Errorf(
+			"expected nil system-prompt-append, got %v",
+			sf.SystemPromptAppend,
+		)
 	}
 }
 
@@ -623,9 +694,12 @@ func TestMergeSystemPromptInherit(t *testing.T) {
 	prompt := "base prompt"
 	base := Sweatfile{SystemPrompt: &prompt}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.SystemPrompt == nil || *merged.SystemPrompt != "base prompt" {
-		t.Errorf("expected inherited system-prompt, got %v", merged.SystemPrompt)
+		t.Errorf(
+			"expected inherited system-prompt, got %v",
+			merged.SystemPrompt,
+		)
 	}
 }
 
@@ -634,9 +708,13 @@ func TestMergeSystemPromptConcatenate(t *testing.T) {
 	repoPrompt := "repo prompt"
 	base := Sweatfile{SystemPrompt: &basePrompt}
 	repo := Sweatfile{SystemPrompt: &repoPrompt}
-	merged := Merge(base, repo)
-	if merged.SystemPrompt == nil || *merged.SystemPrompt != "base prompt repo prompt" {
-		t.Errorf("expected concatenated system-prompt, got %v", merged.SystemPrompt)
+	merged := base.MergeWith(repo)
+	if merged.SystemPrompt == nil ||
+		*merged.SystemPrompt != "base prompt repo prompt" {
+		t.Errorf(
+			"expected concatenated system-prompt, got %v",
+			merged.SystemPrompt,
+		)
 	}
 }
 
@@ -645,7 +723,7 @@ func TestMergeSystemPromptClear(t *testing.T) {
 	empty := ""
 	base := Sweatfile{SystemPrompt: &basePrompt}
 	repo := Sweatfile{SystemPrompt: &empty}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.SystemPrompt == nil {
 		t.Fatal("expected non-nil system-prompt after clear")
 	}
@@ -658,9 +736,13 @@ func TestMergeSystemPromptAppendInherit(t *testing.T) {
 	prompt := "base append"
 	base := Sweatfile{SystemPromptAppend: &prompt}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
-	if merged.SystemPromptAppend == nil || *merged.SystemPromptAppend != "base append" {
-		t.Errorf("expected inherited system-prompt-append, got %v", merged.SystemPromptAppend)
+	merged := base.MergeWith(repo)
+	if merged.SystemPromptAppend == nil ||
+		*merged.SystemPromptAppend != "base append" {
+		t.Errorf(
+			"expected inherited system-prompt-append, got %v",
+			merged.SystemPromptAppend,
+		)
 	}
 }
 
@@ -669,9 +751,13 @@ func TestMergeSystemPromptAppendConcatenate(t *testing.T) {
 	repoPrompt := "repo append"
 	base := Sweatfile{SystemPromptAppend: &basePrompt}
 	repo := Sweatfile{SystemPromptAppend: &repoPrompt}
-	merged := Merge(base, repo)
-	if merged.SystemPromptAppend == nil || *merged.SystemPromptAppend != "base append repo append" {
-		t.Errorf("expected concatenated system-prompt-append, got %v", merged.SystemPromptAppend)
+	merged := base.MergeWith(repo)
+	if merged.SystemPromptAppend == nil ||
+		*merged.SystemPromptAppend != "base append repo append" {
+		t.Errorf(
+			"expected concatenated system-prompt-append, got %v",
+			merged.SystemPromptAppend,
+		)
 	}
 }
 
@@ -680,31 +766,37 @@ func TestMergeSystemPromptAppendClear(t *testing.T) {
 	empty := ""
 	base := Sweatfile{SystemPromptAppend: &basePrompt}
 	repo := Sweatfile{SystemPromptAppend: &empty}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.SystemPromptAppend == nil {
 		t.Fatal("expected non-nil system-prompt-append after clear")
 	}
 	if *merged.SystemPromptAppend != "" {
-		t.Errorf("expected cleared system-prompt-append, got %q", *merged.SystemPromptAppend)
+		t.Errorf(
+			"expected cleared system-prompt-append, got %q",
+			*merged.SystemPromptAppend,
+		)
 	}
 }
 
 func TestParseEnvrcDirectives(t *testing.T) {
 	input := `envrc-directives = ["source_up", "dotenv_if_exists"]`
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(sf.EnvrcDirectives) != 2 {
 		t.Fatalf("expected 2 envrc-directives, got %v", sf.EnvrcDirectives)
 	}
-	if sf.EnvrcDirectives[0] != "source_up" || sf.EnvrcDirectives[1] != "dotenv_if_exists" {
+	if sf.EnvrcDirectives[0] != "source_up" ||
+		sf.EnvrcDirectives[1] != "dotenv_if_exists" {
 		t.Errorf("envrc-directives: got %v", sf.EnvrcDirectives)
 	}
 }
 
 func TestParseEnvrcDirectivesAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -716,7 +808,7 @@ func TestParseEnvrcDirectivesAbsent(t *testing.T) {
 func TestMergeEnvrcDirectivesAppend(t *testing.T) {
 	base := Sweatfile{EnvrcDirectives: []string{"source_up"}}
 	repo := Sweatfile{EnvrcDirectives: []string{"dotenv_if_exists"}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.EnvrcDirectives) != 2 {
 		t.Fatalf("expected 2 envrc-directives, got %v", merged.EnvrcDirectives)
 	}
@@ -725,17 +817,24 @@ func TestMergeEnvrcDirectivesAppend(t *testing.T) {
 func TestMergeEnvrcDirectivesClear(t *testing.T) {
 	base := Sweatfile{EnvrcDirectives: []string{"source_up"}}
 	repo := Sweatfile{EnvrcDirectives: []string{}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.EnvrcDirectives) != 0 {
-		t.Errorf("expected cleared envrc-directives, got %v", merged.EnvrcDirectives)
+		t.Errorf(
+			"expected cleared envrc-directives, got %v",
+			merged.EnvrcDirectives,
+		)
 	}
 }
 
 func TestMergeEnvrcDirectivesInherit(t *testing.T) {
 	base := Sweatfile{EnvrcDirectives: []string{"source_up"}}
-	merged := Merge(base, Sweatfile{})
-	if len(merged.EnvrcDirectives) != 1 || merged.EnvrcDirectives[0] != "source_up" {
-		t.Errorf("expected inherited envrc-directives, got %v", merged.EnvrcDirectives)
+	merged := base.MergeWith(Sweatfile{})
+	if len(merged.EnvrcDirectives) != 1 ||
+		merged.EnvrcDirectives[0] != "source_up" {
+		t.Errorf(
+			"expected inherited envrc-directives, got %v",
+			merged.EnvrcDirectives,
+		)
 	}
 }
 
@@ -745,7 +844,8 @@ func TestParseEnv(t *testing.T) {
 FOO = "bar"
 BAZ = "qux"
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -758,7 +858,8 @@ BAZ = "qux"
 }
 
 func TestParseEnvAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -770,7 +871,7 @@ func TestParseEnvAbsent(t *testing.T) {
 func TestMergeEnvInherit(t *testing.T) {
 	base := Sweatfile{Env: map[string]string{"FOO": "bar"}}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.Env["FOO"] != "bar" {
 		t.Errorf("expected inherited env, got %v", merged.Env)
 	}
@@ -779,7 +880,7 @@ func TestMergeEnvInherit(t *testing.T) {
 func TestMergeEnvOverrideKey(t *testing.T) {
 	base := Sweatfile{Env: map[string]string{"FOO": "bar", "BAZ": "qux"}}
 	repo := Sweatfile{Env: map[string]string{"FOO": "override"}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.Env["FOO"] != "override" {
 		t.Errorf("expected overridden FOO, got %v", merged.Env["FOO"])
 	}
@@ -791,7 +892,7 @@ func TestMergeEnvOverrideKey(t *testing.T) {
 func TestMergeEnvAddKey(t *testing.T) {
 	base := Sweatfile{Env: map[string]string{"FOO": "bar"}}
 	repo := Sweatfile{Env: map[string]string{"BAZ": "qux"}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if len(merged.Env) != 2 {
 		t.Fatalf("expected 2 env vars, got %v", merged.Env)
 	}
@@ -813,7 +914,8 @@ func TestLoadHierarchyHooksStopOverriddenByRepo(t *testing.T) {
 		t.Fatalf("LoadHierarchy returned error: %v", err)
 	}
 
-	if result.Merged.StopHookCommand() == nil || *result.Merged.StopHookCommand() != "just lint" {
+	if result.Merged.StopHookCommand() == nil ||
+		*result.Merged.StopHookCommand() != "just lint" {
 		t.Errorf("expected overridden hooks.stop, got %v", result.Merged.Hooks)
 	}
 }
@@ -823,7 +925,8 @@ func TestParseHooksDisallowMainWorktree(t *testing.T) {
 [hooks]
 disallow-main-worktree = true
 `
-	sf, err := Parse([]byte(input))
+	var sf Sweatfile
+	err := sf.Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -833,7 +936,8 @@ disallow-main-worktree = true
 }
 
 func TestParseHooksDisallowMainWorktreeAbsent(t *testing.T) {
-	sf, err := Parse([]byte(`git-excludes = [".claude/"]`))
+	var sf Sweatfile
+	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -846,7 +950,7 @@ func TestMergeDisallowMainWorktreeInherit(t *testing.T) {
 	enabled := true
 	base := Sweatfile{Hooks: &Hooks{DisallowMainWorktree: &enabled}}
 	repo := Sweatfile{}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if !merged.DisallowMainWorktreeEnabled() {
 		t.Error("expected inherited disallow-main-worktree")
 	}
@@ -857,7 +961,7 @@ func TestMergeDisallowMainWorktreeOverride(t *testing.T) {
 	disabled := false
 	base := Sweatfile{Hooks: &Hooks{DisallowMainWorktree: &enabled}}
 	repo := Sweatfile{Hooks: &Hooks{DisallowMainWorktree: &disabled}}
-	merged := Merge(base, repo)
+	merged := base.MergeWith(repo)
 	if merged.DisallowMainWorktreeEnabled() {
 		t.Error("expected overridden disallow-main-worktree to be disabled")
 	}
@@ -904,5 +1008,42 @@ func TestLoadWorktreeHierarchyWorktreeOverridesMainRepo(t *testing.T) {
 
 	if result.Merged.DisallowMainWorktreeEnabled() {
 		t.Error("expected worktree sweatfile to override main repo")
+	}
+}
+
+func TestResolvePathOrStringLiteral(t *testing.T) {
+	result := resolvePathOrString("just a string")
+	if result != "just a string" {
+		t.Errorf("expected literal string, got %q", result)
+	}
+}
+
+func TestResolvePathOrStringFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "prompt.txt")
+	os.WriteFile(path, []byte("contents from file\n"), 0o644)
+
+	result := resolvePathOrString(path)
+	if result != "contents from file" {
+		t.Errorf("expected file contents, got %q", result)
+	}
+}
+
+func TestResolvePathOrStringEnvVar(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "prompt.txt")
+	os.WriteFile(path, []byte("env resolved\n"), 0o644)
+
+	t.Setenv("TEST_RESOLVE_DIR", dir)
+	result := resolvePathOrString("$TEST_RESOLVE_DIR/prompt.txt")
+	if result != "env resolved" {
+		t.Errorf("expected env-expanded file contents, got %q", result)
+	}
+}
+
+func TestResolvePathOrStringNonexistentFile(t *testing.T) {
+	result := resolvePathOrString("/nonexistent/path/to/file.txt")
+	if result != "/nonexistent/path/to/file.txt" {
+		t.Errorf("expected literal fallback, got %q", result)
 	}
 }

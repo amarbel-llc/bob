@@ -30,7 +30,6 @@ type ResolvedPath struct {
 //
 // SessionKey is always <repo-dirname>/<branch>.
 func ResolvePath(
-	sf sweatfile.Sweatfile,
 	repoPath string,
 	args []string,
 ) (ResolvedPath, error) {
@@ -49,15 +48,17 @@ func ResolvePath(
 	unsanitizedName := strings.Join(args, "-")
 	sanitizedName := SanitizeBranchName(args)
 	if sanitizedName == "" {
-		return ResolvedPath{}, fmt.Errorf("branch name is empty after sanitization of %q", args)
+		return ResolvedPath{}, fmt.Errorf(
+			"branch name is empty after sanitization of %q",
+			args,
+		)
 	}
 
-	transformedName, err := sf.CreateBranchName(sanitizedName)
-	if err != nil {
-		return ResolvedPath{}, err
-	}
-
-	branch, existingBranch := detectBranch(repoPath, unsanitizedName, sanitizedName, transformedName)
+	branch, existingBranch := detectBranch(
+		repoPath,
+		unsanitizedName,
+		sanitizedName,
+	)
 
 	absPath := filepath.Join(repoPath, WorktreesDir, branch)
 	repoDirname := filepath.Base(repoPath)
@@ -146,10 +147,15 @@ func isCeiling(dir string, ceilings []string) bool {
 // Create creates a new git worktree and applies sweatfile configuration.
 // If existingBranch is non-empty, the worktree checks out that branch
 // instead of creating a new one from the directory name.
-func Create(repoPath, worktreePath, existingBranch string) (sweatfile.Hierarchy, error) {
+func Create(
+	repoPath, worktreePath, existingBranch string,
+) (sweatfile.Hierarchy, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return sweatfile.Hierarchy{}, fmt.Errorf("getting home directory: %w", err)
+		return sweatfile.Hierarchy{}, fmt.Errorf(
+			"getting home directory: %w",
+			err,
+		)
 	}
 
 	sweetfile, err := sweatfile.LoadHierarchy(home, repoPath)
@@ -159,7 +165,10 @@ func Create(repoPath, worktreePath, existingBranch string) (sweatfile.Hierarchy,
 
 	if existingBranch != "" {
 		if err := git.RunPassthrough(repoPath, "worktree", "add", worktreePath, existingBranch); err != nil {
-			return sweatfile.Hierarchy{}, fmt.Errorf("git worktree add: %w", err)
+			return sweatfile.Hierarchy{}, fmt.Errorf(
+				"git worktree add: %w",
+				err,
+			)
 		}
 	} else {
 		if err := git.RunPassthrough(repoPath, "worktree", "add", worktreePath); err != nil {
@@ -167,20 +176,30 @@ func Create(repoPath, worktreePath, existingBranch string) (sweatfile.Hierarchy,
 		}
 	}
 
-	return sweetfile, applyWorktreeConfig(home, sweetfile, repoPath, worktreePath)
+	return sweetfile, applyWorktreeConfig(
+		home,
+		sweetfile,
+		repoPath,
+		worktreePath,
+	)
 }
 
 // CreateFrom creates a new worktree branched from fromPath's current HEAD.
 // It runs git worktree add -b from fromPath, then applies sweatfile and
 // trusts the workspace, same as Create.
-func CreateFrom(repoPath, fromPath, newPath, newBranch string) (sweatfile.Hierarchy, error) {
+func CreateFrom(
+	repoPath, fromPath, newPath, newBranch string,
+) (sweatfile.Hierarchy, error) {
 	if err := git.WorktreeAddFrom(fromPath, newBranch, newPath); err != nil {
 		return sweatfile.Hierarchy{}, fmt.Errorf("git worktree add: %w", err)
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return sweatfile.Hierarchy{}, fmt.Errorf("getting home directory: %w", err)
+		return sweatfile.Hierarchy{}, fmt.Errorf(
+			"getting home directory: %w",
+			err,
+		)
 	}
 
 	sweetfile, err := sweatfile.LoadHierarchy(home, repoPath)
@@ -191,7 +210,8 @@ func CreateFrom(repoPath, fromPath, newPath, newBranch string) (sweatfile.Hierar
 	return sweetfile, applyWorktreeConfig(home, sweetfile, repoPath, newPath)
 }
 
-// applyWorktreeConfig excludes .worktrees from git, loads and applies sweatfile,
+// applyWorktreeConfig excludes .worktrees from git, loads and applies
+// sweatfile,
 // and trusts worktreePath in Claude.
 func applyWorktreeConfig(
 	home string,
@@ -218,14 +238,21 @@ func applyWorktreeConfig(
 	}
 
 	if err := sweetfile.Merged.RunCreateHook(worktreePath); err != nil {
-		git.RunPassthrough(repoPath, "worktree", "remove", "--force", worktreePath)
+		git.RunPassthrough(
+			repoPath,
+			"worktree",
+			"remove",
+			"--force",
+			worktreePath,
+		)
 		return fmt.Errorf("create hook failed: %w", err)
 	}
 
 	return nil
 }
 
-// excludeWorktreesDir appends WorktreesDir to .git/info/exclude if not already present.
+// excludeWorktreesDir appends WorktreesDir to .git/info/exclude if not already
+// present.
 func excludeWorktreesDir(repoPath string) error {
 	excludePath := filepath.Join(repoPath, ".git", "info", "exclude")
 
@@ -242,7 +269,11 @@ func excludeWorktreesDir(repoPath string) error {
 		return err
 	}
 
-	f, err := os.OpenFile(excludePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(
+		excludePath,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0o644,
+	)
 	if err != nil {
 		return err
 	}
@@ -306,7 +337,8 @@ func isRepoWithWorktrees(dir string) bool {
 	return true
 }
 
-// ListWorktrees returns absolute paths of all worktree directories in <repoPath>/<WorktreesDir>/.
+// ListWorktrees returns absolute paths of all worktree directories in
+// <repoPath>/<WorktreesDir>/.
 func ListWorktrees(repoPath string) []string {
 	wtDir := filepath.Join(repoPath, WorktreesDir)
 	entries, err := os.ReadDir(wtDir)

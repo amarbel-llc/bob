@@ -1,15 +1,12 @@
 package sweatfile
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/google/shlex"
 )
 
 type Hooks struct {
@@ -20,9 +17,8 @@ type Hooks struct {
 }
 
 type Sweatfile struct {
-	SystemPrompt       *string           `toml:"system-prompt"`        // TODO replace with PathOrString struct
-	SystemPromptAppend *string           `toml:"system-prompt-append"` // TODO replace with PathOrString struct
-	BranchNameCommand  string            `toml:"branch-name-command"`  // TODO add tests
+	SystemPrompt       *string           `toml:"system-prompt"`
+	SystemPromptAppend *string           `toml:"system-prompt-append"`
 	GitSkipIndex       []string          `toml:"git-excludes"`
 	ClaudeAllow        []string          `toml:"claude-allow"`
 	EnvrcDirectives    []string          `toml:"envrc-directives"`
@@ -72,30 +68,6 @@ func GetDefault() Sweatfile {
 	return sweatfile
 }
 
-func (sweatfile Sweatfile) CreateBranchName(
-	base string,
-) (string, error) {
-	if sweatfile.BranchNameCommand == "" {
-		return base, nil
-	}
-
-	cmdComponents, err := shlex.Split(sweatfile.BranchNameCommand)
-	if err != nil {
-		return "", err
-	}
-
-	cmdComponents = append(cmdComponents, base)
-	cmd := exec.Command(cmdComponents[0], cmdComponents[1:]...)
-	cmd.Stderr = os.Stderr
-
-	replacementBytes, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	return string(bytes.TrimSpace(replacementBytes)), nil
-}
-
 func (sweatfile Sweatfile) ExecClaude(
 	args ...string,
 ) error {
@@ -103,7 +75,7 @@ func (sweatfile Sweatfile) ExecClaude(
 		args = append(
 			[]string{
 				"--append-system-prompt",
-				*sweatfile.SystemPromptAppend,
+				resolvePathOrString(*sweatfile.SystemPromptAppend),
 			},
 			args...,
 		)
@@ -113,7 +85,7 @@ func (sweatfile Sweatfile) ExecClaude(
 		args = append(
 			[]string{
 				"--system-prompt",
-				*sweatfile.SystemPrompt,
+				resolvePathOrString(*sweatfile.SystemPrompt),
 			},
 			args...,
 		)

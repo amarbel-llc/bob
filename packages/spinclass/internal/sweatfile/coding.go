@@ -5,33 +5,45 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
 
-// TODO rewrite as object-oriented
-func Parse(data []byte) (Sweatfile, error) {
-	var sf Sweatfile
-	if err := toml.Unmarshal(data, &sf); err != nil {
-		return Sweatfile{}, err
-	}
-	return sf, nil
+func (sf *Sweatfile) Parse(data []byte) error {
+	return toml.Unmarshal(data, sf)
 }
 
-// TODO rewrite as object-oriented
-func Load(path string) (Sweatfile, error) {
+func (sf *Sweatfile) Load(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return Sweatfile{}, nil
+			return nil
 		}
-		return Sweatfile{}, err
+		return err
 	}
-	return Parse(data)
+	return sf.Parse(data)
 }
 
-// TODO rewrite as object-oriented
-func Save(path string, sf Sweatfile) error {
+// resolvePathOrString expands environment variables and ~ in value, then
+// tries to read it as a file path. If the file exists, its contents are
+// returned (trimmed). Otherwise value is returned as a literal string.
+func resolvePathOrString(value string) string {
+	expanded := os.ExpandEnv(value)
+	if strings.HasPrefix(expanded, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			expanded = filepath.Join(home, expanded[2:])
+		}
+	}
+
+	data, err := os.ReadFile(expanded)
+	if err != nil {
+		return value
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func (sf Sweatfile) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

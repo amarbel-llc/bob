@@ -41,14 +41,17 @@ func LoadHierarchy(home, repoDir string) (Hierarchy, error) {
 	merged := Sweatfile{}
 
 	loadAndMerge := func(path string) error {
-		sf, err := Load(path)
-		if err != nil {
+		var sf Sweatfile
+		if err := sf.Load(path); err != nil {
 			return err
 		}
 		_, found := fileExists(path)
-		sources = append(sources, LoadSource{Path: path, Found: found, File: sf})
+		sources = append(
+			sources,
+			LoadSource{Path: path, Found: found, File: sf},
+		)
 		if found {
-			merged = Merge(merged, sf)
+			merged = merged.MergeWith(sf)
 		}
 		return nil
 	}
@@ -91,15 +94,17 @@ func LoadHierarchy(home, repoDir string) (Hierarchy, error) {
 // LoadWorktreeHierarchy loads the sweatfile cascade for a worktree context.
 // It delegates to LoadHierarchy for global → intermediate dirs → main repo,
 // then appends the worktree's own sweatfile as the highest-priority layer.
-func LoadWorktreeHierarchy(home, mainRepoRoot, worktreeDir string) (Hierarchy, error) {
+func LoadWorktreeHierarchy(
+	home, mainRepoRoot, worktreeDir string,
+) (Hierarchy, error) {
 	hierarchy, err := LoadHierarchy(home, mainRepoRoot)
 	if err != nil {
 		return Hierarchy{}, err
 	}
 
 	worktreePath := filepath.Join(filepath.Clean(worktreeDir), "sweatfile")
-	sf, err := Load(worktreePath)
-	if err != nil {
+	var sf Sweatfile
+	if err := sf.Load(worktreePath); err != nil {
 		return Hierarchy{}, err
 	}
 
@@ -108,85 +113,84 @@ func LoadWorktreeHierarchy(home, mainRepoRoot, worktreeDir string) (Hierarchy, e
 		Path: worktreePath, Found: found, File: sf,
 	})
 	if found {
-		hierarchy.Merged = Merge(hierarchy.Merged, sf)
+		hierarchy.Merged = hierarchy.Merged.MergeWith(sf)
 	}
 
 	return hierarchy, nil
 }
 
-// TODO rewrite as object-oriented
-func Merge(base, repo Sweatfile) Sweatfile {
-	merged := base
+func (sf Sweatfile) MergeWith(other Sweatfile) Sweatfile {
+	merged := sf
 
-	if repo.SystemPrompt != nil {
-		if *repo.SystemPrompt == "" {
-			merged.SystemPrompt = repo.SystemPrompt
-		} else if base.SystemPrompt != nil && *base.SystemPrompt != "" {
-			joined := *base.SystemPrompt + " " + *repo.SystemPrompt
+	if other.SystemPrompt != nil {
+		if *other.SystemPrompt == "" {
+			merged.SystemPrompt = other.SystemPrompt
+		} else if sf.SystemPrompt != nil && *sf.SystemPrompt != "" {
+			joined := *sf.SystemPrompt + " " + *other.SystemPrompt
 			merged.SystemPrompt = &joined
 		} else {
-			merged.SystemPrompt = repo.SystemPrompt
+			merged.SystemPrompt = other.SystemPrompt
 		}
 	}
 
-	if repo.SystemPromptAppend != nil {
-		if *repo.SystemPromptAppend == "" {
-			merged.SystemPromptAppend = repo.SystemPromptAppend
-		} else if base.SystemPromptAppend != nil && *base.SystemPromptAppend != "" {
-			joined := *base.SystemPromptAppend + " " + *repo.SystemPromptAppend
+	if other.SystemPromptAppend != nil {
+		if *other.SystemPromptAppend == "" {
+			merged.SystemPromptAppend = other.SystemPromptAppend
+		} else if sf.SystemPromptAppend != nil && *sf.SystemPromptAppend != "" {
+			joined := *sf.SystemPromptAppend + " " + *other.SystemPromptAppend
 			merged.SystemPromptAppend = &joined
 		} else {
-			merged.SystemPromptAppend = repo.SystemPromptAppend
+			merged.SystemPromptAppend = other.SystemPromptAppend
 		}
 	}
 
 	// Arrays: nil = inherit, empty = clear, non-empty = append
-	if repo.GitSkipIndex != nil {
-		if len(repo.GitSkipIndex) == 0 {
+	if other.GitSkipIndex != nil {
+		if len(other.GitSkipIndex) == 0 {
 			merged.GitSkipIndex = []string{}
 		} else {
-			merged.GitSkipIndex = append(base.GitSkipIndex, repo.GitSkipIndex...)
+			merged.GitSkipIndex = append(sf.GitSkipIndex, other.GitSkipIndex...)
 		}
 	}
-	if repo.ClaudeAllow != nil {
-		if len(repo.ClaudeAllow) == 0 {
+	if other.ClaudeAllow != nil {
+		if len(other.ClaudeAllow) == 0 {
 			merged.ClaudeAllow = []string{}
 		} else {
-			merged.ClaudeAllow = append(base.ClaudeAllow, repo.ClaudeAllow...)
+			merged.ClaudeAllow = append(sf.ClaudeAllow, other.ClaudeAllow...)
 		}
 	}
-	if repo.EnvrcDirectives != nil {
-		if len(repo.EnvrcDirectives) == 0 {
+	if other.EnvrcDirectives != nil {
+		if len(other.EnvrcDirectives) == 0 {
 			merged.EnvrcDirectives = []string{}
 		} else {
-			merged.EnvrcDirectives = append(base.EnvrcDirectives, repo.EnvrcDirectives...)
+			merged.EnvrcDirectives = append(sf.EnvrcDirectives, other.EnvrcDirectives...)
 		}
 	}
 
-	if repo.Env != nil {
+	if other.Env != nil {
 		if merged.Env == nil {
 			merged.Env = make(map[string]string)
 		}
-		for k, v := range repo.Env {
+		for k, v := range other.Env {
 			merged.Env[k] = v
 		}
 	}
 
-	if repo.Hooks != nil {
+	if other.Hooks != nil {
 		if merged.Hooks == nil {
 			merged.Hooks = &Hooks{}
 		}
-		if repo.Hooks.Create != nil {
-			merged.Hooks.Create = repo.Hooks.Create
+		if other.Hooks.Create != nil {
+			merged.Hooks.Create = other.Hooks.Create
 		}
-		if repo.Hooks.Stop != nil {
-			merged.Hooks.Stop = repo.Hooks.Stop
+		if other.Hooks.Stop != nil {
+			merged.Hooks.Stop = other.Hooks.Stop
 		}
-		if repo.Hooks.PreMerge != nil {
-			merged.Hooks.PreMerge = repo.Hooks.PreMerge
+		if other.Hooks.PreMerge != nil {
+			merged.Hooks.PreMerge = other.Hooks.PreMerge
 		}
-		if repo.Hooks.DisallowMainWorktree != nil {
-			merged.Hooks.DisallowMainWorktree = repo.Hooks.DisallowMainWorktree
+		if other.Hooks.DisallowMainWorktree != nil {
+			merged.Hooks.DisallowMainWorktree = other.Hooks.DisallowMainWorktree
 		}
 	}
 

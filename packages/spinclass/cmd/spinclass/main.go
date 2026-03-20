@@ -60,12 +60,7 @@ var newCmd = &cobra.Command{
 			return err
 		}
 
-		hierarchy, err := sweatfile.LoadDefaultHierarchy()
-		if err != nil {
-			return err
-		}
-
-		resolvedPath, err := worktree.ResolvePath(hierarchy.Merged, repoPath, args)
+		resolvedPath, err := worktree.ResolvePath(repoPath, args)
 		if err != nil {
 			return err
 		}
@@ -128,7 +123,13 @@ var mergeCmd = &cobra.Command{
 			target = args[0]
 		}
 
-		return merge.Run(executor.ShellExecutor{}, format, target, mergeGitSync, verbose)
+		return merge.Run(
+			executor.ShellExecutor{},
+			format,
+			target,
+			mergeGitSync,
+			verbose,
+		)
 	},
 }
 
@@ -206,13 +207,19 @@ var forkCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session := os.Getenv("SPINCLASS_SESSION")
 		if session == "" {
-			return fmt.Errorf("SPINCLASS_SESSION is not set: are you inside a spinclass session?")
+			return fmt.Errorf(
+				"SPINCLASS_SESSION is not set: are you inside a spinclass session?",
+			)
 		}
 
-		// session is "<repo-dirname>/<branch>"; extract branch as everything after first "/"
+		// session is "<repo-dirname>/<branch>"; extract branch as everything
+		// after first "/"
 		slashIdx := strings.Index(session, "/")
 		if slashIdx < 0 {
-			return fmt.Errorf("invalid SPINCLASS_SESSION format: %q (expected <repo>/<branch>)", session)
+			return fmt.Errorf(
+				"invalid SPINCLASS_SESSION format: %q (expected <repo>/<branch>)",
+				session,
+			)
 		}
 		currentBranch := session[slashIdx+1:]
 
@@ -226,10 +233,17 @@ var forkCmd = &cobra.Command{
 			return err
 		}
 
-		currentPath := filepath.Join(repoPath, worktree.WorktreesDir, currentBranch)
+		currentPath := filepath.Join(
+			repoPath,
+			worktree.WorktreesDir,
+			currentBranch,
+		)
 
 		if _, err := os.Stat(currentPath); os.IsNotExist(err) {
-			return fmt.Errorf("current worktree path %s does not exist; fork requires a standard .worktrees layout", currentPath)
+			return fmt.Errorf(
+				"current worktree path %s does not exist; fork requires a standard .worktrees layout",
+				currentPath,
+			)
 		}
 
 		rp := worktree.ResolvedPath{
@@ -291,19 +305,57 @@ var cmdExecClaude = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&outputFormat, "format", "", "output format: tap or table")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "show detailed output (YAML diagnostics on passing test points)")
-	newCmd.Flags().BoolVar(&newMergeOnClose, "merge-on-close", false, "auto-merge worktree into default branch on session close")
-	newCmd.Flags().BoolVar(&newNoAttach, "no-attach", false, "create worktree but skip attaching (show command that would run)")
-	mergeCmd.Flags().BoolVar(&mergeGitSync, "git-sync", false, "pull and push after merge")
-	cleanCmd.Flags().BoolVarP(&cleanInteractive, "interactive", "i", false, "interactively discard changes in dirty merged worktrees")
+	rootCmd.PersistentFlags().StringVar(
+		&outputFormat,
+		"format",
+		"",
+		"output format: tap or table",
+	)
+	rootCmd.PersistentFlags().BoolVarP(
+		&verbose,
+		"verbose",
+		"v",
+		false,
+		"show detailed output (YAML diagnostics on passing test points)",
+	)
+	newCmd.Flags().BoolVar(
+		&newMergeOnClose,
+		"merge-on-close",
+		false,
+		"auto-merge worktree into default branch on session close",
+	)
+	newCmd.Flags().BoolVar(
+		&newNoAttach,
+		"no-attach",
+		false,
+		"create worktree but skip attaching (show command that would run)",
+	)
+	mergeCmd.Flags().BoolVar(
+		&mergeGitSync,
+		"git-sync",
+		false,
+		"pull and push after merge",
+	)
+	cleanCmd.Flags().BoolVarP(
+		&cleanInteractive,
+		"interactive",
+		"i",
+		false,
+		"interactively discard changes in dirty merged worktrees",
+	)
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(mergeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(completionsCmd)
-	pullCmd.Flags().BoolVarP(&pullDirty, "dirty", "d", false, "include dirty repos and worktrees")
+	pullCmd.Flags().BoolVarP(
+		&pullDirty,
+		"dirty",
+		"d",
+		false,
+		"include dirty repos and worktrees",
+	)
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(perms.NewPermsCmd())
 	rootCmd.AddCommand(hooks.NewHooksCmd())

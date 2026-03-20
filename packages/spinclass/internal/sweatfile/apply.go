@@ -14,7 +14,7 @@ import (
 
 func (sweatfile Sweatfile) Apply(worktreePath string) error {
 	defaults := GetDefault()
-	merged := Merge(sweatfile, defaults)
+	merged := sweatfile.MergeWith(defaults)
 
 	if err := ApplyClaudeSettings(worktreePath, merged); err != nil {
 		return fmt.Errorf("applying claude settings: %w", err)
@@ -55,8 +55,6 @@ exec spinclass exec-claude "$@"`,
 	); err != nil {
 		return err
 	}
-
-	// TODO write claude bin
 
 	return nil
 }

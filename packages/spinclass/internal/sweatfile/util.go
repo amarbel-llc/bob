@@ -7,7 +7,6 @@ import (
 	"github.com/amarbel-llc/spinclass/internal/git"
 )
 
-// TODO replace with util
 func fileExists(path string) (os.FileInfo, bool) {
 	info, err := os.Stat(path)
 	return info, err == nil
