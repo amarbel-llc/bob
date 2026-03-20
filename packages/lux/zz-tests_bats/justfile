@@ -1,0 +1,7 @@
+bats_timeout := "10"
+
+test-targets *targets="*.bats":
+  BATS_TEST_TIMEOUT="{{bats_timeout}}" \
+    bats --jobs {{num_cpus()}} {{targets}}
+
+test: (test-targets "*.bats")
