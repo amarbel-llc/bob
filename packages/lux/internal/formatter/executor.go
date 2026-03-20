@@ -72,6 +72,10 @@ func formatStdin(ctx context.Context, binPath string, args []string, env map[str
 	}
 
 	formatted := stdout.String()
+	if len(content) > 0 && formatted == "" {
+		return nil, fmt.Errorf("formatter %s produced empty output for non-empty input", binPath)
+	}
+
 	limited := output.LimitStderr(stderr.String())
 	return &Result{
 		Formatted: formatted,
@@ -109,6 +113,10 @@ func formatFilepath(ctx context.Context, binPath string, args []string, env map[
 	formatted, err := os.ReadFile(tmpPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading formatted file: %w", err)
+	}
+
+	if len(content) > 0 && len(formatted) == 0 {
+		return nil, fmt.Errorf("formatter %s produced empty output for non-empty input", binPath)
 	}
 
 	limited := output.LimitStderr(stderr.String())
