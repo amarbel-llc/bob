@@ -1,4 +1,10 @@
-{ pkgs, src, sandcastle, purse-first-cli, tap-dancer-cli }:
+{
+  pkgs,
+  src,
+  sandcastle,
+  purse-first-cli,
+  tap-dancer-cli,
+}:
 
 let
   bats-support = pkgs.stdenvNoCC.mkDerivation {
@@ -77,7 +83,14 @@ let
 
   bats-libs = pkgs.symlinkJoin {
     name = "bats-libs";
-    paths = [ bats-support bats-assert bats-assert-additions tap-writer bats-island bats-emo ];
+    paths = [
+      bats-support
+      bats-assert
+      bats-assert-additions
+      tap-writer
+      bats-island
+      bats-emo
+    ];
   };
 
   bats = pkgs.writeShellApplication {
@@ -96,6 +109,7 @@ let
       no_tempdir_cleanup=false
       hide_passing=false
 
+      bats_args=()
       while (( $# > 0 )); do
         case "$1" in
           --bin-dir)
@@ -120,13 +134,16 @@ let
             ;;
           --)
             shift
+            bats_args+=("$@")
             break
             ;;
           *)
-            break
+            bats_args+=("$1")
+            shift
             ;;
         esac
       done
+      set -- "''${bats_args[@]}"
 
       # Prepend --bin-dir directories to PATH (leftmost = highest priority)
       for (( i = ''${#bin_dirs[@]} - 1; i >= 0; i-- )); do
@@ -235,7 +252,21 @@ in
 {
   default = pkgs.symlinkJoin {
     name = "batman";
-    paths = [ bats-libs bats robin ];
+    paths = [
+      bats-libs
+      bats
+      robin
+    ];
   };
-  inherit bats-support bats-assert bats-assert-additions tap-writer bats-island bats-emo bats-libs bats robin;
+  inherit
+    bats-support
+    bats-assert
+    bats-assert-additions
+    tap-writer
+    bats-island
+    bats-emo
+    bats-libs
+    bats
+    robin
+    ;
 }

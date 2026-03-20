@@ -104,6 +104,28 @@ INNER
   assert_output --partial "ok 1"
 }
 
+function bats_wrapper_bin_dir_after_bats_flags { # @test
+  mkdir -p "${TEST_TMPDIR}/fake-bin"
+  cat >"${TEST_TMPDIR}/fake-bin/my-tool" <<'EOF'
+#!/usr/bin/env bash
+echo "fake-tool-output"
+EOF
+  chmod +x "${TEST_TMPDIR}/fake-bin/my-tool"
+
+  cat >"${TEST_TMPDIR}/bin_dir_after.bats" <<'INNER'
+#! /usr/bin/env bats
+function finds_tool_on_path { # @test
+  run my-tool
+  [ "$status" -eq 0 ]
+  [ "$output" = "fake-tool-output" ]
+}
+INNER
+  # --bin-dir appears AFTER bats flags (--jobs, --no-tempdir-cleanup)
+  run "$BATS_WRAPPER" --no-sandbox --jobs 1 --bin-dir "${TEST_TMPDIR}/fake-bin" "${TEST_TMPDIR}/bin_dir_after.bats"
+  assert_success
+  assert_output --partial "ok 1"
+}
+
 function bats_wrapper_defaults_to_tap_output { # @test
   cat >"${TEST_TMPDIR}/tap_default.bats" <<'EOF'
 #! /usr/bin/env bats
