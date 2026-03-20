@@ -3,6 +3,7 @@ package formatter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/amarbel-llc/lux/internal/subprocess"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/output"
 )
+
+var errEmptyOutput = errors.New("produced empty output for non-empty input")
 
 type Result struct {
 	Formatted string
@@ -27,6 +30,17 @@ func ResolveExecutable(ctx context.Context, f *config.Formatter, executor subpro
 	return config.ExpandEnvVars(f.Path), nil
 }
 
+func alternateMode(mode config.FormatterMode) string {
+	switch mode {
+	case config.FormatterModeStdin:
+		return string(config.FormatterModeFilepath)
+	case config.FormatterModeFilepath:
+		return string(config.FormatterModeStdin)
+	default:
+		return ""
+	}
+}
+
 func Format(ctx context.Context, f *config.Formatter, filePath string, content []byte, executor subprocess.Executor) (*Result, error) {
 	binPath, err := ResolveExecutable(ctx, f, executor)
 	if err != nil {
@@ -36,14 +50,25 @@ func Format(ctx context.Context, f *config.Formatter, filePath string, content [
 	args := SubstituteArgs(f.Args, filePath)
 
 	mode := f.EffectiveMode()
+	var result *Result
 	switch mode {
 	case config.FormatterModeStdin:
-		return formatStdin(ctx, binPath, args, f.Env, content)
+		result, err = formatStdin(ctx, binPath, args, f.Env, content)
 	case config.FormatterModeFilepath:
-		return formatFilepath(ctx, binPath, args, f.Env, filePath, content)
+		result, err = formatFilepath(ctx, binPath, args, f.Env, filePath, content)
 	default:
 		return nil, fmt.Errorf("unknown formatter mode: %s", mode)
 	}
+
+	if err != nil && errors.Is(err, errEmptyOutput) {
+		alt := alternateMode(mode)
+		return nil, fmt.Errorf("formatter %s produced empty output for non-empty input\n"+
+			"hint: this formatter may modify files on disk instead of writing to stdout.\n"+
+			"  Set mode = \"%s\" in formatters.toml for the [%s] entry",
+			f.Name, alt, f.Name)
+	}
+
+	return result, err
 }
 
 func buildCmd(ctx context.Context, binPath string, args []string, env map[string]string) *exec.Cmd {
@@ -73,7 +98,7 @@ func formatStdin(ctx context.Context, binPath string, args []string, env map[str
 
 	formatted := stdout.String()
 	if len(content) > 0 && formatted == "" {
-		return nil, fmt.Errorf("formatter %s produced empty output for non-empty input", binPath)
+		return nil, fmt.Errorf("formatter %s: %w", binPath, errEmptyOutput)
 	}
 
 	limited := output.LimitStderr(stderr.String())
@@ -116,7 +141,7 @@ func formatFilepath(ctx context.Context, binPath string, args []string, env map[
 	}
 
 	if len(content) > 0 && len(formatted) == 0 {
-		return nil, fmt.Errorf("formatter %s produced empty output for non-empty input", binPath)
+		return nil, fmt.Errorf("formatter %s: %w", binPath, errEmptyOutput)
 	}
 
 	limited := output.LimitStderr(stderr.String())

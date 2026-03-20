@@ -250,6 +250,7 @@ GO
   run lux fmt --file "$go_file"
   assert_failure
   assert_output --partial "produced empty output"
+  assert_output --partial 'mode = "filepath"'
 
   # File must be preserved.
   local after
