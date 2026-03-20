@@ -36,28 +36,46 @@ exit 0
 SCRIPT
   chmod +x "$fake_empty"
 
+  # fake-ignores-stdin: consumes stdin, writes nothing to stdout, exits 0.
+  # Mimics a filepath-mode formatter misconfigured as stdin mode — it expects
+  # a file path argument and ignores stdin, producing no stdout.
+  fake_ignores_stdin="$BATS_TEST_TMPDIR/fake-ignores-stdin"
+  cat > "$fake_ignores_stdin" <<'SCRIPT'
+#!/usr/bin/env bash
+cat > /dev/null
+exit 0
+SCRIPT
+  chmod +x "$fake_ignores_stdin"
+
   # fake-missing: a path that does not exist.
   fake_missing="$BATS_TEST_TMPDIR/no-such-formatter"
 }
 
 # Write filetype + formatter config for a single formatter.
-# Usage: write_config <formatter_name> <formatter_path> [mode]
+# Usage: write_config <formatter_name> <formatter_path> [filetype_mode] [formatter_mode]
 write_config() {
   local name="$1"
   local path="$2"
-  local mode="${3:-chain}"
+  local filetype_mode="${3:-chain}"
+  local formatter_mode="${4:-}"
 
   cat > "$lux_config_dir/filetype/go.toml" <<TOML
 extensions = [".go"]
 language_ids = ["go"]
 formatters = ["${name}"]
-formatter_mode = "${mode}"
+formatter_mode = "${filetype_mode}"
 TOML
+
+  local mode_line=""
+  if [[ -n "$formatter_mode" ]]; then
+    mode_line="mode = \"${formatter_mode}\""
+  fi
 
   cat > "$lux_config_dir/formatters.toml" <<TOML
 [[formatter]]
 name = "${name}"
 path = "${path}"
+${mode_line}
 TOML
 }
 
@@ -210,6 +228,34 @@ GO
 
   [[ "$after_size" -gt 0 ]] || {
     echo "file was truncated to 0 bytes after chain formatting"
+    return 1
+  }
+}
+
+# --- Stdin/filepath mode mismatch ---
+
+function fmt_filepath_formatter_in_stdin_mode_does_not_truncate { # @test
+  # A filepath-mode formatter misconfigured as stdin mode: it consumes stdin,
+  # produces no stdout, and exits 0. Previously lux would treat the empty
+  # stdout as the formatted result and truncate the file to 0 bytes.
+  write_config "ignores-stdin" "$fake_ignores_stdin" "chain" "stdin"
+
+  local go_file="$BATS_TEST_TMPDIR/mismatch.go"
+  cat > "$go_file" <<'GO'
+package main
+
+func main() {}
+GO
+
+  run lux fmt --file "$go_file"
+  assert_failure
+  assert_output --partial "produced empty output"
+
+  # File must be preserved.
+  local after
+  after=$(cat "$go_file")
+  [[ ${#after} -gt 0 ]] || {
+    echo "file was truncated to 0 bytes"
     return 1
   }
 }
