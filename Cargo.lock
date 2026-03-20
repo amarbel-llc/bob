@@ -544,7 +544,7 @@ dependencies = [
 [[package]]
 name = "mcp-server"
 version = "0.1.0"
-source = "git+https://github.com/amarbel-llc/purse-first#71e4067bef4de37fc1ac2612022f93c9d721a350"
+source = "git+https://github.com/amarbel-llc/purse-first#0618c70ec598744a0b5f46216ad1113a3887add3"
 dependencies = [
  "anyhow",
  "async-trait",
