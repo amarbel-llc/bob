@@ -64,8 +64,8 @@ func TestMCPToolsList(t *testing.T) {
 		t.Fatalf("failed to parse result: %v", err)
 	}
 
-	if len(result.Tools) != 2 {
-		t.Errorf("expected 2 tools (resource-templates, resource-read), got %d", len(result.Tools))
+	if len(result.Tools) != 3 {
+		t.Errorf("expected 3 tools (resource-templates, resource-read, execute-command), got %d", len(result.Tools))
 	}
 
 	toolNames := make(map[string]bool)
@@ -73,7 +73,7 @@ func TestMCPToolsList(t *testing.T) {
 		toolNames[tool.Name] = true
 	}
 
-	for _, name := range []string{"resource-templates", "resource-read"} {
+	for _, name := range []string{"resource-templates", "resource-read", "execute-command"} {
 		if !toolNames[name] {
 			t.Errorf("missing expected tool: %s", name)
 		}

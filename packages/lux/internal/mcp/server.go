@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -188,6 +189,75 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 			}
 
 			return command.TextResult(sb.String()), nil
+		},
+	})
+
+	notReadOnly := false
+	mcpApp.AddCommand(&command.Command{
+		Name: "execute-command",
+		Description: command.Description{
+			Short: "Execute a workspace/executeCommand on a specific LSP server. Use lux://commands to discover available commands.",
+		},
+		Annotations: &protocol.ToolAnnotations{
+			ReadOnlyHint:    &notReadOnly,
+			DestructiveHint: &notDestructive,
+			IdempotentHint:  &idempotent,
+		},
+		Params: []command.Param{
+			{Name: "lsp", Type: command.String, Description: "LSP server name (e.g. 'gopls'). See lux://status for configured LSPs.", Required: true},
+			{Name: "command", Type: command.String, Description: "Command ID to execute (e.g. 'gopls.packages'). See lux://commands for available commands.", Required: true},
+			{Name: "arguments", Type: command.String, Description: "JSON-encoded command arguments (optional)", Required: false},
+		},
+		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+			var a struct {
+				LSP       string `json:"lsp"`
+				Command   string `json:"command"`
+				Arguments string `json:"arguments"`
+			}
+			if err := json.Unmarshal(args, &a); err != nil {
+				return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
+			}
+
+			found := false
+			for _, l := range cfg.LSPs {
+				if l.Name == a.LSP {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return command.TextErrorResult(fmt.Sprintf("unknown LSP %q — check lux://status for configured LSPs", a.LSP)), nil
+			}
+
+			commands := s.pool.Commands()
+			if cmds, ok := commands[a.LSP]; ok {
+				cmdFound := false
+				for _, c := range cmds {
+					if c == a.Command {
+						cmdFound = true
+						break
+					}
+				}
+				if !cmdFound {
+					return command.TextErrorResult(fmt.Sprintf("LSP %q does not advertise command %q — check lux://commands", a.LSP, a.Command)), nil
+				}
+			}
+
+			var arguments json.RawMessage
+			if a.Arguments != "" {
+				arguments = json.RawMessage(a.Arguments)
+			}
+
+			result, err := bridge.ExecuteCommand(ctx, a.LSP, a.Command, arguments)
+			if err != nil {
+				return command.TextErrorResult(err.Error()), nil
+			}
+
+			var pretty bytes.Buffer
+			if err := json.Indent(&pretty, result, "", "  "); err != nil {
+				return command.TextResult(string(result)), nil
+			}
+			return command.TextResult(pretty.String()), nil
 		},
 	})
 
