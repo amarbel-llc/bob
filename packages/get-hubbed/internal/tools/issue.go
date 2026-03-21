@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
@@ -72,8 +73,7 @@ func registerIssueCommands(app *command.App) {
 			{
 				Name:        "repo",
 				Type:        command.String,
-				Description: "Repository in OWNER/REPO format",
-				Required:    true,
+				Description: "Repository in OWNER/REPO format. Omit to use the current directory's git remote. Only pass repo when creating an issue in a different repository than the one you're working in.",
 			},
 			{
 				Name:        "title",
@@ -111,6 +111,16 @@ func handleIssueCreate(
 		return command.TextErrorResult(
 			fmt.Sprintf("invalid arguments: %v", err),
 		), nil
+	}
+
+	if params.Repo == "" {
+		repo, err := resolveRepoFromRemote(ctx)
+		if err != nil {
+			return command.TextErrorResult(
+				fmt.Sprintf("repo not specified and could not detect from git remote: %v", err),
+			), nil
+		}
+		params.Repo = repo
 	}
 
 	// Use the REST API directly to avoid gh's fork-to-parent resolution,
@@ -258,4 +268,20 @@ func handleIssueClose(
 			result.HTMLURL,
 		),
 	), nil
+}
+
+// resolveRepoFromRemote detects the current repository's OWNER/REPO from
+// the git remote, using `gh repo view`.
+func resolveRepoFromRemote(ctx context.Context) (string, error) {
+	out, err := gh.Run(ctx,
+		"repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner",
+	)
+	if err != nil {
+		return "", fmt.Errorf("detecting current repo: %w", err)
+	}
+	repo := strings.TrimSpace(out)
+	if repo == "" {
+		return "", fmt.Errorf("gh repo view returned empty nameWithOwner")
+	}
+	return repo, nil
 }

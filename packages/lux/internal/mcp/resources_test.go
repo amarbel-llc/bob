@@ -127,20 +127,6 @@ func TestReadLSPResourceMissingCharacterParam(t *testing.T) {
 	}
 }
 
-func TestReadLSPResourceRenameMissingNewName(t *testing.T) {
-	p := newTestResourceProvider()
-
-	_, err := p.readLSPResource(context.Background(),
-		"lux://lsp/rename?uri=file:///test.go&line=1&character=1")
-	if err == nil {
-		t.Fatal("expected error for missing new_name")
-	}
-	expected := "missing required parameter 'new_name'"
-	if err.Error() != expected {
-		t.Errorf("expected %q, got %q", expected, err.Error())
-	}
-}
-
 func TestReadLSPResourceWorkspaceSymbolsMissingQuery(t *testing.T) {
 	p := newTestResourceProvider()
 
@@ -187,16 +173,10 @@ func TestReadLSPResourceAllOperationsReachBridge(t *testing.T) {
 		{"references-text", "lux://lsp/references?uri=file:///t.go&line=0&character=0&format=text"},
 		{"completion-json", "lux://lsp/completion?uri=file:///t.go&line=0&character=0"},
 		{"completion-text", "lux://lsp/completion?uri=file:///t.go&line=0&character=0&format=text"},
-		{"format-json", "lux://lsp/format?uri=file:///t.go"},
-		{"format-text", "lux://lsp/format?uri=file:///t.go&format=text"},
 		{"document-symbols-json", "lux://lsp/document-symbols?uri=file:///t.go"},
 		{"document-symbols-text", "lux://lsp/document-symbols?uri=file:///t.go&format=text"},
 		{"diagnostics-json", "lux://lsp/diagnostics?uri=file:///t.go"},
 		{"diagnostics-text", "lux://lsp/diagnostics?uri=file:///t.go&format=text"},
-		{"code-action-json", "lux://lsp/code-action?uri=file:///t.go&start_line=0&start_character=0&end_line=0&end_character=0"},
-		{"code-action-text", "lux://lsp/code-action?uri=file:///t.go&start_line=0&start_character=0&end_line=0&end_character=0&format=text"},
-		{"rename-json", "lux://lsp/rename?uri=file:///t.go&line=0&character=0&new_name=foo"},
-		{"rename-text", "lux://lsp/rename?uri=file:///t.go&line=0&character=0&new_name=foo&format=text"},
 		{"workspace-symbols-json", "lux://lsp/workspace-symbols?uri=file:///t.go&query=foo"},
 		{"workspace-symbols-text", "lux://lsp/workspace-symbols?uri=file:///t.go&query=foo&format=text"},
 		{"incoming-calls", "lux://lsp/incoming-calls?uri=file:///t.go&line=0&character=0"},

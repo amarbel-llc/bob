@@ -8,6 +8,7 @@ func RegisterAll() (*command.App, *resourceProvider) {
 
 	registerStatusCommands(app)
 	registerStagingCommands(app)
+	registerRmCommands(app)
 	registerCommitCommands(app)
 	registerTryCommitCommands(app)
 	registerBranchCommands(app)
