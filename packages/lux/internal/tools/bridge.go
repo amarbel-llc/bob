@@ -834,6 +834,38 @@ func (b *Bridge) OutgoingCallsRaw(ctx context.Context, uri lsp.DocumentURI, line
 	return parseOutgoingCalls(items[0], outgoingRaw), nil
 }
 
+// ExecuteCommand calls workspace/executeCommand on a specific LSP by name.
+// Unlike other bridge methods, this routes by explicit LSP name rather than file URI.
+func (b *Bridge) ExecuteCommand(ctx context.Context, lspName, command string, arguments json.RawMessage) (json.RawMessage, error) {
+	initParams := b.DefaultInitParamsForCwd()
+	inst, err := b.pool.GetOrStart(ctx, lspName, initParams)
+	if err != nil {
+		return nil, fmt.Errorf("starting LSP %s: %w", lspName, err)
+	}
+
+	if err := b.waitForLSPReady(ctx, inst); err != nil {
+		return nil, fmt.Errorf("waiting for LSP %s readiness: %w", lspName, err)
+	}
+
+	var args []json.RawMessage
+	if len(arguments) > 0 && string(arguments) != "null" {
+		args = []json.RawMessage{arguments}
+	}
+
+	params := map[string]any{
+		"command":   command,
+		"arguments": args,
+	}
+
+	return inst.Call(ctx, lsp.MethodWorkspaceExecuteCommand, params)
+}
+
+// DefaultInitParamsForCwd returns init params rooted at the current working directory.
+func (b *Bridge) DefaultInitParamsForCwd() *lsp.InitializeParams {
+	cwd, _ := os.Getwd()
+	return b.DefaultInitParams(lsp.DocumentURI("file://" + cwd + "/dummy"))
+}
+
 func callHierarchyItemToCall(item CallHierarchyItem) CallHierarchyCall {
 	call := CallHierarchyCall{
 		Name: item.Name,

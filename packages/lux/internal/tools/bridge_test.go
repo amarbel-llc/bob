@@ -139,6 +139,9 @@ func TestRawMethodSignatures_Exist(t *testing.T) {
 	_ = func() ([]Symbol, error) { return b.DocumentSymbolsRaw(ctx, uri) }
 	_ = func() (*CallHierarchyResult, error) { return b.IncomingCallsRaw(ctx, uri, 0, 0) }
 	_ = func() (*CallHierarchyResult, error) { return b.OutgoingCallsRaw(ctx, uri, 0, 0) }
+	_ = func() (json.RawMessage, error) {
+		return b.ExecuteCommand(ctx, "gopls", "gopls.packages", json.RawMessage("{}"))
+	}
 }
 
 func TestParseIncomingCalls(t *testing.T) {
