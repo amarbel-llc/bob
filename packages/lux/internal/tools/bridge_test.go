@@ -142,6 +142,10 @@ func TestRawMethodSignatures_Exist(t *testing.T) {
 	_ = func() (json.RawMessage, error) {
 		return b.ExecuteCommand(ctx, "gopls", "gopls.packages", json.RawMessage("{}"))
 	}
+	_ = func() (*PackagesResult, error) { return b.GoplsPackages(ctx, uri, true) }
+	_ = func() (*PackageSymbolsResult, error) { return b.GoplsPackageSymbols(ctx, uri) }
+	_ = func() (*ImportsResult, error) { return b.GoplsImports(ctx, uri) }
+	_ = func() (*ModulesResult, error) { return b.GoplsModules(ctx, uri, 0) }
 }
 
 func TestParseIncomingCalls(t *testing.T) {

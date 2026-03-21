@@ -1453,6 +1453,139 @@ func parseDiagnostics(raw json.RawMessage) []DiagnosticItem {
 	return nil
 }
 
+// Gopls executeCommand result types
+
+type PackagesResult struct {
+	Packages []PackageInfo         `json:"packages"`
+	Module   map[string]ModuleInfo `json:"module,omitempty"`
+}
+
+type PackageInfo struct {
+	Path       string     `json:"path"`
+	ModulePath string     `json:"modulePath,omitempty"`
+	ForTest    string     `json:"forTest,omitempty"`
+	TestFiles  []TestFile `json:"testFiles,omitempty"`
+}
+
+type TestFile struct {
+	URI   string     `json:"uri"`
+	Tests []TestInfo `json:"tests,omitempty"`
+}
+
+type TestInfo struct {
+	Name string        `json:"name"`
+	Loc  *lsp.Location `json:"loc,omitempty"`
+}
+
+type ModuleInfo struct {
+	Path    string `json:"path"`
+	Version string `json:"version,omitempty"`
+	GoMod   string `json:"goMod,omitempty"`
+}
+
+type PackageSymbolsResult struct {
+	PackageName string              `json:"packageName"`
+	Files       []string            `json:"files"`
+	Symbols     []PackageSymbolItem `json:"symbols"`
+}
+
+type PackageSymbolItem struct {
+	Name           string              `json:"name"`
+	Kind           int                 `json:"kind"`
+	Range          lsp.Range           `json:"range,omitempty"`
+	SelectionRange lsp.Range           `json:"selectionRange,omitempty"`
+	Children       []PackageSymbolItem `json:"children,omitempty"`
+	File           int                 `json:"file"`
+}
+
+type ImportsResult struct {
+	Imports        []ImportInfo        `json:"imports"`
+	PackageImports []PackageImportInfo `json:"packageImports"`
+}
+
+type ImportInfo struct {
+	Path string `json:"path"`
+	Name string `json:"name,omitempty"`
+}
+
+type PackageImportInfo struct {
+	Path string `json:"path"`
+}
+
+type ModulesResult struct {
+	Modules []ModuleInfo `json:"modules"`
+}
+
+// Gopls adapter bridge methods
+
+const goplsLSPName = "gopls"
+
+func (b *Bridge) GoplsPackages(ctx context.Context, uri lsp.DocumentURI, recursive bool) (*PackagesResult, error) {
+	args, _ := json.Marshal(map[string]any{
+		"Files":     []string{string(uri)},
+		"Recursive": recursive,
+		"Mode":      1,
+	})
+	result, err := b.ExecuteCommand(ctx, goplsLSPName, "gopls.packages", args)
+	if err != nil {
+		return nil, err
+	}
+	var out PackagesResult
+	if err := json.Unmarshal(result, &out); err != nil {
+		return nil, fmt.Errorf("parsing gopls.packages result: %w", err)
+	}
+	return &out, nil
+}
+
+func (b *Bridge) GoplsPackageSymbols(ctx context.Context, uri lsp.DocumentURI) (*PackageSymbolsResult, error) {
+	args, _ := json.Marshal(map[string]any{
+		"URI": string(uri),
+	})
+	result, err := b.ExecuteCommand(ctx, goplsLSPName, "gopls.package_symbols", args)
+	if err != nil {
+		return nil, err
+	}
+	var out PackageSymbolsResult
+	if err := json.Unmarshal(result, &out); err != nil {
+		return nil, fmt.Errorf("parsing gopls.package_symbols result: %w", err)
+	}
+	return &out, nil
+}
+
+func (b *Bridge) GoplsImports(ctx context.Context, uri lsp.DocumentURI) (*ImportsResult, error) {
+	args, _ := json.Marshal(map[string]any{
+		"URI": string(uri),
+	})
+	result, err := b.ExecuteCommand(ctx, goplsLSPName, "gopls.list_imports", args)
+	if err != nil {
+		return nil, err
+	}
+	var out ImportsResult
+	if err := json.Unmarshal(result, &out); err != nil {
+		return nil, fmt.Errorf("parsing gopls.list_imports result: %w", err)
+	}
+	return &out, nil
+}
+
+func (b *Bridge) GoplsModules(ctx context.Context, uri lsp.DocumentURI, maxDepth int) (*ModulesResult, error) {
+	args := map[string]any{
+		"Dir": string(uri),
+	}
+	if maxDepth > 0 {
+		args["MaxDepth"] = maxDepth
+	}
+	argsJSON, _ := json.Marshal(args)
+	result, err := b.ExecuteCommand(ctx, goplsLSPName, "gopls.modules", argsJSON)
+	if err != nil {
+		return nil, err
+	}
+	var out ModulesResult
+	if err := json.Unmarshal(result, &out); err != nil {
+		return nil, fmt.Errorf("parsing gopls.modules result: %w", err)
+	}
+	return &out, nil
+}
+
 func formatDiagnostics(diags []DiagnosticItem, uri lsp.DocumentURI) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("%d diagnostic(s) in %s:\n", len(diags), uri.Path()))
