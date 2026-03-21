@@ -245,6 +245,33 @@ sys.stdout.write('\n'.join(lines))
   assert_success
 }
 
+# --- Layer 2: Neovim integration tests ---
+
+function lux_lsp_neovim_formats_go_file { # @test
+  command -v nvim >/dev/null 2>&1 || skip "nvim not on PATH"
+
+  local go_file="${BATS_TEST_TMPDIR}/project/main.go"
+  cp "${fixtures_dir}/unformatted.go" "$go_file"
+
+  local output_go="${BATS_TEST_TMPDIR}/project/formatted.go"
+
+  LUX_CMD="$lux lsp" \
+  LUX_INPUT="$go_file" \
+  LUX_OUTPUT="$output_go" \
+    timeout --signal=KILL 120s \
+    nvim --headless --clean -c "luafile ${fixtures_dir}/format.lua" 2>"${BATS_TEST_TMPDIR}/nvim_stderr.log" || true
+
+  # Check nvim produced output
+  [[ -f "$output_go" ]] || {
+    echo "nvim stderr:"
+    cat "${BATS_TEST_TMPDIR}/nvim_stderr.log" >&2
+    fail "output file not created"
+  }
+
+  run diff -u "${fixtures_dir}/expected.go" "$output_go"
+  assert_success
+}
+
 function lux_lsp_returns_method_not_found_for_hover { # @test
   local init_msg='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///tmp","capabilities":{}}}'
   local hover_msg='{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/test.go"},"position":{"line":0,"character":0}}}'

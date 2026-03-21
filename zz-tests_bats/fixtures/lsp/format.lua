@@ -55,17 +55,33 @@ if not attached then
   return
 end
 
--- Small delay for backend LSP initialization
-vim.wait(3000, function() return false end, 100)
-
+-- Retry formatting until we get edits (backend LSP may still be initializing)
 local client = vim.lsp.get_clients({ name = "lux", bufnr = 0 })[1]
-local params = vim.lsp.util.make_formatting_params()
-local result = client:request_sync("textDocument/formatting", params, 60000, 0)
+local edits = nil
+local max_attempts = 10
 
-if result and result.result and #result.result > 0 then
-  vim.lsp.util.apply_text_edits(result.result, 0, client.offset_encoding)
-elseif result and result.err then
-  io.stderr:write("FORMAT ERROR: " .. vim.inspect(result.err) .. "\n")
+for attempt = 1, max_attempts do
+  vim.wait(3000, function() return false end, 100)
+  local params = vim.lsp.util.make_formatting_params()
+  local result = client:request_sync("textDocument/formatting", params, 30000, 0)
+
+  if result and result.err then
+    io.stderr:write("FORMAT ERROR (attempt " .. attempt .. "): " .. vim.inspect(result.err) .. "\n")
+    vim.cmd("cquit 1")
+    return
+  end
+
+  if result and result.result and #result.result > 0 then
+    edits = result
+    break
+  end
+  io.stderr:write("attempt " .. attempt .. ": no edits, retrying...\n")
+end
+
+if edits and edits.result and #edits.result > 0 then
+  vim.lsp.util.apply_text_edits(edits.result, vim.api.nvim_get_current_buf(), client.offset_encoding)
+else
+  io.stderr:write("ERROR: no formatting edits after " .. max_attempts .. " attempts\n")
   vim.cmd("cquit 1")
   return
 end
