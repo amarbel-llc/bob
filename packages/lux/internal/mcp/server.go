@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
@@ -281,6 +282,13 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	s.inner = inner
 
 	go warmup.PreBuildAll(context.Background(), cfg, executor)
+
+	go func() {
+		cwd, _ := os.Getwd()
+		initParams := bridge.DefaultInitParams(lsp.DocumentURI("file://" + cwd + "/dummy"))
+		scanner := warmup.NewScanner(cfg, ftConfigs)
+		warmup.StartRelevantLSPs(context.Background(), s.pool, scanner, []string{cwd}, initParams, cfg)
+	}()
 
 	return s, nil
 }
