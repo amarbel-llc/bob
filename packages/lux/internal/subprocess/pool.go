@@ -391,6 +391,23 @@ func (p *Pool) Status() []LSPStatus {
 	return statuses
 }
 
+// Commands returns advertised executeCommand commands grouped by LSP name.
+func (p *Pool) Commands() map[string][]string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	result := make(map[string][]string)
+	for name, inst := range p.instances {
+		if inst.mu.TryRLock() {
+			if inst.Capabilities != nil && inst.Capabilities.ExecuteCommandProvider != nil {
+				result[name] = inst.Capabilities.ExecuteCommandProvider.Commands
+			}
+			inst.mu.RUnlock()
+		}
+	}
+	return result
+}
+
 type LSPStatus struct {
 	Name      string    `json:"name"`
 	Flake     string    `json:"flake"`

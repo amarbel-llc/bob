@@ -507,6 +507,18 @@ func registerResources(
 
 	registry.RegisterResource(
 		protocol.Resource{
+			URI:         "lux://commands",
+			Name:        "LSP Commands",
+			Description: "Available workspace/executeCommand commands grouped by LSP name",
+			MimeType:    "application/json",
+		},
+		func(ctx context.Context, uri string) (*protocol.ResourceReadResult, error) {
+			return readCommands(pool)
+		},
+	)
+
+	registry.RegisterResource(
+		protocol.Resource{
 			URI:         "lux://files",
 			Name:        "Project Files",
 			Description: "Files in the current directory that match configured LSP extensions/patterns",
@@ -626,9 +638,10 @@ func registerResources(
 }
 
 type statusResponse struct {
-	ConfiguredLSPs      []lspStatus `json:"configured_lsps"`
-	SupportedExtensions []string    `json:"supported_extensions"`
-	SupportedLanguages  []string    `json:"supported_languages"`
+	ConfiguredLSPs      []lspStatus         `json:"configured_lsps"`
+	SupportedExtensions []string            `json:"supported_extensions"`
+	SupportedLanguages  []string            `json:"supported_languages"`
+	Commands            map[string][]string `json:"commands,omitempty"`
 }
 
 type lspStatus struct {
@@ -677,6 +690,7 @@ func readStatus(pool *subprocess.Pool, cfg *config.Config, ftConfigs []*filetype
 		ConfiguredLSPs:      lsps,
 		SupportedExtensions: allExts,
 		SupportedLanguages:  allLangs,
+		Commands:            pool.Commands(),
 	}
 
 	data, err := json.MarshalIndent(resp, "", "  ")
@@ -688,6 +702,25 @@ func readStatus(pool *subprocess.Pool, cfg *config.Config, ftConfigs []*filetype
 		Contents: []protocol.ResourceContent{
 			{
 				URI:      "lux://status",
+				MimeType: "application/json",
+				Text:     string(data),
+			},
+		},
+	}, nil
+}
+
+func readCommands(pool *subprocess.Pool) (*protocol.ResourceReadResult, error) {
+	commands := pool.Commands()
+
+	data, err := json.MarshalIndent(commands, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.ResourceReadResult{
+		Contents: []protocol.ResourceContent{
+			{
+				URI:      "lux://commands",
 				MimeType: "application/json",
 				Text:     string(data),
 			},
