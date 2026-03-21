@@ -233,31 +233,6 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 			mimeType = "application/json"
 		}
 
-	case "format":
-		fileURI, err := getFileURI()
-		if err != nil {
-			return nil, err
-		}
-		if outputFormat == "text" {
-			result, err := p.bridge.Format(ctx, fileURI)
-			if err != nil {
-				return nil, err
-			}
-			if result.IsErr {
-				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
-			}
-			text = result.Text
-			mimeType = "text/plain"
-		} else {
-			raw, err := p.bridge.FormatRaw(ctx, fileURI)
-			if err != nil {
-				return nil, err
-			}
-			// FormatRaw returns json.RawMessage, already JSON
-			text = string(raw)
-			mimeType = "application/json"
-		}
-
 	case "document-symbols":
 		fileURI, err := getFileURI()
 		if err != nil {
@@ -303,70 +278,6 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 			mimeType = "text/plain"
 		} else {
 			raw, err := p.bridge.DiagnosticsRaw(ctx, fileURI)
-			if err != nil {
-				return nil, err
-			}
-			data, err := json.MarshalIndent(raw, "", "  ")
-			if err != nil {
-				return nil, err
-			}
-			text = string(data)
-			mimeType = "application/json"
-		}
-
-	case "code-action":
-		fileURI, err := getFileURI()
-		if err != nil {
-			return nil, err
-		}
-		startLine, _ := strconv.Atoi(q.Get("start_line"))
-		startChar, _ := strconv.Atoi(q.Get("start_character"))
-		endLine, _ := strconv.Atoi(q.Get("end_line"))
-		endChar, _ := strconv.Atoi(q.Get("end_character"))
-		if outputFormat == "text" {
-			result, err := p.bridge.CodeAction(ctx, fileURI, startLine, startChar, endLine, endChar)
-			if err != nil {
-				return nil, err
-			}
-			if result.IsErr {
-				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
-			}
-			text = result.Text
-			mimeType = "text/plain"
-		} else {
-			raw, err := p.bridge.CodeActionRaw(ctx, fileURI, startLine, startChar, endLine, endChar)
-			if err != nil {
-				return nil, err
-			}
-			data, err := json.MarshalIndent(raw, "", "  ")
-			if err != nil {
-				return nil, err
-			}
-			text = string(data)
-			mimeType = "application/json"
-		}
-
-	case "rename":
-		fileURI, line, char, err := getPosition()
-		if err != nil {
-			return nil, err
-		}
-		newName := q.Get("new_name")
-		if newName == "" {
-			return nil, fmt.Errorf("missing required parameter 'new_name'")
-		}
-		if outputFormat == "text" {
-			result, err := p.bridge.Rename(ctx, fileURI, line, char, newName)
-			if err != nil {
-				return nil, err
-			}
-			if result.IsErr {
-				return nil, fmt.Errorf("LSP operation failed: %s", result.Text)
-			}
-			text = result.Text
-			mimeType = "text/plain"
-		} else {
-			raw, err := p.bridge.RenameRaw(ctx, fileURI, line, char, newName)
 			if err != nil {
 				return nil, err
 			}
@@ -646,12 +557,6 @@ func registerResources(
 			MimeType:    "text/plain",
 		},
 		{
-			URITemplate: "lux://lsp/format?uri={uri}",
-			Name:        "Format",
-			Description: "Get formatting edits for a document according to language-standard style",
-			MimeType:    "text/plain",
-		},
-		{
 			URITemplate: "lux://lsp/document-symbols?uri={uri}",
 			Name:        "Document Symbols",
 			Description: "Get a structured outline of all symbols in a file (functions, types, constants)",
@@ -661,18 +566,6 @@ func registerResources(
 			URITemplate: "lux://lsp/diagnostics?uri={uri}",
 			Name:        "Diagnostics",
 			Description: "Get compiler/linter diagnostics (errors, warnings, hints) for a file",
-			MimeType:    "text/plain",
-		},
-		{
-			URITemplate: "lux://lsp/code-action?uri={uri}&start_line={start_line}&start_character={start_character}&end_line={end_line}&end_character={end_character}",
-			Name:        "Code Action",
-			Description: "Get suggested fixes, refactorings, and improvements for a code range",
-			MimeType:    "text/plain",
-		},
-		{
-			URITemplate: "lux://lsp/rename?uri={uri}&line={line}&character={character}&new_name={new_name}",
-			Name:        "Rename",
-			Description: "Rename a symbol across the entire codebase with semantic accuracy",
 			MimeType:    "text/plain",
 		},
 		{
