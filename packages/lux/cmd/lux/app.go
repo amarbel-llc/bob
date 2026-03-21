@@ -204,6 +204,42 @@ With --formatter, adds a formatter to formatters.toml:
 	})
 
 	app.AddCommand(&command.Command{
+		Name: "validate",
+		Description: command.Description{
+			Short: "Validate lux configuration",
+			Long:  "Check lsps.toml, formatters.toml, and filetype configs for structural errors and missing cross-references.",
+		},
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			return runValidate()
+		},
+	})
+
+	app.AddCommand(&command.Command{
+		Name: "config-edit",
+		Description: command.Description{
+			Short: "Edit a config file in $EDITOR",
+			Long: `Open a lux config file in $EDITOR for editing, then validate on save.
+
+Supported config names:
+  lsps         - LSP server configuration (lsps.toml)
+  formatters   - Formatter configuration (formatters.toml)
+  filetype/NAME - A specific filetype config (e.g., filetype/go)`,
+		},
+		Params: []command.Param{
+			{Name: "config", Type: command.String, Description: "Config to edit: lsps, formatters, or filetype/NAME", Required: true},
+		},
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			var p struct {
+				Config string `json:"config"`
+			}
+			if err := json.Unmarshal(args, &p); err != nil {
+				return fmt.Errorf("invalid arguments: %w", err)
+			}
+			return runConfigEdit(p.Config)
+		},
+	})
+
+	app.AddCommand(&command.Command{
 		Name: "fmt",
 		Description: command.Description{
 			Short: "Format a file using configured formatters",
