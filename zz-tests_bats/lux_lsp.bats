@@ -173,6 +173,78 @@ function lux_lsp_advertises_formatting_only_in_phase_1 { # @test
   assert_output "null"
 }
 
+function lux_lsp_formats_go_file_via_gopls { # @test
+  local go_file="${BATS_TEST_TMPDIR}/project/main.go"
+  cp "${fixtures_dir}/unformatted.go" "$go_file"
+
+  local file_uri="file://${go_file}"
+  local file_content
+  file_content="$(cat "$go_file")"
+
+  # Escape the content for JSON (newlines become \n, tabs become \t)
+  local escaped_content
+  escaped_content="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" < "$go_file")"
+
+  local init_msg='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file://'"${BATS_TEST_TMPDIR}/project"'","capabilities":{"textDocument":{"formatting":{"dynamicRegistration":false}}}}}'
+  local initialized_msg='{"jsonrpc":"2.0","method":"initialized","params":{}}'
+  local did_open_msg='{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"'"$file_uri"'","languageId":"go","version":1,"text":'"$escaped_content"'}}}'
+  local format_msg='{"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":"'"$file_uri"'"},"options":{"tabSize":4,"insertSpaces":false}}}'
+  local shutdown_msg='{"jsonrpc":"2.0","id":99,"method":"shutdown","params":null}'
+  local exit_msg='{"jsonrpc":"2.0","method":"exit","params":null}'
+
+  local output_file="${BATS_TEST_TMPDIR}/output.bin"
+
+  (
+    lsp_frame "$init_msg"
+    sleep 1
+    lsp_frame "$initialized_msg"
+    sleep 5
+    lsp_frame "$did_open_msg"
+    sleep 5
+    lsp_frame "$format_msg"
+    sleep 5
+    lsp_frame "$shutdown_msg"
+    sleep 1
+    lsp_frame "$exit_msg"
+  ) | timeout --signal=KILL 30s "$lux" lsp > "$output_file" 2>/dev/null || true
+
+  local response
+  response="$(extract_lsp_response "$output_file" 2)"
+
+  # Should have a result (array of text edits)
+  run jq -e '.result' <<< "$response"
+  assert_success
+
+  # Save response to file and apply edits
+  echo "$response" > "${BATS_TEST_TMPDIR}/response.json"
+
+  python3 -c "
+import json, sys
+
+with open(sys.argv[1], 'r') as f:
+    lines = f.read().split('\n')
+
+with open(sys.argv[2], 'r') as f:
+    response = json.load(f)
+
+edits = response.get('result', [])
+edits.sort(key=lambda e: (e['range']['start']['line'], e['range']['start']['character']), reverse=True)
+
+for edit in edits:
+    s = edit['range']['start']
+    e = edit['range']['end']
+    before = lines[s['line']][:s['character']] if s['line'] < len(lines) else ''
+    after = lines[e['line']][e['character']:] if e['line'] < len(lines) else ''
+    replacement_lines = (before + edit['newText'] + after).split('\n')
+    lines[s['line']:e['line'] + 1] = replacement_lines
+
+sys.stdout.write('\n'.join(lines))
+" "$go_file" "${BATS_TEST_TMPDIR}/response.json" > "${BATS_TEST_TMPDIR}/formatted.go"
+
+  run diff -u "${fixtures_dir}/expected.go" "${BATS_TEST_TMPDIR}/formatted.go"
+  assert_success
+}
+
 function lux_lsp_returns_method_not_found_for_hover { # @test
   local init_msg='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///tmp","capabilities":{}}}'
   local hover_msg='{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/test.go"},"position":{"line":0,"character":0}}}'
