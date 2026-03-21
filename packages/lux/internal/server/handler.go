@@ -130,6 +130,24 @@ func (h *Handler) handleDefault(ctx context.Context, msg *jsonrpc.Message) (*jso
 		return nil, nil
 	}
 
+	if h.server.lspMode {
+		switch msg.Method {
+		case lsp.MethodTextDocumentDidOpen,
+			lsp.MethodTextDocumentDidClose,
+			lsp.MethodTextDocumentDidChange,
+			lsp.MethodTextDocumentFormatting,
+			lsp.MethodTextDocumentRangeFormatting,
+			lsp.MethodWorkspaceDidChangeFolders:
+			// allowed in LSP mode Phase 1
+		default:
+			if msg.IsRequest() {
+				return jsonrpc.NewErrorResponse(*msg.ID, jsonrpc.MethodNotFound,
+					fmt.Sprintf("method %s not supported in LSP mode (Phase 1: formatting only)", msg.Method), nil)
+			}
+			return nil, nil
+		}
+	}
+
 	if msg.Method == lsp.MethodTextDocumentDidOpen {
 		h.server.warmupOnce.Do(func() {
 			go func() {
@@ -411,6 +429,14 @@ func lookupSettingsSection(settings map[string]any, section string) any {
 }
 
 func (s *Server) aggregateCapabilities() lsp.ServerCapabilities {
+	if s.lspMode {
+		return lsp.ServerCapabilities{
+			TextDocumentSync:                1,
+			DocumentFormattingProvider:      true,
+			DocumentRangeFormattingProvider: true,
+		}
+	}
+
 	var caps []lsp.ServerCapabilities
 
 	cached, err := s.loadCachedCapabilities()

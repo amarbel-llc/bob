@@ -27,12 +27,21 @@ type Server struct {
 	initParams  *lsp.InitializeParams
 	projectRoot string
 	initialized bool
+	lspMode     bool
 	warmupOnce  sync.Once
 	mu          sync.RWMutex
 	done        chan struct{}
 }
 
-func New(cfg *config.Config) (*Server, error) {
+type Option func(*Server)
+
+func WithLSPMode() Option {
+	return func(s *Server) {
+		s.lspMode = true
+	}
+}
+
+func New(cfg *config.Config, opts ...Option) (*Server, error) {
 	ftConfigs, err := filetype.LoadMerged()
 	if err != nil {
 		fmt.Fprintf(logfile.Writer(), "warning: could not load filetype config: %v\n", err)
@@ -87,6 +96,10 @@ func New(cfg *config.Config) (*Server, error) {
 		} else {
 			s.fmtRouter = fmtRouter
 		}
+	}
+
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	go warmup.PreBuildAll(context.Background(), cfg, executor)

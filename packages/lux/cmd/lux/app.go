@@ -331,6 +331,26 @@ Supported config names:
 			return nil
 		},
 	})
+
+	app.AddCommand(&command.Command{
+		Name: "lsp",
+		Description: command.Description{
+			Short: "Run as an LSP server over stdio",
+			Long:  "Run Lux as an LSP server, proxying requests to backend language servers based on file type. Editors connect via stdio.",
+		},
+		Params: []command.Param{
+			{Name: "lang", Type: command.String, Description: "Restrict to a single language/LSP name (e.g., gopls)"},
+		},
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			var p struct {
+				Lang string `json:"lang"`
+			}
+			if err := json.Unmarshal(args, &p); err != nil {
+				return fmt.Errorf("invalid arguments: %w", err)
+			}
+			return runLSP(ctx, p.Lang)
+		},
+	})
 }
 
 func addFiletypeConfig(name string, extensions, languageIDs []string, lsp string, formatters []string, formatterMode string) error {

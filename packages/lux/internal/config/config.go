@@ -222,6 +222,15 @@ func (c *Config) FindLSP(name string) *LSP {
 	return nil
 }
 
+func (c *Config) FilterByLSP(name string) (*Config, error) {
+	for _, l := range c.LSPs {
+		if l.Name == name {
+			return &Config{LSPs: []LSP{l}}, nil
+		}
+	}
+	return nil, fmt.Errorf("LSP %q not found in config", name)
+}
+
 func Save(cfg *Config) error {
 	return SaveTo(ConfigPath(), cfg)
 }

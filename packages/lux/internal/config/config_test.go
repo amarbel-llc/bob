@@ -484,6 +484,39 @@ ready_timeout = "not-a-duration"
 	}
 }
 
+func TestFilterByLSP(t *testing.T) {
+	cfg := &Config{
+		LSPs: []LSP{
+			{Name: "gopls", Flake: "nixpkgs#gopls"},
+			{Name: "pyright", Flake: "nixpkgs#pyright"},
+		},
+	}
+
+	filtered, err := cfg.FilterByLSP("gopls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered.LSPs) != 1 {
+		t.Fatalf("expected 1 LSP, got %d", len(filtered.LSPs))
+	}
+	if filtered.LSPs[0].Name != "gopls" {
+		t.Fatalf("expected gopls, got %s", filtered.LSPs[0].Name)
+	}
+}
+
+func TestFilterByLSP_NotFound(t *testing.T) {
+	cfg := &Config{
+		LSPs: []LSP{
+			{Name: "gopls", Flake: "nixpkgs#gopls"},
+		},
+	}
+
+	_, err := cfg.FilterByLSP("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent LSP")
+	}
+}
+
 func TestLSP_ShouldWaitForReady(t *testing.T) {
 	trueVal := true
 	falseVal := false
