@@ -449,6 +449,75 @@ func (p *resourceProvider) readLSPResource(ctx context.Context, uri string) (*pr
 		text = string(data)
 		mimeType = "application/json"
 
+	case "packages":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		recursive := q.Get("recursive") != "false"
+		raw, err := p.bridge.GoplsPackages(ctx, fileURI, recursive)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.MarshalIndent(raw, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		text = string(data)
+		mimeType = "application/json"
+
+	case "package-symbols":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		raw, err := p.bridge.GoplsPackageSymbols(ctx, fileURI)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.MarshalIndent(raw, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		text = string(data)
+		mimeType = "application/json"
+
+	case "imports":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		raw, err := p.bridge.GoplsImports(ctx, fileURI)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.MarshalIndent(raw, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		text = string(data)
+		mimeType = "application/json"
+
+	case "modules":
+		fileURI, err := getFileURI()
+		if err != nil {
+			return nil, err
+		}
+		maxDepth := 0
+		if v := q.Get("max_depth"); v != "" {
+			maxDepth, _ = strconv.Atoi(v)
+		}
+		raw, err := p.bridge.GoplsModules(ctx, fileURI, maxDepth)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.MarshalIndent(raw, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		text = string(data)
+		mimeType = "application/json"
+
 	default:
 		return nil, fmt.Errorf("unknown LSP operation: %s", operation)
 	}
@@ -628,6 +697,30 @@ func registerResources(
 			URITemplate: "lux://lsp/diagnostics-batch?glob={glob}",
 			Name:        "Batch Diagnostics",
 			Description: "Run diagnostics on all files matching a glob pattern. Groups by extension and fans out to multiple LSPs automatically.",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/packages?uri={uri}",
+			Name:        "Go Packages",
+			Description: "Package metadata for a Go file (requires gopls). Returns package path, module info, and test files.",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/package-symbols?uri={uri}",
+			Name:        "Go Package Symbols",
+			Description: "All symbols in a Go file's package with hierarchy (requires gopls). Richer than workspace-symbols.",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/imports?uri={uri}",
+			Name:        "Go Imports",
+			Description: "Imports in a Go file and across its package (requires gopls).",
+			MimeType:    "application/json",
+		},
+		{
+			URITemplate: "lux://lsp/modules?uri={uri}",
+			Name:        "Go Modules",
+			Description: "Module information within a directory (requires gopls). Pass a directory file:// URI.",
 			MimeType:    "application/json",
 		},
 	}
