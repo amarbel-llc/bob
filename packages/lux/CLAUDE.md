@@ -42,6 +42,23 @@ starts LSP subprocesses on demand for that workspace and terminates when the
 parent disconnects. There is no daemon, no sockets, no service installation, and
 no session management.
 
+### LSP Server Mode (`lux lsp`)
+
+Lux can also run as an LSP server over stdio, using standard JSON-RPC with
+Content-Length framing. This allows editors to use lux directly as a language
+server instead of going through MCP.
+
+- `lux lsp` --- multiplexes across all configured LSPs
+- `lux lsp --lang gopls` --- restricts to a single LSP backend
+
+Phase 1 supports formatting only: `documentFormattingProvider` and
+`documentRangeFormattingProvider`. All non-formatting methods return
+`MethodNotFound` (`-32601`). Integration tests are in
+`zz-tests_bats/lux_lsp.bats`.
+
+See `docs/features/0001-lsp-editor-integration.md` for the full feature design
+and phased roadmap.
+
 ### Request Flow
 
 Client (editor/Claude) connects via MCP over stdio. The **Bridge**
@@ -100,41 +117,41 @@ In addition to `resource-templates` and `resource-read`, lux exposes:
 
 ### Key Packages
 
-  -------------------------------------------------------------------------------------------
-  Package                                         Role
-  ----------------------------------------------- -------------------------------------------
-  `cmd/lux`                                       CLI: `mcp-stdio`, `init`, `add`, `list`,
-                                                  `fmt`, `hook`
+  ---------------------------------------------------------------------------------
+  Package                               Role
+  ------------------------------------- -------------------------------------------
+  `cmd/lux`                             CLI: `mcp-stdio`, `lsp`, `init`, `add`,
+                                        `list`, `fmt`, `hook`
 
-  `internal/server`                               LSP server, handler, and file-type router
+  `internal/server`                     LSP server, handler, and file-type router
 
-  `internal/subprocess`                           LSP process pool, lifecycle state machine
-                                                  (Idle→Starting→Running→Stopping→Stopped),
-                                                  Nix executor
+  `internal/subprocess`                 LSP process pool, lifecycle state machine
+                                        (Idle→Starting→Running→Stopping→Stopped),
+                                        Nix executor
 
-  `internal/mcp`                                  MCP server, resource provider, document
-                                                  manager, diagnostics store, prompts
+  `internal/mcp`                        MCP server, resource provider, document
+                                        manager, diagnostics store, prompts
 
-  `internal/tools`                                Bridge (adapts LSP operations to MCP), tool
-                                                  registry (for hook/artifact generation)
+  `internal/tools`                      Bridge (adapts LSP operations to MCP), tool
+                                        registry (for hook/artifact generation)
 
-  `internal/config`                               TOML config parsing (`lsps.toml`,
-                                                  `formatters.toml`), per-project overrides,
-                                                  config merging
+  `internal/config`                     TOML config parsing (`lsps.toml`,
+                                        `formatters.toml`), per-project overrides,
+                                        config merging
 
-  `internal/formatter`                            External formatter routing and execution
-                                                  (separate from LSP formatting)
+  `internal/formatter`                  External formatter routing and execution
+                                        (separate from LSP formatting)
 
-  `internal/capabilities`                         Auto-discovery and caching of LSP
-                                                  capabilities during `lux add`
+  `internal/capabilities`               Auto-discovery and caching of LSP
+                                        capabilities during `lux add`
 
-  `internal/lsp`                                  LSP protocol types, capability aggregation,
-                                                  URI utilities
+  `internal/lsp`                        LSP protocol types, capability aggregation,
+                                        URI utilities
 
-  `pkg/filematch`                                 File matching by extension, glob pattern,
-                                                  or language ID (priority: languageID \>
-                                                  extension \> pattern)
-  -------------------------------------------------------------------------------------------
+  `pkg/filematch`                       File matching by extension, glob pattern,
+                                        or language ID (priority: languageID \>
+                                        extension \> pattern)
+  ---------------------------------------------------------------------------------
 
 ### Configuration
 

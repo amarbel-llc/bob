@@ -5,7 +5,7 @@ promotion-criteria: |
   Phase 1 (proposed → experimental): formatting works in neovim headless tests.
   Phase 1 (experimental → testing): 7 days real neovim usage without fallback. B
   vs C decision: ADR written after Phase 1 testing with real usage data.
-status: exploring
+status: experimental
 ---
 
 # LSP Editor Integration
