@@ -272,6 +272,48 @@ function lux_lsp_neovim_formats_go_file { # @test
   assert_success
 }
 
+function lux_lsp_neovim_attaches_to_go_file { # @test
+  command -v nvim >/dev/null 2>&1 || skip "nvim not on PATH"
+
+  local go_file="${BATS_TEST_TMPDIR}/project/main.go"
+  cp "${fixtures_dir}/expected.go" "$go_file"
+
+  run timeout --signal=KILL 60s env \
+    LUX_CMD="$lux lsp" \
+    LUX_FILE="$go_file" \
+    nvim --headless --clean -c "luafile ${fixtures_dir}/check_attach.lua"
+
+  assert_success
+}
+
+function lux_lsp_neovim_does_not_attach_to_non_matching_filetype { # @test
+  command -v nvim >/dev/null 2>&1 || skip "nvim not on PATH"
+
+  local txt_file="${BATS_TEST_TMPDIR}/project/readme.txt"
+  echo "hello" > "$txt_file"
+
+  run timeout --signal=KILL 15s env \
+    LUX_CMD="$lux lsp" \
+    LUX_FILE="$txt_file" \
+    nvim --headless --clean -c "luafile ${fixtures_dir}/check_no_attach.lua"
+
+  assert_success
+}
+
+function lux_lsp_neovim_clean_shutdown { # @test
+  command -v nvim >/dev/null 2>&1 || skip "nvim not on PATH"
+
+  local go_file="${BATS_TEST_TMPDIR}/project/main.go"
+  cp "${fixtures_dir}/expected.go" "$go_file"
+
+  run timeout --signal=KILL 60s env \
+    LUX_CMD="$lux lsp" \
+    LUX_FILE="$go_file" \
+    nvim --headless --clean -c "luafile ${fixtures_dir}/check_shutdown.lua"
+
+  assert_success
+}
+
 function lux_lsp_returns_method_not_found_for_hover { # @test
   local init_msg='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///tmp","capabilities":{}}}'
   local hover_msg='{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/test.go"},"position":{"line":0,"character":0}}}'
