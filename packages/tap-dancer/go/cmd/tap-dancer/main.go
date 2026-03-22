@@ -90,9 +90,9 @@ func registerCommands() *command.App {
 		Params: []command.Param{
 			{Name: "input", Type: command.String, Description: "TAP-14 text to validate (if omitted in CLI mode, reads from stdin)", Required: false},
 			{Name: "format", Type: command.String, Description: "Output format: text, json, or tap (default: text)", Required: false},
-			{Name: "strict", Type: command.Bool, Description: "Fail-fast mode: exit with error if validation fails", Required: false},
 		},
-		Run: handleValidate,
+		Run:    handleValidate,
+		RunCLI: handleValidateCLI,
 	})
 
 	app.AddCommand(&command.Command{
@@ -275,11 +275,27 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 	return nil
 }
 
+func handleValidateCLI(_ context.Context, args json.RawMessage) error {
+	result, err := handleValidate(context.Background(), args, nil)
+	if err != nil {
+		return err
+	}
+	if result.JSON != nil {
+		data, _ := json.MarshalIndent(result.JSON, "", "  ")
+		fmt.Println(string(data))
+	} else if result.Text != "" {
+		fmt.Println(result.Text)
+	}
+	if result.IsErr {
+		os.Exit(1)
+	}
+	return nil
+}
+
 func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
 		Input  string `json:"input"`
 		Format string `json:"format"`
-		Strict bool   `json:"strict"`
 	}
 
 	if err := json.Unmarshal(args, &params); err != nil {
@@ -319,7 +335,9 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 			"summary":     summary,
 			"diagnostics": diags,
 		}
-		return command.JSONResult(result), nil
+		r := command.JSONResult(result)
+		r.IsErr = !summary.Valid
+		return r, nil
 
 	case "tap":
 		// Output validation results as TAP
@@ -354,7 +372,7 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 
 		tw.Plan()
 
-		if params.Strict && !summary.Valid {
+		if !summary.Valid {
 			return command.TextErrorResult(sb.String()), nil
 		}
 		return command.TextResult(sb.String()), nil
@@ -373,7 +391,7 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 		fmt.Fprintf(&sb, "\n%s: %d tests (%d passed, %d failed, %d skipped, %d todo)\n",
 			status, summary.TotalTests, summary.Passed, summary.Failed, summary.Skipped, summary.Todo)
 
-		if params.Strict && !summary.Valid {
+		if !summary.Valid {
 			return command.TextErrorResult(sb.String()), nil
 		}
 		return command.TextResult(sb.String()), nil
