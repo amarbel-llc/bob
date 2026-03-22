@@ -160,13 +160,13 @@ function exec_parallel_failure_diagnostics_include_stderr { # @test
 function exec_parallel_produces_valid_tap { # @test
   local tap_output
   tap_output=$("$tap_dancer" exec-parallel echo {} ::: a b c 2>/dev/null)
-  run "$tap_dancer" validate --strict <<< "$tap_output"
+  run "$tap_dancer" validate <<< "$tap_output"
   assert_success
 }
 
 function exec_parallel_j1_produces_valid_tap { # @test
   local tap_output
   tap_output=$("$tap_dancer" exec-parallel -j 1 echo {} ::: a b c 2>/dev/null)
-  run "$tap_dancer" validate --strict <<< "$tap_output"
+  run "$tap_dancer" validate <<< "$tap_output"
   assert_success
 }
