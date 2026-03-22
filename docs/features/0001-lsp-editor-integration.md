@@ -102,6 +102,41 @@ Format a file:
 - A previous daemon-based approach was removed (`d460e81`). This design
   intentionally avoids sockets, SSE, HTTP transports, and service management.
 
+## Testing
+
+### Current tests (`zz-tests_bats/lux_lsp.bats`)
+
+Protocol-level:
+
+1.  Initialize response has formatting capabilities and serverInfo
+2.  Phase 1 advertises only formatting providers (no hover/definition)
+3.  Go formatting end-to-end via gopls (didOpen → formatting → apply edits)
+4.  Non-formatting methods return MethodNotFound (-32601)
+
+Neovim integration:
+
+5.  Format Go file through neovim headless (full editor → lux → gopls pipeline)
+6.  Client attaches to Go buffer with formatting capability
+7.  Client does NOT attach to non-matching filetype (.txt)
+8.  Clean shutdown via LspStop
+
+### Future tests (add as phases are implemented)
+
+- **Capability detection timing** --- verify `documentFormattingProvider`
+  becomes true within a bounded window, not just eventually. Catches regressions
+  in initialization ordering.
+- **Multiplexing: two filetypes in one session** --- open `.go` and `.nix` files
+  in the same neovim session, format both. Validates routing when multiple
+  backends are active simultaneously.
+- **No-op format on already-formatted file** --- verify formatting returns empty
+  edits (not an error) when the file is already correct.
+- **Diagnostic forwarding** (Phase 2) --- verify `publishDiagnostics` from gopls
+  propagates through lux to neovim and appears in the quickfix list.
+- **Hover content** (Phase 3) --- verify `textDocument/hover` returns type info
+  from gopls through lux.
+- **Backend crash resilience** --- kill a backend LSP mid-session, verify lux
+  stays alive and reports errors gracefully rather than crashing.
+
 ## More Information
 
 - Design doc: `docs/plans/2026-03-21-lux-lsp-editor-integration-design.md`
