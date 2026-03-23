@@ -82,7 +82,20 @@ func main() {
 	srv, err := server.New(t, server.Options{
 		ServerName:    app.Name,
 		ServerVersion: app.Version,
-		Instructions:  "CalDAV MCP server for managing tasks and calendars. Reads are exposed as resources with progressive disclosure (caldav://calendars → caldav://calendar/{id} → caldav://task/{uid} → caldav://task/{uid}/ical). Writes use tools (create_task, update_task, complete_task, delete_task, move_task, create_calendar). Compatible with tasks.org VTODO format including subtasks, tags, recurrence, and reminders.",
+		Instructions: "CalDAV MCP server for managing tasks and calendars. " +
+			"Reads are exposed as resources with progressive disclosure " +
+			"(caldav://calendars → caldav://calendar/{id} → caldav://task/{uid} → caldav://task/{uid}/ical). " +
+			"Writes use tools (create_task, update_task, complete_task, delete_task, move_task, create_calendar). " +
+			"Compatible with tasks.org VTODO format including subtasks, tags, recurrence, and reminders.\n\n" +
+			"RECURRING TASKS: Tasks.org uses two distinct recurrence patterns. " +
+			"(1) RRULE on VTODO — a single task with an RRULE property (e.g. FREQ=DAILY). " +
+			"Completing one occurrence does not stop the recurrence; the server generates the next instance. " +
+			"(2) Instance-per-occurrence — individual VTODO items created for each recurrence, with no RRULE. " +
+			"These appear as separate tasks (e.g. weekly chores like laundry, cleaning). " +
+			"When searching for recurring work, check BOTH patterns: " +
+			"filter metadata for non-empty rrule to find RRULE-based tasks, " +
+			"and look for repeated summaries or categories to identify instance-per-occurrence tasks. " +
+			"A task without RRULE may still recur regularly.",
 		Tools:         registry,
 		Resources:     provider,
 	})
