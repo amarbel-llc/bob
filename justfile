@@ -25,6 +25,9 @@ build-chix:
 build-robin:
     nix build .#robin
 
+build-caldav:
+    nix build .#caldav
+
 build-spinclass:
     nix build .#spinclass
 
@@ -47,6 +50,9 @@ test-lux:
 
 test-spinclass:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass/...
+
+test-caldav:
+    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
 
 test-tap-dancer-go:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/tap-dancer/go/...
@@ -160,6 +166,7 @@ build-dummies-go:
 
 test: \
     test-batman-bats \
+    test-caldav \
     test-chix \
     test-get-hubbed \
     test-go \
