@@ -53,7 +53,13 @@ func RunWithEnv(ctx context.Context, dir string, extraEnv []string, args ...stri
 
 	if err := cmd.Run(); err != nil {
 		limited := output.LimitStderr(stderr.String())
-		return "", fmt.Errorf("git %v: %w: %s", args, err, limited.Content)
+		gitErr := fmt.Errorf("git %v: %w: %s", args, err, limited.Content)
+
+		if diag := diagnoseWorktreeError(dir, gitErr); diag != nil {
+			return "", diag
+		}
+
+		return "", gitErr
 	}
 
 	return stdout.String(), nil
@@ -85,7 +91,13 @@ func RunBothOutputs(ctx context.Context, dir string, args ...string) (string, st
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	if err := cmd.Run(); err != nil {
+		if diag := diagnoseWorktreeError(dir, err); diag != nil {
+			return "", stderr.String(), diag
+		}
 
-	return stdout.String(), stderr.String(), err
+		return "", stderr.String(), err
+	}
+
+	return stdout.String(), stderr.String(), nil
 }
