@@ -1058,9 +1058,8 @@ claude-allow = ["Bash(git *)"]
 envrc-directives = ["source_up", "use flake"]
 
 [env]
-
 FOO = "bar"
-BAZ = "qux"
+
 [hooks]
 # install deps on create
 create = "npm install"
