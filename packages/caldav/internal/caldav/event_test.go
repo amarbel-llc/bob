@@ -1,6 +1,7 @@
 package caldav
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -192,5 +193,104 @@ func TestParseVEVENT_FoldedLines(t *testing.T) {
 
 	if event.Summary != "This is a folded summary" {
 		t.Errorf("Summary = %q, want %q", event.Summary, "This is a folded summary")
+	}
+}
+
+func TestEventToIcal(t *testing.T) {
+	event := &Event{
+		UID:         "ical-test-1",
+		Summary:     "Team lunch",
+		Description: "Quarterly team lunch",
+		Status:      "CONFIRMED",
+		DtStart:     "20260401T120000Z",
+		DtEnd:       "20260401T133000Z",
+		Location:    "Downtown Grill",
+		Categories:  []string{"Work", "Social"},
+		RRule:       "FREQ=MONTHLY;BYDAY=1FR",
+		Transp:      "OPAQUE",
+		Sequence:    1,
+		Alarms: []Alarm{
+			{Trigger: "-PT30M", Action: "DISPLAY", Description: "Lunch soon"},
+		},
+	}
+
+	result := EventToIcal(event)
+
+	checks := []string{
+		"BEGIN:VCALENDAR",
+		"BEGIN:VEVENT",
+		"UID:ical-test-1",
+		"SUMMARY:Team lunch",
+		"DESCRIPTION:Quarterly team lunch",
+		"STATUS:CONFIRMED",
+		"DTSTART:20260401T120000Z",
+		"DTEND:20260401T133000Z",
+		"LOCATION:Downtown Grill",
+		"CATEGORIES:Work,Social",
+		"RRULE:FREQ=MONTHLY;BYDAY=1FR",
+		"TRANSP:OPAQUE",
+		"SEQUENCE:1",
+		"BEGIN:VALARM",
+		"TRIGGER:-PT30M",
+		"END:VEVENT",
+		"END:VCALENDAR",
+	}
+	for _, want := range checks {
+		if !strings.Contains(result, want) {
+			t.Errorf("missing %q in output:\n%s", want, result)
+		}
+	}
+}
+
+func TestEventToIcal_RoundTrip(t *testing.T) {
+	original := &Event{
+		UID:         "roundtrip-evt-1",
+		Summary:     "Round trip event",
+		Description: "Testing serialize then parse",
+		Status:      "CONFIRMED",
+		DtStart:     "20260401T090000Z",
+		DtEnd:       "20260401T100000Z",
+		Location:    "Office",
+		Categories:  []string{"test", "roundtrip"},
+		RRule:       "FREQ=WEEKLY;COUNT=4",
+		Transp:      "OPAQUE",
+		Sequence:    2,
+	}
+
+	icalStr := EventToIcal(original)
+	parsed, err := ParseVEVENT(icalStr)
+	if err != nil {
+		t.Fatalf("ParseVEVENT: %v", err)
+	}
+
+	if parsed.UID != original.UID {
+		t.Errorf("UID = %q, want %q", parsed.UID, original.UID)
+	}
+	if parsed.Summary != original.Summary {
+		t.Errorf("Summary = %q, want %q", parsed.Summary, original.Summary)
+	}
+	if parsed.Description != original.Description {
+		t.Errorf("Description = %q, want %q", parsed.Description, original.Description)
+	}
+	if parsed.Status != original.Status {
+		t.Errorf("Status = %q, want %q", parsed.Status, original.Status)
+	}
+	if parsed.DtStart != original.DtStart {
+		t.Errorf("DtStart = %q, want %q", parsed.DtStart, original.DtStart)
+	}
+	if parsed.DtEnd != original.DtEnd {
+		t.Errorf("DtEnd = %q, want %q", parsed.DtEnd, original.DtEnd)
+	}
+	if parsed.Location != original.Location {
+		t.Errorf("Location = %q, want %q", parsed.Location, original.Location)
+	}
+	if parsed.RRule != original.RRule {
+		t.Errorf("RRule = %q, want %q", parsed.RRule, original.RRule)
+	}
+	if parsed.Transp != original.Transp {
+		t.Errorf("Transp = %q, want %q", parsed.Transp, original.Transp)
+	}
+	if parsed.Sequence != original.Sequence {
+		t.Errorf("Sequence = %d, want %d", parsed.Sequence, original.Sequence)
 	}
 }

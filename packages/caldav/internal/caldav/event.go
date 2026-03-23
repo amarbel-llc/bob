@@ -190,3 +190,73 @@ func ParseVEVENT(raw string) (*Event, error) {
 
 	return e, nil
 }
+
+// EventToIcal serializes an Event to a full VCALENDAR string.
+func EventToIcal(e *Event) string {
+	var b strings.Builder
+	b.WriteString("BEGIN:VCALENDAR\r\n")
+	b.WriteString("VERSION:2.0\r\n")
+	b.WriteString("PRODID:-//amarbel-llc//caldav-mcp//EN\r\n")
+	b.WriteString("BEGIN:VEVENT\r\n")
+
+	writeIcalProp(&b, "UID", e.UID)
+	writeIcalProp(&b, "DTSTAMP", formatNow())
+	writeIcalProp(&b, "SUMMARY", e.Summary)
+
+	if e.Description != "" {
+		writeIcalProp(&b, "DESCRIPTION", e.Description)
+	}
+	if e.Status != "" {
+		writeIcalProp(&b, "STATUS", e.Status)
+	}
+	if e.DtStart != "" {
+		writeIcalProp(&b, "DTSTART", e.DtStart)
+	}
+	if e.DtEnd != "" {
+		writeIcalProp(&b, "DTEND", e.DtEnd)
+	}
+	if e.Duration != "" {
+		writeIcalProp(&b, "DURATION", e.Duration)
+	}
+	if e.Location != "" {
+		writeIcalProp(&b, "LOCATION", e.Location)
+	}
+	if e.Geo != "" {
+		writeIcalProp(&b, "GEO", e.Geo)
+	}
+	if len(e.Categories) > 0 {
+		writeIcalProp(&b, "CATEGORIES", strings.Join(e.Categories, ","))
+	}
+	if e.RRule != "" {
+		writeIcalProp(&b, "RRULE", e.RRule)
+	}
+	if e.RecurrenceID != "" {
+		writeIcalProp(&b, "RECURRENCE-ID", e.RecurrenceID)
+	}
+	if e.Transp != "" {
+		writeIcalProp(&b, "TRANSP", e.Transp)
+	}
+	if e.Organizer != "" {
+		writeIcalProp(&b, "ORGANIZER", e.Organizer)
+	}
+	for _, attendee := range e.Attendees {
+		writeIcalProp(&b, "ATTENDEE", attendee)
+	}
+	if e.Sequence > 0 {
+		writeIcalProp(&b, "SEQUENCE", strconv.Itoa(e.Sequence))
+	}
+
+	for _, alarm := range e.Alarms {
+		b.WriteString("BEGIN:VALARM\r\n")
+		writeIcalProp(&b, "TRIGGER", alarm.Trigger)
+		writeIcalProp(&b, "ACTION", alarm.Action)
+		if alarm.Description != "" {
+			writeIcalProp(&b, "DESCRIPTION", alarm.Description)
+		}
+		b.WriteString("END:VALARM\r\n")
+	}
+
+	b.WriteString("END:VEVENT\r\n")
+	b.WriteString("END:VCALENDAR\r\n")
+	return b.String()
+}
