@@ -10,6 +10,7 @@ func RegisterAll(provider *resources.Provider) *command.App {
 	app.Version = "0.1.0"
 
 	registerTaskCommands(app, provider)
+	registerEventCommands(app, provider)
 	registerCalendarCommands(app, provider)
 
 	return app
