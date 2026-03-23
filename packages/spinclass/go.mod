@@ -1,16 +1,15 @@
 module github.com/amarbel-llc/spinclass
 
-go 1.24.2
+go 1.25.6
 
 replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.0.0-20260222022802-be680fd2b4ac
+	github.com/amarbel-llc/tommy v0.0.0-20260323010822-a1a5fa79908b
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v0.4.2
-	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.10.2
 )

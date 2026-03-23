@@ -41,10 +41,11 @@ func LoadHierarchy(home, repoDir string) (Hierarchy, error) {
 	merged := Sweatfile{}
 
 	loadAndMerge := func(path string) error {
-		var sf Sweatfile
-		if err := sf.Load(path); err != nil {
+		doc, err := Load(path)
+		if err != nil {
 			return err
 		}
+		sf := *doc.Data()
 		_, found := fileExists(path)
 		sources = append(
 			sources,
@@ -103,10 +104,11 @@ func LoadWorktreeHierarchy(
 	}
 
 	worktreePath := filepath.Join(filepath.Clean(worktreeDir), "sweatfile")
-	var sf Sweatfile
-	if err := sf.Load(worktreePath); err != nil {
+	doc, err := Load(worktreePath)
+	if err != nil {
 		return Hierarchy{}, err
 	}
+	sf := *doc.Data()
 
 	_, found := fileExists(worktreePath)
 	hierarchy.Sources = append(hierarchy.Sources, LoadSource{

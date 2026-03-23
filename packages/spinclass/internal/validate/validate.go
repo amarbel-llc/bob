@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass/internal/tap"
 )
@@ -150,18 +149,17 @@ func findDuplicates(items []string) []string {
 }
 
 func CheckUnknownFields(data []byte) []Issue {
-	var sf sweatfile.Sweatfile
-	md, err := toml.Decode(string(data), &sf)
+	doc, err := sweatfile.Parse(data)
 	if err != nil {
 		return nil
 	}
 
 	var issues []Issue
-	for _, key := range md.Undecoded() {
+	for _, key := range doc.Undecoded() {
 		issues = append(issues, Issue{
-			Message:  fmt.Sprintf("unknown field %q", key.String()),
+			Message:  fmt.Sprintf("unknown field %q", key),
 			Severity: SeverityError,
-			Field:    key.String(),
+			Field:    key,
 		})
 	}
 	return issues
@@ -199,8 +197,7 @@ func Run(w io.Writer, home, repoDir string) int {
 			continue
 		}
 
-		var parsed sweatfile.Sweatfile
-		parseErr := parsed.Parse(data)
+		_, parseErr := sweatfile.Parse(data)
 		if parseErr != nil {
 			sub.NotOk("valid TOML", map[string]string{
 				"severity": SeverityError,

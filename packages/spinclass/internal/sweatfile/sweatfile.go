@@ -16,6 +16,7 @@ type Hooks struct {
 	DisallowMainWorktree *bool   `toml:"disallow-main-worktree"`
 }
 
+//go:generate tommy generate
 type Sweatfile struct {
 	SystemPrompt       *string           `toml:"system-prompt"`
 	SystemPromptAppend *string           `toml:"system-prompt-append"`

@@ -6,23 +6,37 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/BurntSushi/toml"
 )
 
-func (sf *Sweatfile) Parse(data []byte) error {
-	return toml.Unmarshal(data, sf)
+func Parse(data []byte) (*SweatfileDocument, error) {
+	doc, err := DecodeSweatfile(data)
+	if err != nil {
+		return nil, err
+	}
+	// Tommy's GetFromContainer returns nil for empty TOML arrays (e.g. []).
+	// MergeWith relies on nil vs empty to distinguish "absent" from "clear",
+	// so normalize consumed array keys to non-nil empty slices.
+	if doc.consumed["git-excludes"] && doc.data.GitSkipIndex == nil {
+		doc.data.GitSkipIndex = []string{}
+	}
+	if doc.consumed["claude-allow"] && doc.data.ClaudeAllow == nil {
+		doc.data.ClaudeAllow = []string{}
+	}
+	if doc.consumed["envrc-directives"] && doc.data.EnvrcDirectives == nil {
+		doc.data.EnvrcDirectives = []string{}
+	}
+	return doc, nil
 }
 
-func (sf *Sweatfile) Load(path string) error {
+func Load(path string) (*SweatfileDocument, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil
+			return DecodeSweatfile(nil)
 		}
-		return err
+		return nil, err
 	}
-	return sf.Parse(data)
+	return Parse(data)
 }
 
 // resolvePathOrString expands environment variables and ~ in value, then
@@ -43,14 +57,13 @@ func resolvePathOrString(value string) string {
 	return strings.TrimSpace(string(data))
 }
 
-func (sf Sweatfile) Save(path string) error {
+func (doc *SweatfileDocument) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	f, err := os.Create(path)
+	output, err := doc.Encode()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return toml.NewEncoder(f).Encode(sf)
+	return os.WriteFile(path, output, 0o644)
 }

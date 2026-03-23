@@ -10,22 +10,22 @@ func TestParseMinimal(t *testing.T) {
 	input := `
 git-excludes = [".claude/"]
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if len(sf.GitSkipIndex) != 1 || sf.GitSkipIndex[0] != ".claude/" {
 		t.Errorf("git-excludes: got %v", sf.GitSkipIndex)
 	}
 }
 
 func TestParseEmpty(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(""))
+	doc, err := Parse([]byte(""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.GitSkipIndex != nil {
 		t.Errorf("expected nil git-excludes, got %v", sf.GitSkipIndex)
 	}
@@ -36,22 +36,22 @@ func TestLoadFromPath(t *testing.T) {
 	path := filepath.Join(dir, "sweatfile")
 	os.WriteFile(path, []byte(`git-excludes = [".direnv/"]`), 0o644)
 
-	var sf Sweatfile
-	err := sf.Load(path)
+	doc, err := Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if len(sf.GitSkipIndex) != 1 || sf.GitSkipIndex[0] != ".direnv/" {
 		t.Errorf("git-excludes: got %v", sf.GitSkipIndex)
 	}
 }
 
 func TestLoadMissing(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Load("/nonexistent/sweatfile")
+	doc, err := Load("/nonexistent/sweatfile")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.GitSkipIndex != nil {
 		t.Errorf("expected nil git-excludes, got %v", sf.GitSkipIndex)
 	}
@@ -99,22 +99,24 @@ func TestSaveRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sweatfile")
 
-	sf := Sweatfile{
-		GitSkipIndex: []string{".claude/"},
-	}
-
-	err := sf.Save(path)
+	input := "git-excludes = [\".claude/\"]\n"
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var loaded Sweatfile
-	err = loaded.Load(path)
+	err = doc.Save(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error loading: %v", err)
 	}
-	if len(loaded.GitSkipIndex) != 1 || loaded.GitSkipIndex[0] != ".claude/" {
-		t.Errorf("git-excludes roundtrip: got %v", loaded.GitSkipIndex)
+	sf := loaded.Data()
+	if len(sf.GitSkipIndex) != 1 || sf.GitSkipIndex[0] != ".claude/" {
+		t.Errorf("git-excludes roundtrip: got %v", sf.GitSkipIndex)
 	}
 }
 
@@ -122,11 +124,11 @@ func TestParseClaudeAllow(t *testing.T) {
 	input := `
 claude-allow = ["Read", "Bash(git *)"]
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if len(sf.ClaudeAllow) != 2 {
 		t.Fatalf("expected 2 claude-allow rules, got %v", sf.ClaudeAllow)
 	}
@@ -367,11 +369,11 @@ func TestParseHooksCreate(t *testing.T) {
 [hooks]
 create = "composer install"
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Hooks == nil || sf.Hooks.Create == nil ||
 		*sf.Hooks.Create != "composer install" {
 		t.Errorf("hooks.create: got %v", sf.Hooks)
@@ -383,11 +385,11 @@ func TestParseHooksStop(t *testing.T) {
 [hooks]
 stop = "just test"
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Hooks == nil || sf.Hooks.Stop == nil ||
 		*sf.Hooks.Stop != "just test" {
 		t.Errorf("hooks.stop: got %v", sf.Hooks)
@@ -400,11 +402,11 @@ func TestParseHooksBoth(t *testing.T) {
 create = "npm install"
 stop = "just lint"
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Hooks == nil {
 		t.Fatal("expected non-nil hooks")
 	}
@@ -417,11 +419,11 @@ stop = "just lint"
 }
 
 func TestParseHooksAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Hooks != nil {
 		t.Errorf("expected nil hooks, got %v", sf.Hooks)
 	}
@@ -519,11 +521,11 @@ func TestParseHooksPreMerge(t *testing.T) {
 [hooks]
 pre-merge = "just test"
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Hooks == nil || sf.Hooks.PreMerge == nil ||
 		*sf.Hooks.PreMerge != "just test" {
 		t.Errorf("hooks.pre-merge: got %v", sf.Hooks)
@@ -627,11 +629,11 @@ func TestLoadHierarchyHooksStopInherited(t *testing.T) {
 
 func TestParseSystemPrompt(t *testing.T) {
 	input := `system-prompt = "do stuff"`
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.SystemPrompt == nil || *sf.SystemPrompt != "do stuff" {
 		t.Errorf("system-prompt: got %v", sf.SystemPrompt)
 	}
@@ -639,11 +641,11 @@ func TestParseSystemPrompt(t *testing.T) {
 
 func TestParseSystemPromptEmpty(t *testing.T) {
 	input := `system-prompt = ""`
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.SystemPrompt == nil {
 		t.Fatal("expected non-nil system-prompt for explicit empty string")
 	}
@@ -653,11 +655,11 @@ func TestParseSystemPromptEmpty(t *testing.T) {
 }
 
 func TestParseSystemPromptAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.SystemPrompt != nil {
 		t.Errorf("expected nil system-prompt, got %v", sf.SystemPrompt)
 	}
@@ -665,11 +667,11 @@ func TestParseSystemPromptAbsent(t *testing.T) {
 
 func TestParseSystemPromptAppend(t *testing.T) {
 	input := `system-prompt-append = "extra instructions"`
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.SystemPromptAppend == nil ||
 		*sf.SystemPromptAppend != "extra instructions" {
 		t.Errorf("system-prompt-append: got %v", sf.SystemPromptAppend)
@@ -677,11 +679,11 @@ func TestParseSystemPromptAppend(t *testing.T) {
 }
 
 func TestParseSystemPromptAppendAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.SystemPromptAppend != nil {
 		t.Errorf(
 			"expected nil system-prompt-append, got %v",
@@ -780,11 +782,11 @@ func TestMergeSystemPromptAppendClear(t *testing.T) {
 
 func TestParseEnvrcDirectives(t *testing.T) {
 	input := `envrc-directives = ["source_up", "dotenv_if_exists"]`
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if len(sf.EnvrcDirectives) != 2 {
 		t.Fatalf("expected 2 envrc-directives, got %v", sf.EnvrcDirectives)
 	}
@@ -795,11 +797,11 @@ func TestParseEnvrcDirectives(t *testing.T) {
 }
 
 func TestParseEnvrcDirectivesAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.EnvrcDirectives != nil {
 		t.Errorf("expected nil envrc-directives, got %v", sf.EnvrcDirectives)
 	}
@@ -844,11 +846,11 @@ func TestParseEnv(t *testing.T) {
 FOO = "bar"
 BAZ = "qux"
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if len(sf.Env) != 2 {
 		t.Fatalf("expected 2 env vars, got %v", sf.Env)
 	}
@@ -858,11 +860,11 @@ BAZ = "qux"
 }
 
 func TestParseEnvAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.Env != nil {
 		t.Errorf("expected nil env, got %v", sf.Env)
 	}
@@ -925,22 +927,22 @@ func TestParseHooksDisallowMainWorktree(t *testing.T) {
 [hooks]
 disallow-main-worktree = true
 `
-	var sf Sweatfile
-	err := sf.Parse([]byte(input))
+	doc, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if !sf.DisallowMainWorktreeEnabled() {
 		t.Error("expected disallow-main-worktree to be enabled")
 	}
 }
 
 func TestParseHooksDisallowMainWorktreeAbsent(t *testing.T) {
-	var sf Sweatfile
-	err := sf.Parse([]byte(`git-excludes = [".claude/"]`))
+	doc, err := Parse([]byte(`git-excludes = [".claude/"]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	sf := doc.Data()
 	if sf.DisallowMainWorktreeEnabled() {
 		t.Error("expected disallow-main-worktree to be disabled when absent")
 	}
@@ -1045,5 +1047,37 @@ func TestResolvePathOrStringNonexistentFile(t *testing.T) {
 	result := resolvePathOrString("/nonexistent/path/to/file.txt")
 	if result != "/nonexistent/path/to/file.txt" {
 		t.Errorf("expected literal fallback, got %q", result)
+	}
+}
+
+func TestRoundTripPreservesComments(t *testing.T) {
+	input := `# Global config
+system-prompt = "be helpful"
+git-excludes = [".claude/", ".direnv/"]
+claude-allow = ["Bash(git *)"]
+envrc-directives = ["source_up", "use flake"]
+
+[env]
+
+FOO = "bar"
+BAZ = "qux"
+[hooks]
+# install deps on create
+create = "npm install"
+stop = "just test"
+disallow-main-worktree = true
+`
+	doc, err := Parse([]byte(input))
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	output, err := doc.Encode()
+	if err != nil {
+		t.Fatalf("Encode error: %v", err)
+	}
+
+	if string(output) != input {
+		t.Errorf("round-trip mismatch:\n--- want ---\n%s\n--- got ---\n%s", input, string(output))
 	}
 }
