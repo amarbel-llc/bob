@@ -106,6 +106,7 @@ let
       bin_dirs=()
       sandbox=true
       allow_unix_sockets=false
+      allow_local_binding=false
       no_tempdir_cleanup=false
       hide_passing=false
 
@@ -122,6 +123,10 @@ let
             ;;
           --allow-unix-sockets)
             allow_unix_sockets=true
+            shift
+            ;;
+          --allow-local-binding)
+            allow_local_binding=true
             shift
             ;;
           --no-tempdir-cleanup)
@@ -214,7 +219,8 @@ let
         "network": {
           "allowedDomains": [],
           "deniedDomains": []$(if $allow_unix_sockets; then echo ',
-          "allowAllUnixSockets": true'; fi)
+          "allowAllUnixSockets": true'; fi)$(if $allow_local_binding; then echo ',
+          "allowLocalBinding": true'; fi)
         }
       }
       SANDCASTLE_CONFIG
