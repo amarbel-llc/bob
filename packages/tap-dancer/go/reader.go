@@ -136,7 +136,7 @@ func (r *Reader) Next() (Event, error) {
 		for depth < r.currentFrame().depth && len(r.stack) > 1 {
 			completed := r.stack[len(r.stack)-1]
 			r.stack = r.stack[:len(r.stack)-1]
-			if completed.planSeen && completed.testCount != completed.planCount {
+			if completed.planSeen && completed.testCount != completed.planCount && !r.bailed {
 				r.addDiag(SeverityError, "plan-count-mismatch",
 					"subtest plan count mismatch: plan declared "+
 						strconv.Itoa(completed.planCount)+

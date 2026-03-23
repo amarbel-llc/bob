@@ -567,6 +567,40 @@ func TestReaderYAMLStripsANSIFromProtocolButNotContent(t *testing.T) {
 	}
 }
 
+func TestReaderSubtestBailOutSuppressesPlanMismatch(t *testing.T) {
+	input := "TAP version 14\n1..1\n    # Subtest: test\n    1..3\n    ok 1 - first\n    Bail out! disk full\nnot ok 1 - test\n"
+	_, diags, summary := collectEvents(input)
+
+	if !summary.BailedOut {
+		t.Error("expected BailedOut=true")
+	}
+	for _, d := range diags {
+		if d.Rule == "plan-count-mismatch" {
+			t.Errorf("subtest bail out should suppress plan-count-mismatch, got: %s", d.Message)
+		}
+	}
+	if !summary.Valid {
+		t.Error("expected Valid=true when subtest bailed out")
+	}
+}
+
+func TestReaderSubtestBailOutWithRootEcho(t *testing.T) {
+	input := "TAP version 14\n1..1\n    # Subtest: test\n    1..3\n    ok 1 - first\n    Bail out! disk full\nBail out! disk full\n"
+	_, diags, summary := collectEvents(input)
+
+	if !summary.BailedOut {
+		t.Error("expected BailedOut=true")
+	}
+	for _, d := range diags {
+		if d.Rule == "plan-count-mismatch" {
+			t.Errorf("bail out should suppress plan-count-mismatch, got: %s", d.Message)
+		}
+	}
+	if !summary.Valid {
+		t.Error("expected Valid=true when bailed out with root echo")
+	}
+}
+
 func TestReaderLocaleRoundTrip(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewLocaleWriter(&buf, language.MustParse("en-US"))
