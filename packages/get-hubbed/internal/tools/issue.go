@@ -29,8 +29,7 @@ func registerIssueCommands(app *command.App) {
 			{
 				Name:        "repo",
 				Type:        command.String,
-				Description: "Repository in OWNER/REPO format",
-				Required:    true,
+				Description: "Repository in OWNER/REPO format. Omit to use the current directory's git remote.",
 			},
 			{
 				Name:        "number",
@@ -57,6 +56,47 @@ func registerIssueCommands(app *command.App) {
 			},
 		},
 		Run: handleIssueClose,
+	})
+
+	app.AddCommand(&command.Command{
+		Name:  "issue-comment",
+		Title: "Comment on Issue",
+		Description: command.Description{
+			Short: "Post a comment on an issue or pull request",
+		},
+		Annotations: &protocol.ToolAnnotations{
+			ReadOnlyHint:    protocol.BoolPtr(false),
+			DestructiveHint: protocol.BoolPtr(false),
+			IdempotentHint:  protocol.BoolPtr(false),
+			OpenWorldHint:   protocol.BoolPtr(true),
+		},
+		Params: []command.Param{
+			{
+				Name:        "repo",
+				Type:        command.String,
+				Description: "Repository in OWNER/REPO format. Omit to use the current directory's git remote.",
+			},
+			{
+				Name:        "number",
+				Type:        command.Int,
+				Description: "Issue or pull request number",
+				Required:    true,
+			},
+			{
+				Name:        "body",
+				Type:        command.String,
+				Description: "Comment body (markdown supported)",
+				Required:    true,
+			},
+		},
+		MapsTools: []command.ToolMapping{
+			{
+				Replaces:        "Bash",
+				CommandPrefixes: []string{"gh issue comment", "gh pr comment"},
+				UseWhen:         "commenting on issues or pull requests",
+			},
+		},
+		Run: handleIssueComment,
 	})
 
 	app.AddCommand(&command.Command{
@@ -93,6 +133,62 @@ func registerIssueCommands(app *command.App) {
 		},
 		Run: handleIssueCreate,
 	})
+}
+
+func handleIssueComment(
+	ctx context.Context,
+	args json.RawMessage,
+	_ command.Prompter,
+) (*command.Result, error) {
+	var params struct {
+		Repo   string `json:"repo"`
+		Number int    `json:"number"`
+		Body   string `json:"body"`
+	}
+
+	if err := json.Unmarshal(args, &params); err != nil {
+		return command.TextErrorResult(
+			fmt.Sprintf("invalid arguments: %v", err),
+		), nil
+	}
+
+	if params.Repo == "" {
+		repo, err := resolveRepoFromRemote(ctx)
+		if err != nil {
+			return command.TextErrorResult(
+				fmt.Sprintf("repo not specified and could not detect from git remote: %v", err),
+			), nil
+		}
+		params.Repo = repo
+	}
+
+	commentBody, err := json.Marshal(map[string]string{"body": params.Body})
+	if err != nil {
+		return command.TextErrorResult(
+			fmt.Sprintf("marshaling comment body: %v", err),
+		), nil
+	}
+
+	out, err := gh.RunWithInput(ctx, bytes.NewReader(commentBody),
+		"api",
+		fmt.Sprintf("repos/%s/issues/%d/comments", params.Repo, params.Number),
+		"--method", "POST",
+		"--input", "-",
+	)
+	if err != nil {
+		return command.TextErrorResult(
+			fmt.Sprintf("gh api issue comment: %v", err),
+		), nil
+	}
+
+	var result struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return command.TextResult(out), nil
+	}
+
+	return command.TextResult(fmt.Sprintf("%s\n", result.HTMLURL)), nil
 }
 
 func handleIssueCreate(
@@ -186,6 +282,16 @@ func handleIssueClose(
 		return command.TextErrorResult(
 			fmt.Sprintf("invalid arguments: %v", err),
 		), nil
+	}
+
+	if params.Repo == "" {
+		repo, err := resolveRepoFromRemote(ctx)
+		if err != nil {
+			return command.TextErrorResult(
+				fmt.Sprintf("repo not specified and could not detect from git remote: %v", err),
+			), nil
+		}
+		params.Repo = repo
 	}
 
 	issueNumber := params.Number

@@ -17,6 +17,32 @@ import (
 	"github.com/friedenberg/get-hubbed/internal/gh"
 )
 
+// validateQueryParams checks that all query parameters are in the allowed set.
+// Returns an error listing the unknown params and the valid ones.
+func validateQueryParams(q url.Values, allowed []string) error {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, a := range allowed {
+		allowedSet[a] = struct{}{}
+	}
+
+	var unknown []string
+	for key := range q {
+		if _, ok := allowedSet[key]; !ok {
+			unknown = append(unknown, key)
+		}
+	}
+
+	if len(unknown) > 0 {
+		return fmt.Errorf(
+			"unknown query parameter(s): %s; valid parameters: %s",
+			strings.Join(unknown, ", "),
+			strings.Join(allowed, ", "),
+		)
+	}
+
+	return nil
+}
+
 type resourceProvider struct {
 	registry     *mcpserver.ResourceRegistry
 	cwd          string
@@ -83,7 +109,7 @@ func NewResourceProvider() (*resourceProvider, error) {
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "get-hubbed://contents/{path}",
 		Name:        "File Contents",
-		Description: "Read file contents from a repository. Required: path. Optional: ?repo=, ?ref=, ?line_offset=, ?line_limit=",
+		Description: "Read file contents from a repository. Required: path. Optional: ?repo=, ?ref=, ?line_offset=, ?line_limit=. Tip: use get-hubbed://tree first to verify the path exists before reading contents.",
 		MimeType:    "text/plain",
 	}, nil)
 
@@ -176,6 +202,10 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 		}
 		return nil, fmt.Errorf("unknown resource: %s", uri)
 	case "repos":
+		// Handle GitHub API-style paths like get-hubbed://repos/owner/name/issues
+		if redir, err := p.redirectReposPath(ctx, uri, parsed); redir != nil || err != nil {
+			return redir, err
+		}
 		return p.readRepos(ctx, uri, parsed.Query())
 	case "issues":
 		path := strings.TrimPrefix(parsed.Path, "/")
@@ -192,7 +222,10 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 	case "contents":
 		path := strings.TrimPrefix(parsed.Path, "/")
 		if path == "" {
-			return nil, fmt.Errorf("missing path in contents URI")
+			path = parsed.Query().Get("path")
+		}
+		if path == "" {
+			return nil, fmt.Errorf("missing path in contents URI. Use get-hubbed://contents/{path} or get-hubbed://contents?path={path}. List files first with get-hubbed://tree")
 		}
 		return p.readContents(ctx, uri, path, parsed.Query())
 	case "tree":
@@ -200,13 +233,19 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 	case "blame":
 		path := strings.TrimPrefix(parsed.Path, "/")
 		if path == "" {
-			return nil, fmt.Errorf("missing path in blame URI")
+			path = parsed.Query().Get("path")
+		}
+		if path == "" {
+			return nil, fmt.Errorf("missing path in blame URI. Use get-hubbed://blame/{path} or get-hubbed://blame?path={path}")
 		}
 		return p.readBlame(ctx, uri, path, parsed.Query())
 	case "commits":
 		path := strings.TrimPrefix(parsed.Path, "/")
 		if path == "" {
-			return nil, fmt.Errorf("missing path in commits URI")
+			path = parsed.Query().Get("path")
+		}
+		if path == "" {
+			return nil, fmt.Errorf("missing path in commits URI. Use get-hubbed://commits/{path} or get-hubbed://commits?path={path}")
 		}
 		return p.readCommits(ctx, uri, path, parsed.Query())
 	case "runs":
@@ -224,7 +263,50 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 	}
 }
 
+// redirectReposPath handles GitHub API-style URIs like
+// get-hubbed://repos/owner/name/issues by parsing the owner/name and
+// dispatching to the correct resource handler. Returns (nil, nil) if
+// the path doesn't match a known pattern, allowing fallthrough to readRepos.
+func (p *resourceProvider) redirectReposPath(ctx context.Context, uri string, parsed *url.URL) (*protocol.ResourceReadResult, error) {
+	path := strings.TrimPrefix(parsed.Path, "/")
+	parts := strings.SplitN(path, "/", 3)
+	if len(parts) < 2 {
+		return nil, nil
+	}
+
+	repo := parts[0] + "/" + parts[1]
+	q := parsed.Query()
+	q.Set("repo", repo)
+
+	if len(parts) == 2 {
+		// get-hubbed://repos/owner/name → repo view
+		return p.readRepo(ctx, uri, q)
+	}
+
+	rest := parts[2]
+	switch {
+	case rest == "issues":
+		return p.readIssueList(ctx, uri, q)
+	case rest == "pulls":
+		return p.readPRList(ctx, uri, q)
+	case rest == "runs":
+		return p.readRunList(ctx, uri, q)
+	case strings.HasPrefix(rest, "issues/"):
+		number := strings.TrimPrefix(rest, "issues/")
+		return p.readIssueView(ctx, uri, number, q)
+	case strings.HasPrefix(rest, "pulls/"):
+		number := strings.TrimPrefix(rest, "pulls/")
+		return p.readPRView(ctx, uri, number, q)
+	}
+
+	return nil, nil
+}
+
 func (p *resourceProvider) readRepo(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -242,6 +324,10 @@ func (p *resourceProvider) readRepo(ctx context.Context, uri string, q url.Value
 }
 
 func (p *resourceProvider) readRepos(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"owner", "limit"}); err != nil {
+		return nil, err
+	}
+
 	owner := q.Get("owner")
 	if owner == "" {
 		return nil, fmt.Errorf("owner parameter is required for repos resource")
@@ -265,6 +351,10 @@ func (p *resourceProvider) readRepos(ctx context.Context, uri string, q url.Valu
 }
 
 func (p *resourceProvider) readIssueList(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "state", "limit", "labels"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -299,6 +389,10 @@ func (p *resourceProvider) readIssueList(ctx context.Context, uri string, q url.
 }
 
 func (p *resourceProvider) readIssueView(ctx context.Context, uri, number string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -317,6 +411,10 @@ func (p *resourceProvider) readIssueView(ctx context.Context, uri, number string
 }
 
 func (p *resourceProvider) readPRList(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "state", "limit"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -345,6 +443,10 @@ func (p *resourceProvider) readPRList(ctx context.Context, uri string, q url.Val
 }
 
 func (p *resourceProvider) readPRView(ctx context.Context, uri, number string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -363,6 +465,10 @@ func (p *resourceProvider) readPRView(ctx context.Context, uri, number string, q
 }
 
 func (p *resourceProvider) readContents(ctx context.Context, uri, path string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "ref", "path", "line_offset", "line_limit"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -391,6 +497,10 @@ func (p *resourceProvider) readContents(ctx context.Context, uri, path string, q
 					ref, repo, repo,
 				)
 			}
+			hint += fmt.Sprintf(
+				". Use get-hubbed://tree?repo=%s to list files and verify the path exists before reading",
+				repo,
+			)
 			return nil, fmt.Errorf("%s", hint)
 		}
 		return nil, fmt.Errorf("gh api contents: %w", err)
@@ -470,6 +580,10 @@ func (p *resourceProvider) readContents(ctx context.Context, uri, path string, q
 }
 
 func (p *resourceProvider) readTree(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "path", "ref", "recursive", "limit", "offset"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -560,6 +674,10 @@ func (p *resourceProvider) readTree(ctx context.Context, uri string, q url.Value
 }
 
 func (p *resourceProvider) readBlame(ctx context.Context, uri, path string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "ref", "path", "start_line", "end_line"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -676,6 +794,10 @@ func (p *resourceProvider) readBlame(ctx context.Context, uri, path string, q ur
 }
 
 func (p *resourceProvider) readCommits(ctx context.Context, uri, path string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "ref", "path", "per_page", "page"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -710,6 +832,10 @@ func (p *resourceProvider) readCommits(ctx context.Context, uri, path string, q 
 }
 
 func (p *resourceProvider) readRunList(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "branch", "status", "workflow", "event", "commit", "user", "limit"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -758,6 +884,10 @@ func (p *resourceProvider) readRunList(ctx context.Context, uri string, q url.Va
 }
 
 func (p *resourceProvider) readRunView(ctx context.Context, uri, runID string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "attempt"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
@@ -782,6 +912,10 @@ func (p *resourceProvider) readRunView(ctx context.Context, uri, runID string, q
 }
 
 func (p *resourceProvider) readRunLog(ctx context.Context, uri, runID string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "job_id"}); err != nil {
+		return nil, err
+	}
+
 	repo, err := p.resolveRepo(q.Get("repo"))
 	if err != nil {
 		return nil, err
