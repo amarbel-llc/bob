@@ -410,6 +410,115 @@ func (c *Client) FindTaskByUID(uid string) (*TaskWithMeta, string, error) {
 	return nil, "", fmt.Errorf("task with UID %q not found", uid)
 }
 
+// GetEvent fetches a single VEVENT by its href.
+func (c *Client) GetEvent(eventHref string) (*EventWithMeta, error) {
+	url := c.resolveHref(eventHref)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.cfg.Username, c.cfg.Password)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: status %d", eventHref, resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := string(data)
+	event, err := ParseVEVENT(raw)
+	if err != nil {
+		return nil, err
+	}
+	event.Href = eventHref
+	event.ETag = resp.Header.Get("ETag")
+
+	return &EventWithMeta{Event: *event, Raw: raw}, nil
+}
+
+// PutEvent creates or updates a VEVENT at the given href.
+func (c *Client) PutEvent(eventHref, icalData, etag string) error {
+	url := c.resolveHref(eventHref)
+	req, err := http.NewRequest("PUT", url, strings.NewReader(icalData))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(c.cfg.Username, c.cfg.Password)
+	req.Header.Set("Content-Type", "text/calendar; charset=utf-8")
+	if etag != "" {
+		req.Header.Set("If-Match", etag)
+	} else {
+		req.Header.Set("If-None-Match", "*")
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("PUT: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("PUT %s: status %d: %s", eventHref, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// DeleteEvent removes a VEVENT by href.
+func (c *Client) DeleteEvent(eventHref, etag string) error {
+	url := c.resolveHref(eventHref)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(c.cfg.Username, c.cfg.Password)
+	if etag != "" {
+		req.Header.Set("If-Match", etag)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("DELETE: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("DELETE %s: status %d", eventHref, resp.StatusCode)
+	}
+	return nil
+}
+
+// FindEventByUID searches all calendars for an event with the given UID.
+// Returns the event with metadata and the calendar href it was found in.
+func (c *Client) FindEventByUID(uid string) (*EventWithMeta, string, error) {
+	calendars, err := c.ListCalendars()
+	if err != nil {
+		return nil, "", err
+	}
+
+	for _, cal := range calendars {
+		result, err := c.ListEvents(cal.Href)
+		if err != nil {
+			continue
+		}
+		for _, e := range result.Events {
+			if e.Event.UID == uid {
+				return &e, cal.Href, nil
+			}
+		}
+	}
+	return nil, "", fmt.Errorf("event with UID %q not found", uid)
+}
+
 func (c *Client) resolveHref(href string) string {
 	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
 		return href
