@@ -225,6 +225,32 @@ EOF
   refute_line --regexp "^ok 1 "
 }
 
+function bats_wrapper_sandbox_denies_localhost_tcp_bind { # @test
+  cat >"${TEST_TMPDIR}/tcp_bind.bats" <<'INNER'
+#! /usr/bin/env bats
+function tcp_bind_ephemeral_port { # @test
+  run python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(('127.0.0.1', 0))
+    port = s.getsockname()[1]
+    print(f'bound to port {port}')
+except OSError as e:
+    print(f'bind failed: {e}', file=sys.stderr)
+    sys.exit(1)
+finally:
+    s.close()
+"
+  assert_success
+  assert_output --partial "bound to port"
+}
+INNER
+  run "$BATS_WRAPPER" --tap "${TEST_TMPDIR}/tcp_bind.bats"
+  assert_failure
+  assert_output --partial "not ok 1"
+}
+
 function bats_wrapper_hide_passing_preserves_plan_and_version { # @test
   cat >"${TEST_TMPDIR}/plan.bats" <<'EOF'
 #! /usr/bin/env bats
