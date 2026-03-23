@@ -226,6 +226,81 @@ func TestTaskToIcal_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseVTODO_TasksOrgMetadata(t *testing.T) {
+	raw := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:+//IDN tasks.org//android-120500//EN
+BEGIN:VTODO
+UID:tasksorg-meta-test
+SUMMARY:Task with tasks.org extensions
+CATEGORIES:groceries,errand
+PRIORITY:5
+LOCATION:Whole Foods
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-APPLE-RADIUS=70;X-TITLE=Who
+ le Foods:geo:37.7749,-122.4194
+ATTACH;FMTTYPE=image/jpeg:https://example.com/receipt.jpg
+ATTACH:https://example.com/notes.pdf
+X-APPLE-SORT-ORDER:100
+END:VTODO
+END:VCALENDAR`
+
+	task, err := ParseVTODO(raw)
+	if err != nil {
+		t.Fatalf("ParseVTODO: %v", err)
+	}
+
+	// CATEGORIES already works
+	if len(task.Categories) != 2 || task.Categories[0] != "groceries" {
+		t.Errorf("Categories = %v, want [groceries, errand]", task.Categories)
+	}
+
+	// ATTACH should be parsed
+	if len(task.Attachments) != 2 {
+		t.Fatalf("len(Attachments) = %d, want 2", len(task.Attachments))
+	}
+	if task.Attachments[0] != "https://example.com/receipt.jpg" {
+		t.Errorf("Attachments[0] = %q, want receipt URL", task.Attachments[0])
+	}
+	if task.Attachments[1] != "https://example.com/notes.pdf" {
+		t.Errorf("Attachments[1] = %q, want notes URL", task.Attachments[1])
+	}
+
+	// X-APPLE-STRUCTURED-LOCATION should be parsed
+	if task.StructuredLocation == "" {
+		t.Error("StructuredLocation should not be empty")
+	}
+	if task.StructuredLocation != "geo:37.7749,-122.4194" {
+		t.Errorf("StructuredLocation = %q, want geo URI", task.StructuredLocation)
+	}
+}
+
+func TestParseVTODO_AttachmentsInMetadata(t *testing.T) {
+	task := &Task{
+		UID:         "meta-attach",
+		Summary:     "Task with attachments",
+		Attachments: []string{"https://example.com/file.pdf"},
+	}
+
+	meta := task.ToMetadata()
+	if meta.AttachmentCount != 1 {
+		t.Errorf("AttachmentCount = %d, want 1", meta.AttachmentCount)
+	}
+}
+
+func TestParseVTODO_LocationInMetadata(t *testing.T) {
+	task := &Task{
+		UID:                "meta-loc",
+		Summary:            "Task with location",
+		Location:           "Whole Foods",
+		StructuredLocation: "geo:37.7749,-122.4194",
+	}
+
+	meta := task.ToMetadata()
+	if meta.Location != "Whole Foods" {
+		t.Errorf("Location = %q, want %q", meta.Location, "Whole Foods")
+	}
+}
+
 func TestCapDescription(t *testing.T) {
 	short := "short"
 	if got := CapDescription(short, 100); got != short {

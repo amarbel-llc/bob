@@ -26,8 +26,10 @@ type Task struct {
 	RRule           string   `json:"rrule,omitempty"`
 	Location        string   `json:"location,omitempty"`
 	Geo             string   `json:"geo,omitempty"`
-	SortOrder       int      `json:"sort_order,omitempty"`
-	Sequence        int      `json:"sequence,omitempty"`
+	SortOrder          int      `json:"sort_order,omitempty"`
+	Sequence           int      `json:"sequence,omitempty"`
+	Attachments        []string `json:"attachments,omitempty"`
+	StructuredLocation string   `json:"structured_location,omitempty"`
 
 	// Derived fields
 	SubtaskUIDs       []string `json:"subtask_uids,omitempty"`
@@ -59,6 +61,8 @@ type TaskMetadata struct {
 	HasDescription    bool     `json:"has_description"`
 	DescriptionTokens int      `json:"description_tokens"`
 	ParentUID         string   `json:"parent_uid,omitempty"`
+	AttachmentCount   int      `json:"attachment_count,omitempty"`
+	Location          string   `json:"location,omitempty"`
 }
 
 // ToMetadata converts a full Task to its lightweight metadata representation.
@@ -74,6 +78,8 @@ func (t *Task) ToMetadata() TaskMetadata {
 		HasDescription:    t.HasDescription,
 		DescriptionTokens: t.DescriptionTokens,
 		ParentUID:         t.ParentUID,
+		AttachmentCount:   len(t.Attachments),
+		Location:          t.Location,
 	}
 }
 
@@ -184,6 +190,10 @@ func ParseVTODO(raw string) (*Task, error) {
 			if n, err := strconv.Atoi(value); err == nil {
 				t.Sequence = n
 			}
+		case "ATTACH":
+			t.Attachments = append(t.Attachments, value)
+		case "X-APPLE-STRUCTURED-LOCATION":
+			t.StructuredLocation = value
 		}
 	}
 
