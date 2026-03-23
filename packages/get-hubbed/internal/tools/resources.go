@@ -86,9 +86,9 @@ func NewResourceProvider() (*resourceProvider, error) {
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://issues/{number}",
+		URITemplate: "get-hubbed://issues?number={number}&repo={repo}",
 		Name:        "Issue Detail",
-		Description: "View issue details. Required: number. Optional: ?repo= query param",
+		Description: "View issue details. Required: number. Optional: repo (defaults to current)",
 		MimeType:    "application/json",
 	}, nil)
 
@@ -100,16 +100,16 @@ func NewResourceProvider() (*resourceProvider, error) {
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://pulls/{number}",
+		URITemplate: "get-hubbed://pulls?number={number}&repo={repo}",
 		Name:        "Pull Request Detail",
-		Description: "View pull request details. Required: number. Optional: ?repo= query param",
+		Description: "View pull request details. Required: number. Optional: repo (defaults to current)",
 		MimeType:    "application/json",
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://contents/{path}",
+		URITemplate: "get-hubbed://contents?path={path}&repo={repo}&ref={ref}&line_offset={line_offset}&line_limit={line_limit}",
 		Name:        "File Contents",
-		Description: "Read file contents from a repository. Required: path. Optional: ?repo=, ?ref=, ?line_offset=, ?line_limit=. Tip: use get-hubbed://tree first to verify the path exists before reading contents.",
+		Description: "Read file contents from a repository. Required: path. Optional: repo, ref, line_offset, line_limit. Tip: use get-hubbed://tree first to verify the path exists before reading contents.",
 		MimeType:    "text/plain",
 	}, nil)
 
@@ -121,16 +121,16 @@ func NewResourceProvider() (*resourceProvider, error) {
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://blame/{path}",
+		URITemplate: "get-hubbed://blame?path={path}&repo={repo}&ref={ref}&start_line={start_line}&end_line={end_line}",
 		Name:        "File Blame",
-		Description: "Show line-by-line authorship of a file. Required: path. Optional: ?repo=, ?ref=, ?start_line=, ?end_line=",
+		Description: "Show line-by-line authorship of a file. Required: path. Optional: repo, ref, start_line, end_line",
 		MimeType:    "application/json",
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://commits/{path}",
+		URITemplate: "get-hubbed://commits?path={path}&repo={repo}&ref={ref}&per_page={per_page}&page={page}",
 		Name:        "File Commits",
-		Description: "List commits for a file or directory. Required: path. Optional: ?repo=, ?ref=, ?per_page=, ?page=",
+		Description: "List commits for a file or directory. Required: path. Optional: repo, ref, per_page, page",
 		MimeType:    "application/json",
 	}, nil)
 
@@ -142,16 +142,16 @@ func NewResourceProvider() (*resourceProvider, error) {
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://runs/{run_id}",
+		URITemplate: "get-hubbed://runs?run_id={run_id}&repo={repo}&attempt={attempt}",
 		Name:        "Workflow Run",
-		Description: "View a workflow run with jobs and steps. Required: run_id. Optional: ?repo=, ?attempt=",
+		Description: "View a workflow run with jobs and steps. Required: run_id. Optional: repo, attempt",
 		MimeType:    "application/json",
 	}, nil)
 
 	registry.RegisterTemplate(protocol.ResourceTemplate{
-		URITemplate: "get-hubbed://runs/{run_id}/log",
+		URITemplate: "get-hubbed://runs/log?run_id={run_id}&repo={repo}&job_id={job_id}",
 		Name:        "Workflow Run Log",
-		Description: "Get logs for failed steps in a workflow run. Required: run_id. Optional: ?repo=, ?job_id=",
+		Description: "Get logs for failed steps in a workflow run. Required: run_id. Optional: repo, job_id",
 		MimeType:    "text/plain",
 	}, nil)
 
@@ -208,15 +208,21 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 		}
 		return p.readRepos(ctx, uri, parsed.Query())
 	case "issues":
-		path := strings.TrimPrefix(parsed.Path, "/")
-		if path != "" {
-			return p.readIssueView(ctx, uri, path, parsed.Query())
+		number := strings.TrimPrefix(parsed.Path, "/")
+		if number == "" {
+			number = parsed.Query().Get("number")
+		}
+		if number != "" {
+			return p.readIssueView(ctx, uri, number, parsed.Query())
 		}
 		return p.readIssueList(ctx, uri, parsed.Query())
 	case "pulls":
-		path := strings.TrimPrefix(parsed.Path, "/")
-		if path != "" {
-			return p.readPRView(ctx, uri, path, parsed.Query())
+		number := strings.TrimPrefix(parsed.Path, "/")
+		if number == "" {
+			number = parsed.Query().Get("number")
+		}
+		if number != "" {
+			return p.readPRView(ctx, uri, number, parsed.Query())
 		}
 		return p.readPRList(ctx, uri, parsed.Query())
 	case "contents":
@@ -251,7 +257,17 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 	case "runs":
 		path := strings.TrimPrefix(parsed.Path, "/")
 		if path == "" {
+			if runID := parsed.Query().Get("run_id"); runID != "" {
+				return p.readRunView(ctx, uri, runID, parsed.Query())
+			}
 			return p.readRunList(ctx, uri, parsed.Query())
+		}
+		if path == "log" {
+			runID := parsed.Query().Get("run_id")
+			if runID == "" {
+				return nil, fmt.Errorf("missing run_id for runs/log. Use get-hubbed://runs/log?run_id={run_id}")
+			}
+			return p.readRunLog(ctx, uri, runID, parsed.Query())
 		}
 		if strings.HasSuffix(path, "/log") {
 			runID := strings.TrimSuffix(path, "/log")
@@ -389,7 +405,7 @@ func (p *resourceProvider) readIssueList(ctx context.Context, uri string, q url.
 }
 
 func (p *resourceProvider) readIssueView(ctx context.Context, uri, number string, q url.Values) (*protocol.ResourceReadResult, error) {
-	if err := validateQueryParams(q, []string{"repo"}); err != nil {
+	if err := validateQueryParams(q, []string{"repo", "number"}); err != nil {
 		return nil, err
 	}
 
@@ -443,7 +459,7 @@ func (p *resourceProvider) readPRList(ctx context.Context, uri string, q url.Val
 }
 
 func (p *resourceProvider) readPRView(ctx context.Context, uri, number string, q url.Values) (*protocol.ResourceReadResult, error) {
-	if err := validateQueryParams(q, []string{"repo"}); err != nil {
+	if err := validateQueryParams(q, []string{"repo", "number"}); err != nil {
 		return nil, err
 	}
 
@@ -884,7 +900,7 @@ func (p *resourceProvider) readRunList(ctx context.Context, uri string, q url.Va
 }
 
 func (p *resourceProvider) readRunView(ctx context.Context, uri, runID string, q url.Values) (*protocol.ResourceReadResult, error) {
-	if err := validateQueryParams(q, []string{"repo", "attempt"}); err != nil {
+	if err := validateQueryParams(q, []string{"repo", "run_id", "attempt"}); err != nil {
 		return nil, err
 	}
 
@@ -912,7 +928,7 @@ func (p *resourceProvider) readRunView(ctx context.Context, uri, runID string, q
 }
 
 func (p *resourceProvider) readRunLog(ctx context.Context, uri, runID string, q url.Values) (*protocol.ResourceReadResult, error) {
-	if err := validateQueryParams(q, []string{"repo", "job_id"}); err != nil {
+	if err := validateQueryParams(q, []string{"repo", "run_id", "job_id"}); err != nil {
 		return nil, err
 	}
 

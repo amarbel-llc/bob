@@ -77,7 +77,9 @@ func main() {
 	opts := server.Options{
 		ServerName:    app.Name,
 		ServerVersion: app.Version,
-		Instructions:  "GitHub MCP server. Read-only operations (repo info, issues, PRs, content, runs) are available as auto-approved resources via get-hubbed:// URIs. Mutation operations (issue/PR creation, API calls) remain as tools.",
+		Instructions: "GitHub MCP server. Read-only operations (repo info, issues, PRs, content, runs) are available as auto-approved resources via get-hubbed:// URIs. Mutation operations (issue/PR creation, comments, API calls) remain as tools." +
+			"\n\nIMPORTANT: There are no tools named content_read, content_tree, content_commits, or repo_view. Use resource-read with get-hubbed:// URIs instead." +
+			" All resource URIs use query parameters (e.g. get-hubbed://contents?path=README.md, get-hubbed://issues?number=42). Call resource-templates to see all available URIs.",
 		Tools:         registry,
 	}
 
