@@ -1,10 +1,25 @@
-{ pkgs, src, craneLib, purse-first-cli, goWorkspaceSrc, goVendorHash, rustWorkspaceSrc, rustCargoArtifacts }:
+{
+  pkgs,
+  src,
+  craneLib,
+  purse-first-cli,
+  goWorkspaceSrc,
+  goVendorHash,
+  go,
+  rustWorkspaceSrc,
+  rustCargoArtifacts,
+}:
 
 let
   version = "0.1.0";
 
   mkGoModule = import ../mkGoWorkspaceModule.nix {
-    inherit pkgs goWorkspaceSrc goVendorHash;
+    inherit
+      pkgs
+      goWorkspaceSrc
+      goVendorHash
+      go
+      ;
   };
 
   tap-dancer-cli = mkGoModule {
@@ -27,14 +42,14 @@ let
     strictDeps = true;
   };
 
-  tap-dancer-skill = pkgs.runCommand "tap-dancer-skill"
-    { nativeBuildInputs = [ purse-first-cli ]; }
-    ''
-      ${purse-first-cli}/bin/purse-first generate-plugin \
-        --root ${src} \
-        --output $out \
-        --skills-dir ${src}/skills
-    '';
+  tap-dancer-skill =
+    pkgs.runCommand "tap-dancer-skill" { nativeBuildInputs = [ purse-first-cli ]; }
+      ''
+        ${purse-first-cli}/bin/purse-first generate-plugin \
+          --root ${src} \
+          --output $out \
+          --skills-dir ${src}/skills
+      '';
 
   tap-dancer-bash = pkgs.stdenvNoCC.mkDerivation {
     pname = "tap-dancer-bash";
@@ -53,7 +68,12 @@ in
 {
   default = pkgs.symlinkJoin {
     name = "tap-dancer";
-    paths = [ tap-dancer-cli tap-dancer-rust tap-dancer-skill tap-dancer-bash ];
+    paths = [
+      tap-dancer-cli
+      tap-dancer-rust
+      tap-dancer-skill
+      tap-dancer-bash
+    ];
   };
   cli = tap-dancer-cli;
   rust = tap-dancer-rust;

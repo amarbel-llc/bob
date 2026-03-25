@@ -54,7 +54,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-PWJSX/w4IQRMZw0eyOmAYw96gJ8LnQxUFXNqH0n68ok=";
+      goVendorHash = "sha256-2omuxhk9Mr2MKtb3Pns+4HA2heDQM4QRH8MHJKXaoac=";
 
       buildDevenvs =
         system:
@@ -90,8 +90,15 @@
           fhPkg = fh.packages.${system}.default;
           purse-first-cli = purse-first.packages.${system}.purse-first;
 
+          go = pkgs-master.go;
+
           mkGoModule = import ./lib/mkGoWorkspaceModule.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           sandcastlePkg = import ./lib/packages/sandcastle.nix {
@@ -105,24 +112,49 @@
           };
 
           potatoPkg = import ./lib/packages/potato.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           spinclassPkg = import ./lib/packages/spinclass.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
             src = ./packages/spinclass;
           };
 
           caldavPkg = import ./lib/packages/caldav.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           gritPkg = import ./lib/packages/grit.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           get-hubbed-unwrapped = import ./lib/packages/get-hubbed.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           get-hubbed-wrapped =
@@ -140,7 +172,12 @@
               '';
 
           luxPkg = import ./lib/packages/lux.nix {
-            inherit pkgs goWorkspaceSrc goVendorHash;
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
           };
 
           chixPkg = import ./lib/packages/chix.nix {
@@ -161,6 +198,7 @@
               purse-first-cli
               goWorkspaceSrc
               goVendorHash
+              go
               rustWorkspaceSrc
               rustCargoArtifacts
               ;

@@ -23,7 +23,7 @@ let
       parallel
       ;
 
-    inherit (pkgs)
+    inherit (pkgs-master)
       go
       ;
 

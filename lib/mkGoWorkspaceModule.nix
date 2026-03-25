@@ -15,11 +15,15 @@
   pkgs,
   goWorkspaceSrc,
   goVendorHash,
+  go ? pkgs.go,
 }:
 
+let
+  buildGoModule = pkgs.buildGoModule.override { inherit go; };
+in
 attrs:
 
-pkgs.buildGoModule (
+buildGoModule (
   {
     version = "0.1.0";
     src = goWorkspaceSrc;

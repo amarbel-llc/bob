@@ -2,12 +2,18 @@
   pkgs,
   goWorkspaceSrc,
   goVendorHash,
+  go,
   src, # Original source for non-Go assets (completions)
 }:
 
 let
   mkGoModule = import ../mkGoWorkspaceModule.nix {
-    inherit pkgs goWorkspaceSrc goVendorHash;
+    inherit
+      pkgs
+      goWorkspaceSrc
+      goVendorHash
+      go
+      ;
   };
 
   spinclass = mkGoModule {

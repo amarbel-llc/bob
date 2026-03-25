@@ -2,11 +2,17 @@
   pkgs,
   goWorkspaceSrc,
   goVendorHash,
+  go,
 }:
 
 let
   mkGoModule = import ../mkGoWorkspaceModule.nix {
-    inherit pkgs goWorkspaceSrc goVendorHash;
+    inherit
+      pkgs
+      goWorkspaceSrc
+      goVendorHash
+      go
+      ;
   };
 in
 mkGoModule {
