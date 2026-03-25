@@ -1,12 +1,12 @@
 module github.com/amarbel-llc/spinclass
 
-go 1.25.6
+go 1.26
 
 replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 
 require (
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.0.0-20260222022802-be680fd2b4ac
-	github.com/amarbel-llc/tommy v0.0.0-20260323021814-21665d240a69
+	github.com/amarbel-llc/tommy v0.0.0-20260325160617-9ac55581209e
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v0.4.2
