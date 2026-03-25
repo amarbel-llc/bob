@@ -315,6 +315,7 @@
               robin = localPkgs.batmanPkgs.robin;
               batman = localPkgs.batmanPkgs.default;
               tap-dancer = localPkgs.tapDancerPkgs.default;
+              tap-dancer-bash = localPkgs.tapDancerPkgs.bash-lib;
               sandcastle = localPkgs.sandcastlePkg;
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
