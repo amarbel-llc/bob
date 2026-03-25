@@ -690,6 +690,26 @@ func TestRunCreateHookEmptyStringIsNoop(t *testing.T) {
 	}
 }
 
+func TestRunCreateHookMultilineWithEmptyLines(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "hook-ran")
+
+	// A multiline create hook with empty lines between commands should
+	// execute correctly — empty lines must not be fed to the shell as
+	// separate commands or cause parse failures.
+	cmd := fmt.Sprintf("echo first\n\ntouch %s\n", marker)
+	sf := Sweatfile{Hooks: &Hooks{Create: &cmd}}
+
+	err := sf.RunCreateHook(dir)
+	if err != nil {
+		t.Fatalf("multiline create hook with empty lines should not error: %v", err)
+	}
+
+	if _, err := os.Stat(marker); os.IsNotExist(err) {
+		t.Error("expected multiline create hook to execute and create marker file")
+	}
+}
+
 func TestRunPreMergeHookExecutes(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "pre-merge-ran")

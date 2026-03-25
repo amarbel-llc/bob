@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/amarbel-llc/spinclass/internal/git"
 )
@@ -167,11 +168,25 @@ func (sf Sweatfile) prepareDirenv(worktreePath string) error {
 
 func (sf Sweatfile) RunCreateHook(worktreePath string) error {
 	cmd := sf.CreateHookCommand()
+	return runHook(cmd, worktreePath)
+}
+
+func (sf Sweatfile) RunPreMergeHook(worktreePath string) error {
+	cmd := sf.PreMergeHookCommand()
+	return runHook(cmd, worktreePath)
+}
+
+func runHook(cmd *string, worktreePath string) error {
 	if cmd == nil || *cmd == "" {
 		return nil
 	}
 
-	c := exec.Command("sh", "-c", *cmd)
+	script := stripEmptyLines(*cmd)
+	if script == "" {
+		return nil
+	}
+
+	c := exec.Command("sh", "-c", script)
 	c.Dir = worktreePath
 	c.Env = append(os.Environ(), "WORKTREE="+worktreePath)
 	c.Stdout = os.Stdout
@@ -180,19 +195,14 @@ func (sf Sweatfile) RunCreateHook(worktreePath string) error {
 	return c.Run()
 }
 
-func (sf Sweatfile) RunPreMergeHook(worktreePath string) error {
-	cmd := sf.PreMergeHookCommand()
-	if cmd == nil || *cmd == "" {
-		return nil
+func stripEmptyLines(s string) string {
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
+		}
 	}
-
-	c := exec.Command("sh", "-c", *cmd)
-	c.Dir = worktreePath
-	c.Env = append(os.Environ(), "WORKTREE="+worktreePath)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-
-	return c.Run()
+	return strings.Join(lines, "\n")
 }
 
 func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
