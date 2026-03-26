@@ -53,7 +53,12 @@ func (e *NixExecutor) Build(ctx context.Context, flake, binarySpec string) (stri
 	lines := strings.Split(outPath, "\n")
 	outPath = strings.TrimSpace(lines[0])
 
-	binPath, err := findExecutable(outPath, binarySpec)
+	spec := binarySpec
+	if spec == "" {
+		spec = flakeAttrName(flake)
+	}
+
+	binPath, err := findExecutable(outPath, spec)
 	if err != nil {
 		return "", err
 	}
@@ -63,6 +68,20 @@ func (e *NixExecutor) Build(ctx context.Context, flake, binarySpec string) (stri
 	e.cacheMu.Unlock()
 
 	return binPath, nil
+}
+
+// flakeAttrName extracts the last component of the attribute path from a flake
+// reference like "nixpkgs#golines" or "nixpkgs#nodePackages.typescript-language-server".
+func flakeAttrName(flake string) string {
+	idx := strings.LastIndex(flake, "#")
+	if idx < 0 || idx == len(flake)-1 {
+		return ""
+	}
+	attr := flake[idx+1:]
+	if dot := strings.LastIndex(attr, "."); dot >= 0 {
+		attr = attr[dot+1:]
+	}
+	return attr
 }
 
 func findExecutable(storePath, binarySpec string) (string, error) {
