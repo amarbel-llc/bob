@@ -29,6 +29,8 @@ func Run(r io.Reader, w io.Writer, mainRepoRoot, sessionWorktree string, disallo
 	switch input.HookEventName {
 	case "Stop":
 		return runStopHook(input, w)
+	case "PostToolUse":
+		return runPostToolUseLog(input)
 	default:
 		return runPreToolUse(input, w, mainRepoRoot, sessionWorktree, disallowMainWorktree)
 	}
@@ -183,4 +185,50 @@ func isInsideMainWorktree(path, mainRepoRoot, sessionWorktree string) bool {
 	}
 
 	return resolved == mainRepoRoot || strings.HasPrefix(resolved, mainRepoRoot+string(filepath.Separator))
+}
+
+// runPostToolUseLog appends the raw hook payload as a JSONL line to the
+// tool-use log in the worktree's .claude/ directory. Fails silently — a
+// logging failure must never block Claude.
+func runPostToolUseLog(input hookInput) error {
+	claudeDir := findClaudeDir(input.CWD)
+	if claudeDir == "" {
+		return nil
+	}
+
+	logPath := filepath.Join(claudeDir, "tool-use.log")
+
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil // fail silently
+	}
+	defer f.Close()
+
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil
+	}
+
+	data = append(data, '\n')
+	f.Write(data)
+
+	return nil
+}
+
+// findClaudeDir walks up from dir looking for a .claude/ directory containing
+// settings.local.json. Returns the .claude/ path or empty string if not found.
+func findClaudeDir(dir string) string {
+	current := filepath.Clean(dir)
+	for {
+		candidate := filepath.Join(current, ".claude")
+		if _, err := os.Stat(filepath.Join(candidate, "settings.local.json")); err == nil {
+			return candidate
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+		current = parent
+	}
 }

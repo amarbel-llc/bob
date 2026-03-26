@@ -14,6 +14,7 @@ type Hooks struct {
 	Stop                 *string `toml:"stop"`
 	PreMerge             *string `toml:"pre-merge"`
 	DisallowMainWorktree *bool   `toml:"disallow-main-worktree"`
+	ToolUseLog           *bool   `toml:"tool-use-log"`
 }
 
 //go:generate tommy generate
@@ -52,6 +53,12 @@ func (sf Sweatfile) DisallowMainWorktreeEnabled() bool {
 	return sf.Hooks != nil &&
 		sf.Hooks.DisallowMainWorktree != nil &&
 		*sf.Hooks.DisallowMainWorktree
+}
+
+func (sf Sweatfile) ToolUseLogEnabled() bool {
+	return sf.Hooks != nil &&
+		sf.Hooks.ToolUseLog != nil &&
+		*sf.Hooks.ToolUseLog
 }
 
 // baseline excludes and allow rules that are always applied regardless of user

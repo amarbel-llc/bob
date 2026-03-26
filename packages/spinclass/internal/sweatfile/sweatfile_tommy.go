@@ -73,6 +73,10 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 			hooksVal.DisallowMainWorktree = &v
 			d.consumed["hooks.disallow-main-worktree"] = true
 		}
+		if v, err := document.GetFromContainer[bool](d.cstDoc, tableNode, "tool-use-log"); err == nil {
+			hooksVal.ToolUseLog = &v
+			d.consumed["hooks.tool-use-log"] = true
+		}
 		d.data.Hooks = hooksVal
 	} else {
 		hooksVal := &Hooks{}
@@ -96,6 +100,11 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 			hooksVal.DisallowMainWorktree = &v
 			found = true
 			d.consumed["disallow-main-worktree"] = true
+		}
+		if v, err := document.GetFromContainer[bool](d.cstDoc, d.cstDoc.Root(), "tool-use-log"); err == nil {
+			hooksVal.ToolUseLog = &v
+			found = true
+			d.consumed["tool-use-log"] = true
 		}
 		if found {
 			d.data.Hooks = hooksVal
@@ -137,26 +146,30 @@ func (d *SweatfileDocument) Encode() ([]byte, error) {
 		}
 	}
 	if d.data.Hooks != nil {
-		if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "hooks"); tableNode != nil {
-			if d.data.Hooks.Create != nil {
-				if err := d.cstDoc.SetInContainer(tableNode, "create", *d.data.Hooks.Create); err != nil {
-					return nil, err
-				}
+		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "hooks")
+		if d.data.Hooks.Create != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "create", *d.data.Hooks.Create); err != nil {
+				return nil, err
 			}
-			if d.data.Hooks.Stop != nil {
-				if err := d.cstDoc.SetInContainer(tableNode, "stop", *d.data.Hooks.Stop); err != nil {
-					return nil, err
-				}
+		}
+		if d.data.Hooks.Stop != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "stop", *d.data.Hooks.Stop); err != nil {
+				return nil, err
 			}
-			if d.data.Hooks.PreMerge != nil {
-				if err := d.cstDoc.SetInContainer(tableNode, "pre-merge", *d.data.Hooks.PreMerge); err != nil {
-					return nil, err
-				}
+		}
+		if d.data.Hooks.PreMerge != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "pre-merge", *d.data.Hooks.PreMerge); err != nil {
+				return nil, err
 			}
-			if d.data.Hooks.DisallowMainWorktree != nil {
-				if err := d.cstDoc.SetInContainer(tableNode, "disallow-main-worktree", *d.data.Hooks.DisallowMainWorktree); err != nil {
-					return nil, err
-				}
+		}
+		if d.data.Hooks.DisallowMainWorktree != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "disallow-main-worktree", *d.data.Hooks.DisallowMainWorktree); err != nil {
+				return nil, err
+			}
+		}
+		if d.data.Hooks.ToolUseLog != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "tool-use-log", *d.data.Hooks.ToolUseLog); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -166,4 +179,167 @@ func (d *SweatfileDocument) Encode() ([]byte, error) {
 
 func (d *SweatfileDocument) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+}
+
+func (d *SweatfileDocument) Comment(key string) string {
+	return d.cstDoc.GetComment(key)
+}
+
+func (d *SweatfileDocument) SetComment(key, comment string) {
+	d.cstDoc.SetComment(key, comment)
+}
+
+func (d *SweatfileDocument) InlineComment(key string) string {
+	return d.cstDoc.GetInlineComment(key)
+}
+
+func (d *SweatfileDocument) SetInlineComment(key, comment string) {
+	d.cstDoc.SetInlineComment(key, comment)
+}
+
+func DecodeSweatfileInto(data *Sweatfile, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
+	if v, err := document.GetFromContainer[string](doc, container, "system-prompt"); err == nil {
+		data.SystemPrompt = &v
+		consumed[keyPrefix+"system-prompt"] = true
+	}
+	if v, err := document.GetFromContainer[string](doc, container, "system-prompt-append"); err == nil {
+		data.SystemPromptAppend = &v
+		consumed[keyPrefix+"system-prompt-append"] = true
+	}
+	if v, err := document.GetFromContainer[[]string](doc, container, "git-excludes"); err == nil {
+		data.GitSkipIndex = v
+		consumed[keyPrefix+"git-excludes"] = true
+	}
+	if v, err := document.GetFromContainer[[]string](doc, container, "claude-allow"); err == nil {
+		data.ClaudeAllow = v
+		consumed[keyPrefix+"claude-allow"] = true
+	}
+	if v, err := document.GetFromContainer[[]string](doc, container, "envrc-directives"); err == nil {
+		data.EnvrcDirectives = v
+		consumed[keyPrefix+"envrc-directives"] = true
+	}
+	if tableNode := doc.FindTable("env"); tableNode != nil {
+		data.Env = document.GetStringMapFromTable(tableNode)
+		consumed[keyPrefix+"env"] = true
+		document.MarkAllConsumed(tableNode, "env", consumed)
+	}
+	if tableNode := doc.FindTableInContainer(container, "hooks"); tableNode != nil {
+		consumed[keyPrefix+"hooks"] = true
+		hooksVal := &Hooks{}
+		if v, err := document.GetFromContainer[string](doc, tableNode, "create"); err == nil {
+			hooksVal.Create = &v
+			consumed[keyPrefix+"hooks.create"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, tableNode, "stop"); err == nil {
+			hooksVal.Stop = &v
+			consumed[keyPrefix+"hooks.stop"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, tableNode, "pre-merge"); err == nil {
+			hooksVal.PreMerge = &v
+			consumed[keyPrefix+"hooks.pre-merge"] = true
+		}
+		if v, err := document.GetFromContainer[bool](doc, tableNode, "disallow-main-worktree"); err == nil {
+			hooksVal.DisallowMainWorktree = &v
+			consumed[keyPrefix+"hooks.disallow-main-worktree"] = true
+		}
+		if v, err := document.GetFromContainer[bool](doc, tableNode, "tool-use-log"); err == nil {
+			hooksVal.ToolUseLog = &v
+			consumed[keyPrefix+"hooks.tool-use-log"] = true
+		}
+		data.Hooks = hooksVal
+	} else {
+		hooksVal := &Hooks{}
+		found := false
+		if v, err := document.GetFromContainer[string](doc, container, "create"); err == nil {
+			hooksVal.Create = &v
+			found = true
+			consumed[keyPrefix+"create"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, container, "stop"); err == nil {
+			hooksVal.Stop = &v
+			found = true
+			consumed[keyPrefix+"stop"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, container, "pre-merge"); err == nil {
+			hooksVal.PreMerge = &v
+			found = true
+			consumed[keyPrefix+"pre-merge"] = true
+		}
+		if v, err := document.GetFromContainer[bool](doc, container, "disallow-main-worktree"); err == nil {
+			hooksVal.DisallowMainWorktree = &v
+			found = true
+			consumed[keyPrefix+"disallow-main-worktree"] = true
+		}
+		if v, err := document.GetFromContainer[bool](doc, container, "tool-use-log"); err == nil {
+			hooksVal.ToolUseLog = &v
+			found = true
+			consumed[keyPrefix+"tool-use-log"] = true
+		}
+		if found {
+			data.Hooks = hooksVal
+		}
+	}
+
+	return nil
+}
+
+func EncodeSweatfileFrom(data *Sweatfile, doc *document.Document, container *cst.Node) error {
+	if data.SystemPrompt != nil {
+		if err := doc.SetInContainer(container, "system-prompt", *data.SystemPrompt); err != nil {
+			return err
+		}
+	}
+	if data.SystemPromptAppend != nil {
+		if err := doc.SetInContainer(container, "system-prompt-append", *data.SystemPromptAppend); err != nil {
+			return err
+		}
+	}
+	if err := doc.SetInContainer(container, "git-excludes", data.GitSkipIndex); err != nil {
+		return err
+	}
+	if err := doc.SetInContainer(container, "claude-allow", data.ClaudeAllow); err != nil {
+		return err
+	}
+	if err := doc.SetInContainer(container, "envrc-directives", data.EnvrcDirectives); err != nil {
+		return err
+	}
+	if len(data.Env) > 0 {
+		tableNode := doc.EnsureTable("env")
+		document.DeleteAllInContainer(tableNode)
+		for k, v := range data.Env {
+			if err := doc.SetInContainer(tableNode, k, v); err != nil {
+				return err
+			}
+		}
+	}
+	if data.Hooks != nil {
+		tableNode := doc.EnsureTableInContainer(container, "hooks")
+		if data.Hooks.Create != nil {
+			if err := doc.SetInContainer(tableNode, "create", *data.Hooks.Create); err != nil {
+				return err
+			}
+		}
+		if data.Hooks.Stop != nil {
+			if err := doc.SetInContainer(tableNode, "stop", *data.Hooks.Stop); err != nil {
+				return err
+			}
+		}
+		if data.Hooks.PreMerge != nil {
+			if err := doc.SetInContainer(tableNode, "pre-merge", *data.Hooks.PreMerge); err != nil {
+				return err
+			}
+		}
+		if data.Hooks.DisallowMainWorktree != nil {
+			if err := doc.SetInContainer(tableNode, "disallow-main-worktree", *data.Hooks.DisallowMainWorktree); err != nil {
+				return err
+			}
+		}
+		if data.Hooks.ToolUseLog != nil {
+			if err := doc.SetInContainer(tableNode, "tool-use-log", *data.Hooks.ToolUseLog); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

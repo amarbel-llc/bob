@@ -360,6 +360,129 @@ func TestStopHookApprovesOnSecondInvocation(t *testing.T) {
 	}
 }
 
+func TestPostToolUseWritesLog(t *testing.T) {
+	worktree := t.TempDir()
+	claudeDir := filepath.Join(worktree, ".claude")
+	os.MkdirAll(claudeDir, 0o755)
+	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+
+	input, _ := json.Marshal(map[string]any{
+		"hook_event_name": "PostToolUse",
+		"session_id":      "test-session",
+		"tool_name":       "Edit",
+		"tool_input":      map[string]any{"file_path": "/some/file.go"},
+		"cwd":             worktree,
+	})
+
+	var out bytes.Buffer
+	err := Run(bytes.NewReader(input), &out, "", "", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if out.Len() != 0 {
+		t.Errorf("expected no output, got %q", out.String())
+	}
+
+	logPath := filepath.Join(claudeDir, "tool-use.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("expected log file at %s: %v", logPath, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 log line, got %d", len(lines))
+	}
+
+	var logged map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &logged); err != nil {
+		t.Fatalf("expected valid JSON log line: %v", err)
+	}
+	if logged["tool_name"] != "Edit" {
+		t.Errorf("expected tool_name Edit, got %v", logged["tool_name"])
+	}
+}
+
+func TestPostToolUseAppendsToLog(t *testing.T) {
+	worktree := t.TempDir()
+	claudeDir := filepath.Join(worktree, ".claude")
+	os.MkdirAll(claudeDir, 0o755)
+	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+
+	for _, tool := range []string{"Edit", "Bash"} {
+		input, _ := json.Marshal(map[string]any{
+			"hook_event_name": "PostToolUse",
+			"session_id":      "test-session",
+			"tool_name":       tool,
+			"tool_input":      map[string]any{},
+			"cwd":             worktree,
+		})
+		var out bytes.Buffer
+		if err := Run(bytes.NewReader(input), &out, "", "", false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	logPath := filepath.Join(claudeDir, "tool-use.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("expected log file: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 log lines, got %d", len(lines))
+	}
+}
+
+func TestPostToolUseNoClaudeDirIsSilent(t *testing.T) {
+	cwd := t.TempDir()
+
+	input, _ := json.Marshal(map[string]any{
+		"hook_event_name": "PostToolUse",
+		"session_id":      "test-session",
+		"tool_name":       "Read",
+		"tool_input":      map[string]any{},
+		"cwd":             cwd,
+	})
+
+	var out bytes.Buffer
+	err := Run(bytes.NewReader(input), &out, "", "", false)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestPostToolUseSubdirFindsClaudeDir(t *testing.T) {
+	worktree := t.TempDir()
+	claudeDir := filepath.Join(worktree, ".claude")
+	os.MkdirAll(claudeDir, 0o755)
+	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+
+	subdir := filepath.Join(worktree, "src", "pkg")
+	os.MkdirAll(subdir, 0o755)
+
+	input, _ := json.Marshal(map[string]any{
+		"hook_event_name": "PostToolUse",
+		"session_id":      "test-session",
+		"tool_name":       "Grep",
+		"tool_input":      map[string]any{},
+		"cwd":             subdir,
+	})
+
+	var out bytes.Buffer
+	err := Run(bytes.NewReader(input), &out, "", "", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	logPath := filepath.Join(claudeDir, "tool-use.log")
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		t.Fatal("expected log file to be created when CWD is a subdirectory")
+	}
+}
+
 func TestStopHookApprovesOnSuccess(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("TMPDIR", tmpDir)

@@ -194,6 +194,9 @@ func (sf Sweatfile) MergeWith(other Sweatfile) Sweatfile {
 		if other.Hooks.DisallowMainWorktree != nil {
 			merged.Hooks.DisallowMainWorktree = other.Hooks.DisallowMainWorktree
 		}
+		if other.Hooks.ToolUseLog != nil {
+			merged.Hooks.ToolUseLog = other.Hooks.ToolUseLog
+		}
 	}
 
 	return merged

@@ -1013,6 +1013,43 @@ func TestLoadWorktreeHierarchyWorktreeOverridesMainRepo(t *testing.T) {
 	}
 }
 
+func TestMergeToolUseLogInherit(t *testing.T) {
+	enabled := true
+	base := Sweatfile{Hooks: &Hooks{ToolUseLog: &enabled}}
+	overlay := Sweatfile{}
+	merged := base.MergeWith(overlay)
+	if !merged.ToolUseLogEnabled() {
+		t.Error("expected ToolUseLog to be inherited")
+	}
+}
+
+func TestMergeToolUseLogOverride(t *testing.T) {
+	enabled := true
+	disabled := false
+	base := Sweatfile{Hooks: &Hooks{ToolUseLog: &enabled}}
+	overlay := Sweatfile{Hooks: &Hooks{ToolUseLog: &disabled}}
+	merged := base.MergeWith(overlay)
+	if merged.ToolUseLogEnabled() {
+		t.Error("expected ToolUseLog to be overridden to false")
+	}
+}
+
+func TestParseToolUseLog(t *testing.T) {
+	doc, err := Parse([]byte("[hooks]\ntool-use-log = true\n"))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if !doc.Data().ToolUseLogEnabled() {
+		t.Error("expected ToolUseLog to be true")
+	}
+	undecoded := doc.Undecoded()
+	for _, key := range undecoded {
+		if key == "hooks.tool-use-log" {
+			t.Error("tool-use-log should be decoded, not undecoded")
+		}
+	}
+}
+
 func TestResolvePathOrStringLiteral(t *testing.T) {
 	result := resolvePathOrString("just a string")
 	if result != "just a string" {

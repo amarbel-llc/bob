@@ -262,6 +262,20 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 			}
 		}
 
+		if sweatfile.ToolUseLogEnabled() {
+			hooksMap["PostToolUse"] = []any{
+				map[string]any{
+					"matcher": "*",
+					"hooks": []any{
+						map[string]any{
+							"type":    "command",
+							"command": "spinclass hooks",
+						},
+					},
+				},
+			}
+		}
+
 		doc["hooks"] = hooksMap
 	}
 
