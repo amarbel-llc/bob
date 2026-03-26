@@ -168,3 +168,82 @@ func TestRemoveRules(t *testing.T) {
 		t.Errorf("expected Bash(go test:*), got %q", result[1])
 	}
 }
+
+func TestComputeReviewableRules(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Override HOME so the auto-injected Read(<home>/.claude/*) exclusion
+	// matches the synthetic /Users/me paths used in this test.
+	t.Setenv("HOME", "/Users/me")
+
+	// Worktree settings: mix of rules
+	worktreeSettingsPath := filepath.Join(tmpDir, "worktree", ".claude", "settings.local.json")
+	worktreeRules := []string{
+		"Bash(go test:*)",
+		"Bash(nix build:*)",
+		"Edit",
+		"Glob",
+		"Read(/Users/me/.claude/*)",
+		"Read(/Users/me/repos/bob/.worktrees/wt/*)",
+		"Edit(/Users/me/repos/bob/.worktrees/wt/*)",
+		"Write(/Users/me/repos/bob/.worktrees/wt/*)",
+		"mcp__plugin_grit_grit__add",
+		"WebSearch",
+	}
+	if err := SaveClaudeSettings(worktreeSettingsPath, worktreeRules); err != nil {
+		t.Fatal(err)
+	}
+
+	// Global settings: some overlap
+	globalSettingsPath := filepath.Join(tmpDir, "global-settings.json")
+	if err := SaveClaudeSettings(globalSettingsPath, []string{
+		"Glob",
+		"WebSearch",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tier files: some overlap
+	tiersDir := filepath.Join(tmpDir, "tiers")
+	os.MkdirAll(filepath.Join(tiersDir, "repos"), 0o755)
+	if err := SaveTierFile(filepath.Join(tiersDir, "global.json"), Tier{Allow: []string{"Edit"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ComputeReviewableRules(
+		worktreeSettingsPath,
+		globalSettingsPath,
+		tiersDir,
+		"myrepo",
+		"/Users/me/repos/bob/.worktrees/wt",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should contain: Bash(go test:*), Bash(nix build:*), mcp__plugin_grit_grit__add
+	// Should NOT contain: Edit (in tier), Glob (global), WebSearch (global),
+	// Read/Edit/Write worktree paths, Read(~/.claude/*)
+	wantSet := map[string]bool{
+		"Bash(go test:*)":            true,
+		"Bash(nix build:*)":          true,
+		"mcp__plugin_grit_grit__add": true,
+	}
+
+	gotSet := map[string]bool{}
+	for _, r := range got {
+		gotSet[r] = true
+	}
+
+	for want := range wantSet {
+		if !gotSet[want] {
+			t.Errorf("expected %q in reviewable rules", want)
+		}
+	}
+
+	for _, r := range got {
+		if !wantSet[r] {
+			t.Errorf("unexpected rule %q in reviewable rules", r)
+		}
+	}
+}

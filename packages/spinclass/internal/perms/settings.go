@@ -3,6 +3,7 @@ package perms
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -108,4 +109,65 @@ func RemoveRules(rules, toRemove []string) []string {
 	}
 
 	return result
+}
+
+// ComputeReviewableRules returns worktree rules that are not already covered by
+// global Claude settings, curated tier files, or auto-injected worktree-scoped
+// rules.
+func ComputeReviewableRules(
+	worktreeSettingsPath, globalSettingsPath, tiersDir, repo, worktreePath string,
+) ([]string, error) {
+	worktreeRules, err := LoadClaudeSettings(worktreeSettingsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	globalRules, err := LoadClaudeSettings(globalSettingsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	tierRules := LoadTiers(tiersDir, repo)
+
+	exclude := make(map[string]bool)
+	for _, r := range globalRules {
+		exclude[r] = true
+	}
+	for _, r := range tierRules {
+		exclude[r] = true
+	}
+
+	// Auto-injected worktree-scoped rules
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		exclude[fmt.Sprintf("Read(%s/.claude/*)", home)] = true
+	}
+	if worktreePath != "" {
+		exclude[fmt.Sprintf("Read(%s/*)", worktreePath)] = true
+		exclude[fmt.Sprintf("Edit(%s/*)", worktreePath)] = true
+		exclude[fmt.Sprintf("Write(%s/*)", worktreePath)] = true
+	}
+
+	var result []string
+	for _, r := range worktreeRules {
+		if !exclude[r] {
+			result = append(result, r)
+		}
+	}
+
+	if result == nil {
+		result = []string{}
+	}
+
+	return result, nil
+}
+
+// GlobalClaudeSettingsPath returns the path to the user-level Claude
+// settings.local.json file.
+func GlobalClaudeSettingsPath() string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".claude", "settings.local.json")
 }
