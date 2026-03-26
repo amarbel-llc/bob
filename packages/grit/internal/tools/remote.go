@@ -140,8 +140,13 @@ func handleGitPull(ctx context.Context, args json.RawMessage, _ command.Prompter
 		gitArgs = append(gitArgs, "--rebase")
 	}
 
-	if params.Remote != "" {
-		gitArgs = append(gitArgs, params.Remote)
+	remote := params.Remote
+	if remote == "" && params.Branch != "" {
+		remote = "origin"
+	}
+
+	if remote != "" {
+		gitArgs = append(gitArgs, remote)
 	}
 
 	if params.Branch != "" {
@@ -204,8 +209,13 @@ func handleGitPush(ctx context.Context, args json.RawMessage, _ command.Prompter
 		gitArgs = append(gitArgs, "-u")
 	}
 
-	if params.Remote != "" {
-		gitArgs = append(gitArgs, params.Remote)
+	remote := params.Remote
+	if remote == "" && params.Branch != "" {
+		remote = "origin"
+	}
+
+	if remote != "" {
+		gitArgs = append(gitArgs, remote)
 	}
 
 	if params.Branch != "" {
@@ -218,7 +228,7 @@ func handleGitPush(ctx context.Context, args json.RawMessage, _ command.Prompter
 
 	return command.JSONResult(git.MutationResult{
 		Status:      "pushed",
-		Remote:      params.Remote,
+		Remote:      remote,
 		Branch:      params.Branch,
 		SetUpstream: params.SetUpstream,
 		Force:       params.Force,
