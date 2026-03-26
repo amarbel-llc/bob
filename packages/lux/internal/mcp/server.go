@@ -114,6 +114,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	readOnly := true
 	notDestructive := false
 	idempotent := true
+	notOpenWorld := false
 
 	mcpApp.AddCommand(&command.Command{
 		Name: "resource-templates",
@@ -124,6 +125,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 			ReadOnlyHint:    &readOnly,
 			DestructiveHint: &notDestructive,
 			IdempotentHint:  &idempotent,
+			OpenWorldHint:   &notOpenWorld,
 		},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			templates, err := resProvider.ListResourceTemplates(ctx)
@@ -164,6 +166,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 			ReadOnlyHint:    &readOnly,
 			DestructiveHint: &notDestructive,
 			IdempotentHint:  &idempotent,
+			OpenWorldHint:   &notOpenWorld,
 		},
 		Params: []command.Param{
 			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
@@ -203,6 +206,7 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 			ReadOnlyHint:    &notReadOnly,
 			DestructiveHint: &notDestructive,
 			IdempotentHint:  &idempotent,
+			OpenWorldHint:   &notOpenWorld,
 		},
 		Params: []command.Param{
 			{Name: "lsp", Type: command.String, Description: "LSP server name (e.g. 'gopls'). See lux://status for configured LSPs.", Required: true},
@@ -262,8 +266,8 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 		},
 	})
 
-	toolRegistry := mcpserver.NewToolRegistry()
-	mcpApp.RegisterMCPTools(toolRegistry)
+	toolRegistry := mcpserver.NewToolRegistryV1()
+	mcpApp.RegisterMCPToolsV1(toolRegistry)
 
 	promptRegistry := mcpserver.NewPromptRegistry()
 	registerPrompts(promptRegistry)
