@@ -131,6 +131,24 @@ test-lifecycle: build-batman
 validate:
     {{cmd_nix_dev}} go run ./dummies/go/cmd/... validate .claude-plugin/plugin.json || true
 
+# Validate MCP server annotations via purse-first validate-mcp
+validate-mcp-grit: build-grit
+    purse-first validate-mcp result/bin/grit
+
+validate-mcp-get-hubbed: build-get-hubbed
+    purse-first validate-mcp result/bin/get-hubbed
+
+validate-mcp-lux: build-lux
+    purse-first validate-mcp result/bin/lux
+
+validate-mcp-chix: build-chix
+    purse-first validate-mcp result/bin/chix
+
+validate-mcp-caldav: build-caldav
+    purse-first validate-mcp result/bin/caldav
+
+validate-mcp: validate-mcp-grit validate-mcp-get-hubbed validate-mcp-lux validate-mcp-chix validate-mcp-caldav
+
 test-spinclass-bats: build-batman
     nix build .#spinclass
     SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass/zz-tests_bats/test
@@ -179,7 +197,8 @@ test: \
     test-spinclass-bats \
     test-tap-dancer-bats \
     test-tap-dancer-go \
-    test-tap-dancer-rust
+    test-tap-dancer-rust \
+    validate-mcp
 
 update: update-nix
 
