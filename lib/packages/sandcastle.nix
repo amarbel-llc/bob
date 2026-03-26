@@ -1,4 +1,8 @@
-{ pkgs, src }:
+{
+  pkgs,
+  src,
+  sandcastle-seccomp ? null,
+}:
 
 pkgs.buildNpmPackage {
   pname = "sandcastle";
@@ -25,6 +29,12 @@ pkgs.buildNpmPackage {
     cp -r node_modules $out/lib/sandcastle/
     cp package.json $out/lib/sandcastle/
     cp ${src}/sandcastle-cli.mjs $out/lib/sandcastle/sandcastle-cli.mjs
+
+    ${pkgs.lib.optionalString (sandcastle-seccomp != null) ''
+      # Install pre-generated seccomp BPF filters and apply-seccomp binary
+      mkdir -p $out/lib/sandcastle/vendor
+      cp -r ${sandcastle-seccomp}/share/seccomp $out/lib/sandcastle/vendor/seccomp
+    ''}
 
     makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/sandcastle \
       --add-flags "$out/lib/sandcastle/sandcastle-cli.mjs" \

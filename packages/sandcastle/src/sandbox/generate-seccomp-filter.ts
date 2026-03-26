@@ -1,83 +1,84 @@
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import * as fs from 'node:fs'
-import { execSync } from 'node:child_process'
-import { homedir } from 'node:os'
-import { logForDebugging } from '../utils/debug.js'
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import * as fs from "node:fs";
+import { execSync } from "node:child_process";
+import { homedir } from "node:os";
+import { logForDebugging } from "../utils/debug.js";
 
 // Cache for path lookups (key: explicit path or empty string, value: resolved path or null)
-const bpfPathCache = new Map<string, string | null>()
-const applySeccompPathCache = new Map<string, string | null>()
+const bpfPathCache = new Map<string, string | null>();
+const bindBlockBpfPathCache = new Map<string, string | null>();
+const applySeccompPathCache = new Map<string, string | null>();
 
 // Cache for global npm paths (computed once per process)
-let cachedGlobalNpmPaths: string[] | null = null
+let cachedGlobalNpmPaths: string[] | null = null;
 
 /**
  * Get paths to check for globally installed @anthropic-ai/sandbox-runtime package.
  * This is used as a fallback when the binaries aren't bundled (e.g., native builds).
  */
 function getGlobalNpmPaths(): string[] {
-  if (cachedGlobalNpmPaths) return cachedGlobalNpmPaths
+  if (cachedGlobalNpmPaths) return cachedGlobalNpmPaths;
 
-  const paths: string[] = []
+  const paths: string[] = [];
 
   // Try to get the actual global npm root
   try {
-    const npmRoot = execSync('npm root -g', {
-      encoding: 'utf8',
+    const npmRoot = execSync("npm root -g", {
+      encoding: "utf8",
       timeout: 5000,
-      stdio: ['pipe', 'pipe', 'ignore'],
-    }).trim()
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
     if (npmRoot) {
-      paths.push(join(npmRoot, '@anthropic-ai', 'sandbox-runtime'))
+      paths.push(join(npmRoot, "@anthropic-ai", "sandbox-runtime"));
     }
   } catch {
     // npm not available or failed
   }
 
   // Common global npm locations as fallbacks
-  const home = homedir()
+  const home = homedir();
   paths.push(
     // npm global (Linux/macOS)
-    join('/usr', 'lib', 'node_modules', '@anthropic-ai', 'sandbox-runtime'),
+    join("/usr", "lib", "node_modules", "@anthropic-ai", "sandbox-runtime"),
     join(
-      '/usr',
-      'local',
-      'lib',
-      'node_modules',
-      '@anthropic-ai',
-      'sandbox-runtime',
+      "/usr",
+      "local",
+      "lib",
+      "node_modules",
+      "@anthropic-ai",
+      "sandbox-runtime",
     ),
     // npm global with prefix (common on macOS with homebrew)
     join(
-      '/opt',
-      'homebrew',
-      'lib',
-      'node_modules',
-      '@anthropic-ai',
-      'sandbox-runtime',
+      "/opt",
+      "homebrew",
+      "lib",
+      "node_modules",
+      "@anthropic-ai",
+      "sandbox-runtime",
     ),
     // User-local npm global
     join(
       home,
-      '.npm',
-      'lib',
-      'node_modules',
-      '@anthropic-ai',
-      'sandbox-runtime',
+      ".npm",
+      "lib",
+      "node_modules",
+      "@anthropic-ai",
+      "sandbox-runtime",
     ),
     join(
       home,
-      '.npm-global',
-      'lib',
-      'node_modules',
-      '@anthropic-ai',
-      'sandbox-runtime',
+      ".npm-global",
+      "lib",
+      "node_modules",
+      "@anthropic-ai",
+      "sandbox-runtime",
     ),
-  )
+  );
 
-  cachedGlobalNpmPaths = paths
-  return paths
+  cachedGlobalNpmPaths = paths;
+  return paths;
 }
 
 /**
@@ -85,16 +86,16 @@ function getGlobalNpmPaths(): string[] {
  * Returns null for unsupported architectures
  */
 function getVendorArchitecture(): string | null {
-  const arch = process.arch as string
+  const arch = process.arch as string;
   switch (arch) {
-    case 'x64':
-    case 'x86_64':
-      return 'x64'
-    case 'arm64':
-    case 'aarch64':
-      return 'arm64'
-    case 'ia32':
-    case 'x86':
+    case "x64":
+    case "x86_64":
+      return "x64";
+    case "arm64":
+    case "aarch64":
+      return "arm64";
+    case "ia32":
+    case "x86":
       // TODO: Add support for 32-bit x86 (ia32)
       // Currently blocked because the seccomp filter does not block the socketcall() syscall,
       // which is used on 32-bit x86 for all socket operations (socket, socketpair, bind, connect, etc.).
@@ -112,14 +113,14 @@ function getVendorArchitecture(): string | null {
       logForDebugging(
         `[SeccompFilter] 32-bit x86 (ia32) is not currently supported due to missing socketcall() syscall blocking. ` +
           `The current seccomp filter only blocks socket(AF_UNIX, ...), but on 32-bit x86, socketcall() can be used to bypass this.`,
-        { level: 'error' },
-      )
-      return null
+        { level: "error" },
+      );
+      return null;
     default:
       logForDebugging(
         `[SeccompFilter] Unsupported architecture: ${arch}. Only x64 and arm64 are supported.`,
-      )
-      return null
+      );
+      return null;
   }
 }
 
@@ -127,17 +128,17 @@ function getVendorArchitecture(): string | null {
  * Get local paths to check for seccomp files (bundled or package installs).
  */
 function getLocalSeccompPaths(filename: string): string[] {
-  const arch = getVendorArchitecture()
-  if (!arch) return []
+  const arch = getVendorArchitecture();
+  if (!arch) return [];
 
-  const baseDir = dirname(fileURLToPath(import.meta.url))
-  const relativePath = join('vendor', 'seccomp', arch, filename)
+  const baseDir = dirname(fileURLToPath(import.meta.url));
+  const relativePath = join("vendor", "seccomp", arch, filename);
 
   return [
     join(baseDir, relativePath), // bundled: same directory as bundle (e.g., when bundled into claude-cli)
-    join(baseDir, '..', '..', relativePath), // package root: vendor/seccomp/...
-    join(baseDir, '..', relativePath), // dist: dist/vendor/seccomp/...
-  ]
+    join(baseDir, "..", "..", relativePath), // package root: vendor/seccomp/...
+    join(baseDir, "..", relativePath), // dist: dist/vendor/seccomp/...
+  ];
 }
 
 /**
@@ -161,14 +162,14 @@ function getLocalSeccompPaths(filename: string): string[] {
 export function getPreGeneratedBpfPath(
   seccompBinaryPath?: string,
 ): string | null {
-  const cacheKey = seccompBinaryPath ?? ''
+  const cacheKey = seccompBinaryPath ?? "";
   if (bpfPathCache.has(cacheKey)) {
-    return bpfPathCache.get(cacheKey)!
+    return bpfPathCache.get(cacheKey)!;
   }
 
-  const result = findBpfPath(seccompBinaryPath)
-  bpfPathCache.set(cacheKey, result)
-  return result
+  const result = findBpfPath(seccompBinaryPath);
+  bpfPathCache.set(cacheKey, result);
+  return result;
 }
 
 // NOTE: This is a slow operation (synchronous fs lookups + execSync). Ensure calls
@@ -179,31 +180,31 @@ function findBpfPath(seccompBinaryPath?: string): string | null {
     if (fs.existsSync(seccompBinaryPath)) {
       logForDebugging(
         `[SeccompFilter] Using BPF filter from explicit path: ${seccompBinaryPath}`,
-      )
-      return seccompBinaryPath
+      );
+      return seccompBinaryPath;
     }
     logForDebugging(
       `[SeccompFilter] Explicit path provided but file not found: ${seccompBinaryPath}`,
-    )
+    );
   }
 
-  const arch = getVendorArchitecture()
+  const arch = getVendorArchitecture();
   if (!arch) {
     logForDebugging(
       `[SeccompFilter] Cannot find pre-generated BPF filter: unsupported architecture ${process.arch}`,
-    )
-    return null
+    );
+    return null;
   }
 
-  logForDebugging(`[SeccompFilter] Detected architecture: ${arch}`)
+  logForDebugging(`[SeccompFilter] Detected architecture: ${arch}`);
 
   // Check local paths first (bundled or package install)
-  for (const bpfPath of getLocalSeccompPaths('unix-block.bpf')) {
+  for (const bpfPath of getLocalSeccompPaths("unix-block.bpf")) {
     if (fs.existsSync(bpfPath)) {
       logForDebugging(
         `[SeccompFilter] Found pre-generated BPF filter: ${bpfPath} (${arch})`,
-      )
-      return bpfPath
+      );
+      return bpfPath;
     }
   }
 
@@ -211,23 +212,23 @@ function findBpfPath(seccompBinaryPath?: string): string | null {
   for (const globalBase of getGlobalNpmPaths()) {
     const bpfPath = join(
       globalBase,
-      'vendor',
-      'seccomp',
+      "vendor",
+      "seccomp",
       arch,
-      'unix-block.bpf',
-    )
+      "unix-block.bpf",
+    );
     if (fs.existsSync(bpfPath)) {
       logForDebugging(
         `[SeccompFilter] Found pre-generated BPF filter in global install: ${bpfPath} (${arch})`,
-      )
-      return bpfPath
+      );
+      return bpfPath;
     }
   }
 
   logForDebugging(
     `[SeccompFilter] Pre-generated BPF filter not found in any expected location (${arch})`,
-  )
-  return null
+  );
+  return null;
 }
 
 /**
@@ -251,14 +252,14 @@ function findBpfPath(seccompBinaryPath?: string): string | null {
 export function getApplySeccompBinaryPath(
   seccompBinaryPath?: string,
 ): string | null {
-  const cacheKey = seccompBinaryPath ?? ''
+  const cacheKey = seccompBinaryPath ?? "";
   if (applySeccompPathCache.has(cacheKey)) {
-    return applySeccompPathCache.get(cacheKey)!
+    return applySeccompPathCache.get(cacheKey)!;
   }
 
-  const result = findApplySeccompPath(seccompBinaryPath)
-  applySeccompPathCache.set(cacheKey, result)
-  return result
+  const result = findApplySeccompPath(seccompBinaryPath);
+  applySeccompPathCache.set(cacheKey, result);
+  return result;
 }
 
 function findApplySeccompPath(seccompBinaryPath?: string): string | null {
@@ -267,33 +268,33 @@ function findApplySeccompPath(seccompBinaryPath?: string): string | null {
     if (fs.existsSync(seccompBinaryPath)) {
       logForDebugging(
         `[SeccompFilter] Using apply-seccomp binary from explicit path: ${seccompBinaryPath}`,
-      )
-      return seccompBinaryPath
+      );
+      return seccompBinaryPath;
     }
     logForDebugging(
       `[SeccompFilter] Explicit path provided but file not found: ${seccompBinaryPath}`,
-    )
+    );
   }
 
-  const arch = getVendorArchitecture()
+  const arch = getVendorArchitecture();
   if (!arch) {
     logForDebugging(
       `[SeccompFilter] Cannot find apply-seccomp binary: unsupported architecture ${process.arch}`,
-    )
-    return null
+    );
+    return null;
   }
 
   logForDebugging(
     `[SeccompFilter] Looking for apply-seccomp binary for architecture: ${arch}`,
-  )
+  );
 
   // Check local paths first (bundled or package install)
-  for (const binaryPath of getLocalSeccompPaths('apply-seccomp')) {
+  for (const binaryPath of getLocalSeccompPaths("apply-seccomp")) {
     if (fs.existsSync(binaryPath)) {
       logForDebugging(
         `[SeccompFilter] Found apply-seccomp binary: ${binaryPath} (${arch})`,
-      )
-      return binaryPath
+      );
+      return binaryPath;
     }
   }
 
@@ -301,23 +302,92 @@ function findApplySeccompPath(seccompBinaryPath?: string): string | null {
   for (const globalBase of getGlobalNpmPaths()) {
     const binaryPath = join(
       globalBase,
-      'vendor',
-      'seccomp',
+      "vendor",
+      "seccomp",
       arch,
-      'apply-seccomp',
-    )
+      "apply-seccomp",
+    );
     if (fs.existsSync(binaryPath)) {
       logForDebugging(
         `[SeccompFilter] Found apply-seccomp binary in global install: ${binaryPath} (${arch})`,
-      )
-      return binaryPath
+      );
+      return binaryPath;
     }
   }
 
   logForDebugging(
     `[SeccompFilter] apply-seccomp binary not found in any expected location (${arch})`,
-  )
-  return null
+  );
+  return null;
+}
+
+/**
+ * Get the path to a pre-generated BPF filter that blocks the bind() syscall.
+ * Uses the same lookup chain as getPreGeneratedBpfPath but searches for bind-block.bpf.
+ *
+ * @param seccompBinaryPath - Optional explicit path to the BPF filter file
+ * @returns Path to the pre-generated bind-block BPF filter file, or null if not available
+ */
+export function getPreGeneratedBindBlockBpfPath(
+  seccompBinaryPath?: string,
+): string | null {
+  const cacheKey = seccompBinaryPath ?? "";
+  if (bindBlockBpfPathCache.has(cacheKey)) {
+    return bindBlockBpfPathCache.get(cacheKey)!;
+  }
+
+  const result = findBindBlockBpfPath(seccompBinaryPath);
+  bindBlockBpfPathCache.set(cacheKey, result);
+  return result;
+}
+
+function findBindBlockBpfPath(seccompBinaryPath?: string): string | null {
+  if (seccompBinaryPath) {
+    if (fs.existsSync(seccompBinaryPath)) {
+      logForDebugging(
+        `[SeccompFilter] Using bind-block BPF filter from explicit path: ${seccompBinaryPath}`,
+      );
+      return seccompBinaryPath;
+    }
+    logForDebugging(
+      `[SeccompFilter] Explicit bind-block path provided but file not found: ${seccompBinaryPath}`,
+    );
+  }
+
+  const arch = getVendorArchitecture();
+  if (!arch) {
+    return null;
+  }
+
+  for (const bpfPath of getLocalSeccompPaths("bind-block.bpf")) {
+    if (fs.existsSync(bpfPath)) {
+      logForDebugging(
+        `[SeccompFilter] Found bind-block BPF filter: ${bpfPath} (${arch})`,
+      );
+      return bpfPath;
+    }
+  }
+
+  for (const globalBase of getGlobalNpmPaths()) {
+    const bpfPath = join(
+      globalBase,
+      "vendor",
+      "seccomp",
+      arch,
+      "bind-block.bpf",
+    );
+    if (fs.existsSync(bpfPath)) {
+      logForDebugging(
+        `[SeccompFilter] Found bind-block BPF filter in global install: ${bpfPath} (${arch})`,
+      );
+      return bpfPath;
+    }
+  }
+
+  logForDebugging(
+    `[SeccompFilter] bind-block BPF filter not found in any expected location (${arch})`,
+  );
+  return null;
 }
 
 /**
@@ -347,18 +417,18 @@ function findApplySeccompPath(seccompBinaryPath?: string): string | null {
 export function generateSeccompFilter(
   seccompBinaryPath?: string,
 ): string | null {
-  const preGeneratedBpf = getPreGeneratedBpfPath(seccompBinaryPath)
+  const preGeneratedBpf = getPreGeneratedBpfPath(seccompBinaryPath);
   if (preGeneratedBpf) {
-    logForDebugging('[SeccompFilter] Using pre-generated BPF filter')
-    return preGeneratedBpf
+    logForDebugging("[SeccompFilter] Using pre-generated BPF filter");
+    return preGeneratedBpf;
   }
 
   logForDebugging(
-    '[SeccompFilter] Pre-generated BPF filter not available for this architecture. ' +
-      'Only x64 and arm64 are supported.',
-    { level: 'error' },
-  )
-  return null
+    "[SeccompFilter] Pre-generated BPF filter not available for this architecture. " +
+      "Only x64 and arm64 are supported.",
+    { level: "error" },
+  );
+  return null;
 }
 
 /**

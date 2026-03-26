@@ -226,7 +226,6 @@ EOF
 }
 
 function bats_wrapper_sandbox_denies_localhost_tcp_bind { # @test
-  [[ "$(uname -s)" == "Linux" ]] && skip "bwrap --unshare-net keeps loopback up; local binding denial is macOS-only"
   cat >"${TEST_TMPDIR}/tcp_bind.bats" <<'INNER'
 #! /usr/bin/env bats
 function tcp_bind_ephemeral_port { # @test
@@ -251,7 +250,6 @@ INNER
 }
 
 function bats_wrapper_allow_local_binding_permits_localhost_tcp_bind { # @test
-  [[ "$(uname -s)" == "Linux" ]] && skip "allowLocalBinding is macOS-only (sandbox profiles)"
   cat >"${TEST_TMPDIR}/tcp_bind.bats" <<'INNER'
 #! /usr/bin/env bats
 function tcp_bind_ephemeral_port { # @test

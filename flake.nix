@@ -101,9 +101,19 @@
               ;
           };
 
+          sandcastleSeccompPkg =
+            if pkgs.stdenv.isLinux then
+              import ./lib/packages/sandcastle-seccomp.nix {
+                inherit pkgs;
+                src = ./packages/sandcastle/seccomp-src;
+              }
+            else
+              null;
+
           sandcastlePkg = import ./lib/packages/sandcastle.nix {
             inherit pkgs;
             src = ./packages/sandcastle;
+            sandcastle-seccomp = sandcastleSeccompPkg;
           };
 
           andSoCanYouRepoPkg = import ./lib/packages/and-so-can-you-repo.nix {

@@ -1,18 +1,18 @@
-import { createHttpProxyServer } from './http-proxy.js'
-import { createSocksProxyServer } from './socks-proxy.js'
-import type { SocksProxyWrapper } from './socks-proxy.js'
-import { logForDebugging } from '../utils/debug.js'
-import { whichSync } from '../utils/which.js'
-import { cloneDeep } from 'lodash-es'
-import { getPlatform, getWslVersion } from '../utils/platform.js'
-import * as fs from 'fs'
-import type { SandboxRuntimeConfig } from './sandbox-config.js'
+import { createHttpProxyServer } from "./http-proxy.js";
+import { createSocksProxyServer } from "./socks-proxy.js";
+import type { SocksProxyWrapper } from "./socks-proxy.js";
+import { logForDebugging } from "../utils/debug.js";
+import { whichSync } from "../utils/which.js";
+import { cloneDeep } from "lodash-es";
+import { getPlatform, getWslVersion } from "../utils/platform.js";
+import * as fs from "fs";
+import type { SandboxRuntimeConfig } from "./sandbox-config.js";
 import type {
   SandboxAskCallback,
   FsReadRestrictionConfig,
   FsWriteRestrictionConfig,
   NetworkRestrictionConfig,
-} from './sandbox-schemas.js'
+} from "./sandbox-schemas.js";
 import {
   wrapCommandWithSandboxLinux,
   initializeLinuxNetworkBridge,
@@ -21,39 +21,39 @@ import {
   type SandboxDependencyCheck,
   cleanupBwrapMountPoints,
   isInsideBwrap,
-} from './linux-sandbox-utils.js'
+} from "./linux-sandbox-utils.js";
 import {
   wrapCommandWithSandboxMacOS,
   startMacOSSandboxLogMonitor,
-} from './macos-sandbox-utils.js'
+} from "./macos-sandbox-utils.js";
 import {
   getDefaultWritePaths,
   containsGlobChars,
   removeTrailingGlobSuffix,
   expandGlobPattern,
-} from './sandbox-utils.js'
-import { SandboxViolationStore } from './sandbox-violation-store.js'
-import { EOL } from 'node:os'
+} from "./sandbox-utils.js";
+import { SandboxViolationStore } from "./sandbox-violation-store.js";
+import { EOL } from "node:os";
 
 interface HostNetworkManagerContext {
-  httpProxyPort: number
-  socksProxyPort: number
-  linuxBridge: LinuxNetworkBridgeContext | undefined
+  httpProxyPort: number;
+  socksProxyPort: number;
+  linuxBridge: LinuxNetworkBridgeContext | undefined;
 }
 
 // ============================================================================
 // Private Module State
 // ============================================================================
 
-let config: SandboxRuntimeConfig | undefined
-let httpProxyServer: ReturnType<typeof createHttpProxyServer> | undefined
-let socksProxyServer: SocksProxyWrapper | undefined
-let managerContext: HostNetworkManagerContext | undefined
-let initializationPromise: Promise<HostNetworkManagerContext> | undefined
-let cleanupRegistered = false
-let logMonitorShutdown: (() => void) | undefined
-let sandboxTmpdir: string | undefined
-const sandboxViolationStore = new SandboxViolationStore()
+let config: SandboxRuntimeConfig | undefined;
+let httpProxyServer: ReturnType<typeof createHttpProxyServer> | undefined;
+let socksProxyServer: SocksProxyWrapper | undefined;
+let managerContext: HostNetworkManagerContext | undefined;
+let initializationPromise: Promise<HostNetworkManagerContext> | undefined;
+let cleanupRegistered = false;
+let logMonitorShutdown: (() => void) | undefined;
+let sandboxTmpdir: string | undefined;
+const sandboxViolationStore = new SandboxViolationStore();
 
 // ============================================================================
 // Private Helper Functions (not exported)
@@ -61,30 +61,30 @@ const sandboxViolationStore = new SandboxViolationStore()
 
 function registerCleanup(): void {
   if (cleanupRegistered) {
-    return
+    return;
   }
   const cleanupHandler = () =>
-    reset().catch(e => {
+    reset().catch((e) => {
       logForDebugging(`Cleanup failed in registerCleanup ${e}`, {
-        level: 'error',
-      })
-    })
-  process.once('exit', cleanupHandler)
-  process.once('SIGINT', cleanupHandler)
-  process.once('SIGTERM', cleanupHandler)
-  cleanupRegistered = true
+        level: "error",
+      });
+    });
+  process.once("exit", cleanupHandler);
+  process.once("SIGINT", cleanupHandler);
+  process.once("SIGTERM", cleanupHandler);
+  cleanupRegistered = true;
 }
 
 function matchesDomainPattern(hostname: string, pattern: string): boolean {
   // Support wildcard patterns like *.example.com
   // This matches any subdomain but not the base domain itself
-  if (pattern.startsWith('*.')) {
-    const baseDomain = pattern.substring(2) // Remove '*.'
-    return hostname.toLowerCase().endsWith('.' + baseDomain.toLowerCase())
+  if (pattern.startsWith("*.")) {
+    const baseDomain = pattern.substring(2); // Remove '*.'
+    return hostname.toLowerCase().endsWith("." + baseDomain.toLowerCase());
   }
 
   // Exact match for non-wildcard patterns
-  return hostname.toLowerCase() === pattern.toLowerCase()
+  return hostname.toLowerCase() === pattern.toLowerCase();
 }
 
 async function filterNetworkRequest(
@@ -93,47 +93,47 @@ async function filterNetworkRequest(
   sandboxAskCallback?: SandboxAskCallback,
 ): Promise<boolean> {
   if (!config) {
-    logForDebugging('No config available, denying network request')
-    return false
+    logForDebugging("No config available, denying network request");
+    return false;
   }
 
   // Check denied domains first
   for (const deniedDomain of config.network.deniedDomains) {
     if (matchesDomainPattern(host, deniedDomain)) {
-      logForDebugging(`Denied by config rule: ${host}:${port}`)
-      return false
+      logForDebugging(`Denied by config rule: ${host}:${port}`);
+      return false;
     }
   }
 
   // Check allowed domains
   for (const allowedDomain of config.network.allowedDomains) {
     if (matchesDomainPattern(host, allowedDomain)) {
-      logForDebugging(`Allowed by config rule: ${host}:${port}`)
-      return true
+      logForDebugging(`Allowed by config rule: ${host}:${port}`);
+      return true;
     }
   }
 
   // No matching rules - ask user or deny
   if (!sandboxAskCallback) {
-    logForDebugging(`No matching config rule, denying: ${host}:${port}`)
-    return false
+    logForDebugging(`No matching config rule, denying: ${host}:${port}`);
+    return false;
   }
 
-  logForDebugging(`No matching config rule, asking user: ${host}:${port}`)
+  logForDebugging(`No matching config rule, asking user: ${host}:${port}`);
   try {
-    const userAllowed = await sandboxAskCallback({ host, port })
+    const userAllowed = await sandboxAskCallback({ host, port });
     if (userAllowed) {
-      logForDebugging(`User allowed: ${host}:${port}`)
-      return true
+      logForDebugging(`User allowed: ${host}:${port}`);
+      return true;
     } else {
-      logForDebugging(`User denied: ${host}:${port}`)
-      return false
+      logForDebugging(`User denied: ${host}:${port}`);
+      return false;
     }
   } catch (error) {
     logForDebugging(`Error in permission callback: ${error}`, {
-      level: 'error',
-    })
-    return false
+      level: "error",
+    });
+    return false;
   }
 }
 
@@ -144,19 +144,19 @@ async function filterNetworkRequest(
  */
 function getMitmSocketPath(host: string): string | undefined {
   if (!config?.network.mitmProxy) {
-    return undefined
+    return undefined;
   }
 
-  const { socketPath, domains } = config.network.mitmProxy
+  const { socketPath, domains } = config.network.mitmProxy;
 
   for (const pattern of domains) {
     if (matchesDomainPattern(host, pattern)) {
-      logForDebugging(`Host ${host} matches MITM pattern ${pattern}`)
-      return socketPath
+      logForDebugging(`Host ${host} matches MITM pattern ${pattern}`);
+      return socketPath;
     }
   }
 
-  return undefined
+  return undefined;
 }
 
 async function startHttpProxyServer(
@@ -166,30 +166,30 @@ async function startHttpProxyServer(
     filter: (port: number, host: string) =>
       filterNetworkRequest(port, host, sandboxAskCallback),
     getMitmSocketPath,
-  })
+  });
 
   return new Promise<number>((resolve, reject) => {
     if (!httpProxyServer) {
-      reject(new Error('HTTP proxy server undefined before listen'))
-      return
+      reject(new Error("HTTP proxy server undefined before listen"));
+      return;
     }
 
-    const server = httpProxyServer
+    const server = httpProxyServer;
 
-    server.once('error', reject)
-    server.once('listening', () => {
-      const address = server.address()
-      if (address && typeof address === 'object') {
-        server.unref()
-        logForDebugging(`HTTP proxy listening on localhost:${address.port}`)
-        resolve(address.port)
+    server.once("error", reject);
+    server.once("listening", () => {
+      const address = server.address();
+      if (address && typeof address === "object") {
+        server.unref();
+        logForDebugging(`HTTP proxy listening on localhost:${address.port}`);
+        resolve(address.port);
       } else {
-        reject(new Error('Failed to get proxy server address'))
+        reject(new Error("Failed to get proxy server address"));
       }
-    })
+    });
 
-    server.listen(0, '127.0.0.1')
-  })
+    server.listen(0, "127.0.0.1");
+  });
 }
 
 async function startSocksProxyServer(
@@ -198,23 +198,23 @@ async function startSocksProxyServer(
   socksProxyServer = createSocksProxyServer({
     filter: (port: number, host: string) =>
       filterNetworkRequest(port, host, sandboxAskCallback),
-  })
+  });
 
   return new Promise<number>((resolve, reject) => {
     if (!socksProxyServer) {
       // This is mostly just for the typechecker
-      reject(new Error('SOCKS proxy server undefined before listen'))
-      return
+      reject(new Error("SOCKS proxy server undefined before listen"));
+      return;
     }
 
     socksProxyServer
-      .listen(0, '127.0.0.1')
+      .listen(0, "127.0.0.1")
       .then((port: number) => {
-        socksProxyServer?.unref()
-        resolve(port)
+        socksProxyServer?.unref();
+        resolve(port);
       })
-      .catch(reject)
-  })
+      .catch(reject);
+  });
 }
 
 // ============================================================================
@@ -228,112 +228,116 @@ async function initialize(
 ): Promise<void> {
   // Return if already initializing
   if (initializationPromise) {
-    await initializationPromise
-    return
+    await initializationPromise;
+    return;
   }
 
   // Store config for use by other functions
-  config = runtimeConfig
+  config = runtimeConfig;
 
   // Check dependencies
-  const deps = checkDependencies()
+  const deps = checkDependencies();
   if (deps.errors.length > 0) {
     throw new Error(
-      `Sandbox dependencies not available: ${deps.errors.join(', ')}`,
-    )
+      `Sandbox dependencies not available: ${deps.errors.join(", ")}`,
+    );
   }
 
   // Start log monitor for macOS if enabled
-  if (enableLogMonitor && getPlatform() === 'macos') {
+  if (enableLogMonitor && getPlatform() === "macos") {
     logMonitorShutdown = startMacOSSandboxLogMonitor(
       sandboxViolationStore.addViolation.bind(sandboxViolationStore),
       config.ignoreViolations,
-    )
-    logForDebugging('Started macOS sandbox log monitor')
+    );
+    logForDebugging("Started macOS sandbox log monitor");
   }
 
   // Register cleanup handlers first time
-  registerCleanup()
+  registerCleanup();
 
   // Skip network infrastructure when nested inside bwrap — the socat bridge
   // processes call socket(AF_UNIX) which is blocked by the outer bwrap's
   // seccomp filter. wrapCommandWithSandboxLinux already skips --unshare-net
   // when nested, so none of this infrastructure is needed.
-  if (getPlatform() === 'linux' && isInsideBwrap()) {
-    logForDebugging('Skipping network infrastructure — nested inside bwrap')
-    managerContext = { httpProxyPort: 0, socksProxyPort: 0, linuxBridge: undefined }
-    return
+  if (getPlatform() === "linux" && isInsideBwrap()) {
+    logForDebugging("Skipping network infrastructure — nested inside bwrap");
+    managerContext = {
+      httpProxyPort: 0,
+      socksProxyPort: 0,
+      linuxBridge: undefined,
+    };
+    return;
   }
 
   // Initialize network infrastructure
   initializationPromise = (async () => {
     try {
       // Conditionally start proxy servers based on config
-      let httpProxyPort: number
+      let httpProxyPort: number;
       if (config.network.httpProxyPort !== undefined) {
         // Use external HTTP proxy (don't start a server)
-        httpProxyPort = config.network.httpProxyPort
-        logForDebugging(`Using external HTTP proxy on port ${httpProxyPort}`)
+        httpProxyPort = config.network.httpProxyPort;
+        logForDebugging(`Using external HTTP proxy on port ${httpProxyPort}`);
       } else {
         // Start local HTTP proxy
-        httpProxyPort = await startHttpProxyServer(sandboxAskCallback)
+        httpProxyPort = await startHttpProxyServer(sandboxAskCallback);
       }
 
-      let socksProxyPort: number
+      let socksProxyPort: number;
       if (config.network.socksProxyPort !== undefined) {
         // Use external SOCKS proxy (don't start a server)
-        socksProxyPort = config.network.socksProxyPort
-        logForDebugging(`Using external SOCKS proxy on port ${socksProxyPort}`)
+        socksProxyPort = config.network.socksProxyPort;
+        logForDebugging(`Using external SOCKS proxy on port ${socksProxyPort}`);
       } else {
         // Start local SOCKS proxy
-        socksProxyPort = await startSocksProxyServer(sandboxAskCallback)
+        socksProxyPort = await startSocksProxyServer(sandboxAskCallback);
       }
 
       // Initialize platform-specific infrastructure
-      let linuxBridge: LinuxNetworkBridgeContext | undefined
-      if (getPlatform() === 'linux') {
+      let linuxBridge: LinuxNetworkBridgeContext | undefined;
+      if (getPlatform() === "linux") {
         linuxBridge = await initializeLinuxNetworkBridge(
           httpProxyPort,
           socksProxyPort,
-        )
+        );
       }
 
       const context: HostNetworkManagerContext = {
         httpProxyPort,
         socksProxyPort,
         linuxBridge,
-      }
-      managerContext = context
-      logForDebugging('Network infrastructure initialized')
-      return context
+      };
+      managerContext = context;
+      logForDebugging("Network infrastructure initialized");
+      return context;
     } catch (error) {
       // Clear state on error so initialization can be retried
-      initializationPromise = undefined
-      managerContext = undefined
-      reset().catch(e => {
+      initializationPromise = undefined;
+      managerContext = undefined;
+      reset().catch((e) => {
         logForDebugging(`Cleanup failed in initializationPromise ${e}`, {
-          level: 'error',
-        })
-      })
-      throw error
+          level: "error",
+        });
+      });
+      throw error;
     }
-  })()
+  })();
 
-  await initializationPromise
+  await initializationPromise;
 }
 
 function isSupportedPlatform(): boolean {
-  const platform = getPlatform()
-  if (platform === 'linux') {
+  const platform = getPlatform();
+  if (platform === "linux") {
     // WSL1 doesn't support bubblewrap
-    return getWslVersion() !== '1'
+    return getWslVersion() !== "1";
   }
-  return platform === 'macos'
+  return platform === "macos";
 }
 
 function isSandboxingEnabled(): boolean {
   // Sandboxing is enabled if config has been set (via initialize())
-  return config !== undefined
+  return config !== undefined;
 }
 
 /**
@@ -342,163 +346,166 @@ function isSandboxingEnabled(): boolean {
  * @returns { warnings, errors } - errors mean sandbox cannot run, warnings mean degraded functionality
  */
 function checkDependencies(ripgrepConfig?: {
-  command: string
-  args?: string[]
+  command: string;
+  args?: string[];
 }): SandboxDependencyCheck {
   if (!isSupportedPlatform()) {
-    return { errors: ['Unsupported platform'], warnings: [] }
+    return { errors: ["Unsupported platform"], warnings: [] };
   }
 
-  const errors: string[] = []
-  const warnings: string[] = []
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Check ripgrep - use provided config, then initialized config, then default 'rg'
-  const rgToCheck = ripgrepConfig ?? config?.ripgrep ?? { command: 'rg' }
+  const rgToCheck = ripgrepConfig ?? config?.ripgrep ?? { command: "rg" };
   if (whichSync(rgToCheck.command) === null) {
-    errors.push(`ripgrep (${rgToCheck.command}) not found`)
+    errors.push(`ripgrep (${rgToCheck.command}) not found`);
   }
 
-  const platform = getPlatform()
-  if (platform === 'linux') {
-    const linuxDeps = checkLinuxDependencies(config?.seccomp)
-    errors.push(...linuxDeps.errors)
-    warnings.push(...linuxDeps.warnings)
+  const platform = getPlatform();
+  if (platform === "linux") {
+    const linuxDeps = checkLinuxDependencies(config?.seccomp);
+    errors.push(...linuxDeps.errors);
+    warnings.push(...linuxDeps.warnings);
   }
 
-  return { errors, warnings }
+  return { errors, warnings };
 }
 
 function getFsReadConfig(): FsReadRestrictionConfig {
   if (!config) {
-    return { denyOnly: [] }
+    return { denyOnly: [] };
   }
 
-  const denyPaths: string[] = []
+  const denyPaths: string[] = [];
   for (const p of config.filesystem.denyRead) {
-    const stripped = removeTrailingGlobSuffix(p)
-    if (getPlatform() === 'linux' && containsGlobChars(stripped)) {
+    const stripped = removeTrailingGlobSuffix(p);
+    if (getPlatform() === "linux" && containsGlobChars(stripped)) {
       // Expand glob to concrete paths on Linux (bubblewrap doesn't support globs)
-      const expanded = expandGlobPattern(p)
+      const expanded = expandGlobPattern(p);
       logForDebugging(
         `[Sandbox] Expanded glob pattern "${p}" to ${expanded.length} paths on Linux`,
-      )
-      denyPaths.push(...expanded)
+      );
+      denyPaths.push(...expanded);
     } else {
-      denyPaths.push(stripped)
+      denyPaths.push(stripped);
     }
   }
 
   return {
     denyOnly: denyPaths,
-  }
+  };
 }
 
 function getFsWriteConfig(): FsWriteRestrictionConfig {
   if (!config) {
-    return { allowOnly: getDefaultWritePaths(sandboxTmpdir), denyWithinAllow: [] }
+    return {
+      allowOnly: getDefaultWritePaths(sandboxTmpdir),
+      denyWithinAllow: [],
+    };
   }
 
   // Filter out glob patterns on Linux/WSL for allowWrite (bubblewrap doesn't support globs)
   const allowPaths = config.filesystem.allowWrite
-    .map(path => removeTrailingGlobSuffix(path))
-    .filter(path => {
-      if (getPlatform() === 'linux' && containsGlobChars(path)) {
-        logForDebugging(`Skipping glob pattern on Linux/WSL: ${path}`)
-        return false
+    .map((path) => removeTrailingGlobSuffix(path))
+    .filter((path) => {
+      if (getPlatform() === "linux" && containsGlobChars(path)) {
+        logForDebugging(`Skipping glob pattern on Linux/WSL: ${path}`);
+        return false;
       }
-      return true
-    })
+      return true;
+    });
 
   // Filter out glob patterns on Linux/WSL for denyWrite (bubblewrap doesn't support globs)
   const denyPaths = config.filesystem.denyWrite
-    .map(path => removeTrailingGlobSuffix(path))
-    .filter(path => {
-      if (getPlatform() === 'linux' && containsGlobChars(path)) {
-        logForDebugging(`Skipping glob pattern on Linux/WSL: ${path}`)
-        return false
+    .map((path) => removeTrailingGlobSuffix(path))
+    .filter((path) => {
+      if (getPlatform() === "linux" && containsGlobChars(path)) {
+        logForDebugging(`Skipping glob pattern on Linux/WSL: ${path}`);
+        return false;
       }
-      return true
-    })
+      return true;
+    });
 
   // Build allowOnly list: default paths + configured allow paths
-  const allowOnly = [...getDefaultWritePaths(sandboxTmpdir), ...allowPaths]
+  const allowOnly = [...getDefaultWritePaths(sandboxTmpdir), ...allowPaths];
 
   return {
     allowOnly,
     denyWithinAllow: denyPaths,
-  }
+  };
 }
 
 function getNetworkRestrictionConfig(): NetworkRestrictionConfig {
   if (!config) {
-    return {}
+    return {};
   }
 
-  const allowedHosts = config.network.allowedDomains
-  const deniedHosts = config.network.deniedDomains
+  const allowedHosts = config.network.allowedDomains;
+  const deniedHosts = config.network.deniedDomains;
 
   return {
     ...(allowedHosts.length > 0 && { allowedHosts }),
     ...(deniedHosts.length > 0 && { deniedHosts }),
-  }
+  };
 }
 
 function getAllowUnixSockets(): string[] | undefined {
-  return config?.network?.allowUnixSockets
+  return config?.network?.allowUnixSockets;
 }
 
 function getAllowAllUnixSockets(): boolean | undefined {
-  return config?.network?.allowAllUnixSockets
+  return config?.network?.allowAllUnixSockets;
 }
 
 function getAllowLocalBinding(): boolean | undefined {
-  return config?.network?.allowLocalBinding
+  return config?.network?.allowLocalBinding;
 }
 
 function getIgnoreViolations(): Record<string, string[]> | undefined {
-  return config?.ignoreViolations
+  return config?.ignoreViolations;
 }
 
 function getEnableWeakerNestedSandbox(): boolean | undefined {
-  return config?.enableWeakerNestedSandbox
+  return config?.enableWeakerNestedSandbox;
 }
 
 function getEnableWeakerNetworkIsolation(): boolean | undefined {
-  return config?.enableWeakerNetworkIsolation
+  return config?.enableWeakerNetworkIsolation;
 }
 
 function getRipgrepConfig(): { command: string; args?: string[] } {
-  return config?.ripgrep ?? { command: 'rg' }
+  return config?.ripgrep ?? { command: "rg" };
 }
 
 function getMandatoryDenySearchDepth(): number {
-  return config?.mandatoryDenySearchDepth ?? 3
+  return config?.mandatoryDenySearchDepth ?? 3;
 }
 
 function getAllowGitConfig(): boolean {
-  return config?.filesystem?.allowGitConfig ?? false
+  return config?.filesystem?.allowGitConfig ?? false;
 }
 
 function getSeccompConfig():
   | { bpfPath?: string; applyPath?: string }
   | undefined {
-  return config?.seccomp
+  return config?.seccomp;
 }
 
 function getProxyPort(): number | undefined {
-  return managerContext?.httpProxyPort
+  return managerContext?.httpProxyPort;
 }
 
 function getSocksProxyPort(): number | undefined {
-  return managerContext?.socksProxyPort
+  return managerContext?.socksProxyPort;
 }
 
 function getLinuxHttpSocketPath(): string | undefined {
-  return managerContext?.linuxBridge?.httpSocketPath
+  return managerContext?.linuxBridge?.httpSocketPath;
 }
 
 function getLinuxSocksSocketPath(): string | undefined {
-  return managerContext?.linuxBridge?.socksSocketPath
+  return managerContext?.linuxBridge?.socksSocketPath;
 }
 
 /**
@@ -507,17 +514,17 @@ function getLinuxSocksSocketPath(): string | undefined {
  */
 async function waitForNetworkInitialization(): Promise<boolean> {
   if (!config) {
-    return false
+    return false;
   }
   if (initializationPromise) {
     try {
-      await initializationPromise
-      return true
+      await initializationPromise;
+      return true;
     } catch {
-      return false
+      return false;
     }
   }
-  return managerContext !== undefined
+  return managerContext !== undefined;
 }
 
 async function wrapWithSandbox(
@@ -526,32 +533,32 @@ async function wrapWithSandbox(
   customConfig?: Partial<SandboxRuntimeConfig>,
   abortSignal?: AbortSignal,
 ): Promise<string> {
-  const platform = getPlatform()
+  const platform = getPlatform();
 
   // Get configs - use custom if provided, otherwise fall back to main config
   // If neither exists, defaults to empty arrays (most restrictive)
   // Always include default system write paths (like /dev/null, /tmp/claude)
   const userAllowWrite =
-    customConfig?.filesystem?.allowWrite ?? config?.filesystem.allowWrite ?? []
+    customConfig?.filesystem?.allowWrite ?? config?.filesystem.allowWrite ?? [];
   const writeConfig = {
     allowOnly: [...getDefaultWritePaths(sandboxTmpdir), ...userAllowWrite],
     denyWithinAllow:
       customConfig?.filesystem?.denyWrite ?? config?.filesystem.denyWrite ?? [],
-  }
+  };
   const rawDenyRead =
-    customConfig?.filesystem?.denyRead ?? config?.filesystem.denyRead ?? []
-  const expandedDenyRead: string[] = []
+    customConfig?.filesystem?.denyRead ?? config?.filesystem.denyRead ?? [];
+  const expandedDenyRead: string[] = [];
   for (const p of rawDenyRead) {
-    const stripped = removeTrailingGlobSuffix(p)
-    if (getPlatform() === 'linux' && containsGlobChars(stripped)) {
-      expandedDenyRead.push(...expandGlobPattern(p))
+    const stripped = removeTrailingGlobSuffix(p);
+    if (getPlatform() === "linux" && containsGlobChars(stripped)) {
+      expandedDenyRead.push(...expandGlobPattern(p));
     } else {
-      expandedDenyRead.push(stripped)
+      expandedDenyRead.push(stripped);
     }
   }
   const readConfig = {
     denyOnly: expandedDenyRead,
-  }
+  };
 
   // Check if network config is specified - this determines if we need network restrictions
   // Network restriction is needed when:
@@ -560,28 +567,28 @@ async function wrapWithSandbox(
   // An empty allowedDomains array means "no domains allowed" = block all network access
   const hasNetworkConfig =
     customConfig?.network?.allowedDomains !== undefined ||
-    config?.network?.allowedDomains !== undefined
+    config?.network?.allowedDomains !== undefined;
 
   // Network RESTRICTION is needed whenever network config is specified
   // This includes empty allowedDomains which means "block all network"
-  const needsNetworkRestriction = hasNetworkConfig
+  const needsNetworkRestriction = hasNetworkConfig;
 
   // Network PROXY is needed whenever network config is specified
   // Even with empty allowedDomains, we route through proxy so that:
   // 1. updateConfig() can enable network access for already-running processes
   // 2. The proxy blocks all requests when allowlist is empty
-  const needsNetworkProxy = hasNetworkConfig
+  const needsNetworkProxy = hasNetworkConfig;
 
   // Wait for network initialization only if proxy is actually needed
   if (needsNetworkProxy) {
-    await waitForNetworkInitialization()
+    await waitForNetworkInitialization();
   }
 
   // Check custom config to allow pseudo-terminal (can be applied dynamically)
-  const allowPty = customConfig?.allowPty ?? config?.allowPty
+  const allowPty = customConfig?.allowPty ?? config?.allowPty;
 
   switch (platform) {
-    case 'macos':
+    case "macos":
       // macOS sandbox profile supports glob patterns directly, no ripgrep needed
       return wrapCommandWithSandboxMacOS({
         command,
@@ -600,9 +607,9 @@ async function wrapWithSandbox(
         enableWeakerNetworkIsolation: getEnableWeakerNetworkIsolation(),
         binShell,
         tmpdir: sandboxTmpdir,
-      })
+      });
 
-    case 'linux':
+    case "linux":
       return wrapCommandWithSandboxLinux({
         command,
         needsNetworkRestriction,
@@ -623,6 +630,7 @@ async function wrapWithSandbox(
         writeConfig,
         enableWeakerNestedSandbox: getEnableWeakerNestedSandbox(),
         allowAllUnixSockets: getAllowAllUnixSockets(),
+        allowLocalBinding: getAllowLocalBinding(),
         binShell,
         ripgrepConfig: getRipgrepConfig(),
         mandatoryDenySearchDepth: getMandatoryDenySearchDepth(),
@@ -630,13 +638,13 @@ async function wrapWithSandbox(
         seccompConfig: getSeccompConfig(),
         abortSignal,
         tmpdir: sandboxTmpdir,
-      })
+      });
 
     default:
       // Unsupported platform - this should not happen since isSandboxingEnabled() checks platform support
       throw new Error(
         `Sandbox configuration is not supported on platform: ${platform}`,
-      )
+      );
   }
 }
 
@@ -645,11 +653,11 @@ async function wrapWithSandbox(
  * @returns The current configuration, or undefined if not initialized
  */
 export function setTmpdir(dir: string): void {
-  sandboxTmpdir = dir
+  sandboxTmpdir = dir;
 }
 
 function getConfig(): SandboxRuntimeConfig | undefined {
-  return config
+  return config;
 }
 
 /**
@@ -658,8 +666,8 @@ function getConfig(): SandboxRuntimeConfig | undefined {
  */
 function updateConfig(newConfig: SandboxRuntimeConfig): void {
   // Deep clone the config to avoid mutations
-  config = cloneDeep(newConfig)
-  logForDebugging('Sandbox configuration updated')
+  config = cloneDeep(newConfig);
+  logForDebugging("Sandbox configuration updated");
 }
 
 /**
@@ -673,17 +681,17 @@ function updateConfig(newConfig: SandboxRuntimeConfig): void {
  * Also called automatically by reset() and on process exit as safety nets.
  */
 function cleanupAfterCommand(): void {
-  cleanupBwrapMountPoints()
+  cleanupBwrapMountPoints();
 }
 
 async function reset(): Promise<void> {
   // Clean up any leftover bwrap mount points
-  cleanupAfterCommand()
+  cleanupAfterCommand();
 
   // Stop log monitor
   if (logMonitorShutdown) {
-    logMonitorShutdown()
-    logMonitorShutdown = undefined
+    logMonitorShutdown();
+    logMonitorShutdown = undefined;
   }
 
   if (managerContext?.linuxBridge) {
@@ -692,47 +700,47 @@ async function reset(): Promise<void> {
       socksSocketPath,
       httpBridgeProcess,
       socksBridgeProcess,
-    } = managerContext.linuxBridge
+    } = managerContext.linuxBridge;
 
     // Create array to wait for process exits
-    const exitPromises: Promise<void>[] = []
+    const exitPromises: Promise<void>[] = [];
 
     // Kill HTTP bridge and wait for it to exit
     if (httpBridgeProcess.pid && !httpBridgeProcess.killed) {
       try {
-        process.kill(httpBridgeProcess.pid, 'SIGTERM')
-        logForDebugging('Sent SIGTERM to HTTP bridge process')
+        process.kill(httpBridgeProcess.pid, "SIGTERM");
+        logForDebugging("Sent SIGTERM to HTTP bridge process");
 
         // Wait for process to exit
         exitPromises.push(
-          new Promise<void>(resolve => {
-            httpBridgeProcess.once('exit', () => {
-              logForDebugging('HTTP bridge process exited')
-              resolve()
-            })
+          new Promise<void>((resolve) => {
+            httpBridgeProcess.once("exit", () => {
+              logForDebugging("HTTP bridge process exited");
+              resolve();
+            });
             // Timeout after 5 seconds
             setTimeout(() => {
               if (!httpBridgeProcess.killed) {
-                logForDebugging('HTTP bridge did not exit, forcing SIGKILL', {
-                  level: 'warn',
-                })
+                logForDebugging("HTTP bridge did not exit, forcing SIGKILL", {
+                  level: "warn",
+                });
                 try {
                   if (httpBridgeProcess.pid) {
-                    process.kill(httpBridgeProcess.pid, 'SIGKILL')
+                    process.kill(httpBridgeProcess.pid, "SIGKILL");
                   }
                 } catch {
                   // Process may have already exited
                 }
               }
-              resolve()
-            }, 5000)
+              resolve();
+            }, 5000);
           }),
-        )
+        );
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ESRCH') {
+        if ((err as NodeJS.ErrnoException).code !== "ESRCH") {
           logForDebugging(`Error killing HTTP bridge: ${err}`, {
-            level: 'error',
-          })
+            level: "error",
+          });
         }
       }
     }
@@ -740,109 +748,109 @@ async function reset(): Promise<void> {
     // Kill SOCKS bridge and wait for it to exit
     if (socksBridgeProcess.pid && !socksBridgeProcess.killed) {
       try {
-        process.kill(socksBridgeProcess.pid, 'SIGTERM')
-        logForDebugging('Sent SIGTERM to SOCKS bridge process')
+        process.kill(socksBridgeProcess.pid, "SIGTERM");
+        logForDebugging("Sent SIGTERM to SOCKS bridge process");
 
         // Wait for process to exit
         exitPromises.push(
-          new Promise<void>(resolve => {
-            socksBridgeProcess.once('exit', () => {
-              logForDebugging('SOCKS bridge process exited')
-              resolve()
-            })
+          new Promise<void>((resolve) => {
+            socksBridgeProcess.once("exit", () => {
+              logForDebugging("SOCKS bridge process exited");
+              resolve();
+            });
             // Timeout after 5 seconds
             setTimeout(() => {
               if (!socksBridgeProcess.killed) {
-                logForDebugging('SOCKS bridge did not exit, forcing SIGKILL', {
-                  level: 'warn',
-                })
+                logForDebugging("SOCKS bridge did not exit, forcing SIGKILL", {
+                  level: "warn",
+                });
                 try {
                   if (socksBridgeProcess.pid) {
-                    process.kill(socksBridgeProcess.pid, 'SIGKILL')
+                    process.kill(socksBridgeProcess.pid, "SIGKILL");
                   }
                 } catch {
                   // Process may have already exited
                 }
               }
-              resolve()
-            }, 5000)
+              resolve();
+            }, 5000);
           }),
-        )
+        );
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ESRCH') {
+        if ((err as NodeJS.ErrnoException).code !== "ESRCH") {
           logForDebugging(`Error killing SOCKS bridge: ${err}`, {
-            level: 'error',
-          })
+            level: "error",
+          });
         }
       }
     }
 
     // Wait for both processes to exit
-    await Promise.all(exitPromises)
+    await Promise.all(exitPromises);
 
     // Clean up sockets
     if (httpSocketPath) {
       try {
-        fs.rmSync(httpSocketPath, { force: true })
-        logForDebugging('Cleaned up HTTP socket')
+        fs.rmSync(httpSocketPath, { force: true });
+        logForDebugging("Cleaned up HTTP socket");
       } catch (err) {
         logForDebugging(`HTTP socket cleanup error: ${err}`, {
-          level: 'error',
-        })
+          level: "error",
+        });
       }
     }
 
     if (socksSocketPath) {
       try {
-        fs.rmSync(socksSocketPath, { force: true })
-        logForDebugging('Cleaned up SOCKS socket')
+        fs.rmSync(socksSocketPath, { force: true });
+        logForDebugging("Cleaned up SOCKS socket");
       } catch (err) {
         logForDebugging(`SOCKS socket cleanup error: ${err}`, {
-          level: 'error',
-        })
+          level: "error",
+        });
       }
     }
   }
 
   // Close servers in parallel (only if they exist, i.e., were started by us)
-  const closePromises: Promise<void>[] = []
+  const closePromises: Promise<void>[] = [];
 
   if (httpProxyServer) {
-    const server = httpProxyServer // Capture reference to avoid TypeScript error
-    const httpClose = new Promise<void>(resolve => {
-      server.close(error => {
-        if (error && error.message !== 'Server is not running.') {
+    const server = httpProxyServer; // Capture reference to avoid TypeScript error
+    const httpClose = new Promise<void>((resolve) => {
+      server.close((error) => {
+        if (error && error.message !== "Server is not running.") {
           logForDebugging(`Error closing HTTP proxy server: ${error.message}`, {
-            level: 'error',
-          })
+            level: "error",
+          });
         }
-        resolve()
-      })
-    })
-    closePromises.push(httpClose)
+        resolve();
+      });
+    });
+    closePromises.push(httpClose);
   }
 
   if (socksProxyServer) {
     const socksClose = socksProxyServer.close().catch((error: Error) => {
       logForDebugging(`Error closing SOCKS proxy server: ${error.message}`, {
-        level: 'error',
-      })
-    })
-    closePromises.push(socksClose)
+        level: "error",
+      });
+    });
+    closePromises.push(socksClose);
   }
 
   // Wait for all servers to close
-  await Promise.all(closePromises)
+  await Promise.all(closePromises);
 
   // Clear references
-  httpProxyServer = undefined
-  socksProxyServer = undefined
-  managerContext = undefined
-  initializationPromise = undefined
+  httpProxyServer = undefined;
+  socksProxyServer = undefined;
+  managerContext = undefined;
+  initializationPromise = undefined;
 }
 
 function getSandboxViolationStore() {
-  return sandboxViolationStore
+  return sandboxViolationStore;
 }
 
 function annotateStderrWithSandboxFailures(
@@ -850,22 +858,22 @@ function annotateStderrWithSandboxFailures(
   stderr: string,
 ): string {
   if (!config) {
-    return stderr
+    return stderr;
   }
 
-  const violations = sandboxViolationStore.getViolationsForCommand(command)
+  const violations = sandboxViolationStore.getViolationsForCommand(command);
   if (violations.length === 0) {
-    return stderr
+    return stderr;
   }
 
-  let annotated = stderr
-  annotated += EOL + '<sandbox_violations>' + EOL
+  let annotated = stderr;
+  annotated += EOL + "<sandbox_violations>" + EOL;
   for (const violation of violations) {
-    annotated += violation.line + EOL
+    annotated += violation.line + EOL;
   }
-  annotated += '</sandbox_violations>'
+  annotated += "</sandbox_violations>";
 
-  return annotated
+  return annotated;
 }
 
 /**
@@ -878,30 +886,30 @@ function annotateStderrWithSandboxFailures(
 function getLinuxGlobPatternWarnings(): string[] {
   // Only warn on Linux/WSL (bubblewrap doesn't support globs)
   // macOS supports glob patterns via regex conversion
-  if (getPlatform() !== 'linux' || !config) {
-    return []
+  if (getPlatform() !== "linux" || !config) {
+    return [];
   }
 
-  const globPatterns: string[] = []
+  const globPatterns: string[] = [];
 
   // Check filesystem paths for glob patterns
   // Note: denyRead is excluded because globs are now expanded to concrete paths on Linux
   const allPaths = [
     ...config.filesystem.allowWrite,
     ...config.filesystem.denyWrite,
-  ]
+  ];
 
   for (const path of allPaths) {
     // Strip trailing /** since that's just a subpath (directory and everything under it)
-    const pathWithoutTrailingStar = removeTrailingGlobSuffix(path)
+    const pathWithoutTrailingStar = removeTrailingGlobSuffix(path);
 
     // Only warn if there are still glob characters after removing trailing /**
     if (containsGlobChars(pathWithoutTrailingStar)) {
-      globPatterns.push(path)
+      globPatterns.push(path);
     }
   }
 
-  return globPatterns
+  return globPatterns;
 }
 
 // ============================================================================
@@ -916,39 +924,39 @@ export interface ISandboxManager {
     runtimeConfig: SandboxRuntimeConfig,
     sandboxAskCallback?: SandboxAskCallback,
     enableLogMonitor?: boolean,
-  ): Promise<void>
-  isSupportedPlatform(): boolean
-  isSandboxingEnabled(): boolean
+  ): Promise<void>;
+  isSupportedPlatform(): boolean;
+  isSandboxingEnabled(): boolean;
   checkDependencies(ripgrepConfig?: {
-    command: string
-    args?: string[]
-  }): SandboxDependencyCheck
-  getFsReadConfig(): FsReadRestrictionConfig
-  getFsWriteConfig(): FsWriteRestrictionConfig
-  getNetworkRestrictionConfig(): NetworkRestrictionConfig
-  getAllowUnixSockets(): string[] | undefined
-  getAllowLocalBinding(): boolean | undefined
-  getIgnoreViolations(): Record<string, string[]> | undefined
-  getEnableWeakerNestedSandbox(): boolean | undefined
-  getProxyPort(): number | undefined
-  getSocksProxyPort(): number | undefined
-  getLinuxHttpSocketPath(): string | undefined
-  getLinuxSocksSocketPath(): string | undefined
-  waitForNetworkInitialization(): Promise<boolean>
+    command: string;
+    args?: string[];
+  }): SandboxDependencyCheck;
+  getFsReadConfig(): FsReadRestrictionConfig;
+  getFsWriteConfig(): FsWriteRestrictionConfig;
+  getNetworkRestrictionConfig(): NetworkRestrictionConfig;
+  getAllowUnixSockets(): string[] | undefined;
+  getAllowLocalBinding(): boolean | undefined;
+  getIgnoreViolations(): Record<string, string[]> | undefined;
+  getEnableWeakerNestedSandbox(): boolean | undefined;
+  getProxyPort(): number | undefined;
+  getSocksProxyPort(): number | undefined;
+  getLinuxHttpSocketPath(): string | undefined;
+  getLinuxSocksSocketPath(): string | undefined;
+  waitForNetworkInitialization(): Promise<boolean>;
   wrapWithSandbox(
     command: string,
     binShell?: string,
     customConfig?: Partial<SandboxRuntimeConfig>,
     abortSignal?: AbortSignal,
-  ): Promise<string>
-  getSandboxViolationStore(): SandboxViolationStore
-  annotateStderrWithSandboxFailures(command: string, stderr: string): string
-  getLinuxGlobPatternWarnings(): string[]
-  getConfig(): SandboxRuntimeConfig | undefined
-  updateConfig(newConfig: SandboxRuntimeConfig): void
-  setTmpdir(dir: string): void
-  cleanupAfterCommand(): void
-  reset(): Promise<void>
+  ): Promise<string>;
+  getSandboxViolationStore(): SandboxViolationStore;
+  annotateStderrWithSandboxFailures(command: string, stderr: string): string;
+  getLinuxGlobPatternWarnings(): string[];
+  getConfig(): SandboxRuntimeConfig | undefined;
+  updateConfig(newConfig: SandboxRuntimeConfig): void;
+  setTmpdir(dir: string): void;
+  cleanupAfterCommand(): void;
+  reset(): Promise<void>;
 }
 
 // ============================================================================
@@ -985,4 +993,4 @@ export const SandboxManager: ISandboxManager = {
   getConfig,
   updateConfig,
   setTmpdir,
-} as const
+} as const;
