@@ -39,15 +39,22 @@ func newCheckCmd() *cobra.Command {
 }
 
 func newReviewCmd() *cobra.Command {
-	return &cobra.Command{
+	var worktreeDir string
+	var dryRun bool
+
+	cmd := &cobra.Command{
 		Use:   "review [worktree-path]",
 		Short: "Interactively review new permissions from a session",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var worktreePath string
-			if len(args) > 0 {
+
+			switch {
+			case worktreeDir != "":
+				worktreePath = worktreeDir
+			case len(args) > 0:
 				worktreePath = args[0]
-			} else {
+			default:
 				cwd, err := os.Getwd()
 				if err != nil {
 					return err
@@ -69,9 +76,14 @@ func newReviewCmd() *cobra.Command {
 			}
 			repoName := filepath.Base(repoPath)
 
-			return RunReviewInteractive(worktreePath, repoName)
+			return RunReviewEditor(worktreePath, repoName, dryRun)
 		},
 	}
+
+	cmd.Flags().StringVar(&worktreeDir, "worktree-dir", "", "override worktree path")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without writing")
+
+	return cmd
 }
 
 func newListCmd() *cobra.Command {
@@ -201,50 +213,112 @@ func newEditCmd() *cobra.Command {
 	return cmd
 }
 
-func RunReviewInteractive(worktreePath, repoName string) error {
+// RunReviewEditor opens $EDITOR with reviewable rules and loops until the user
+// accepts, edits again, or aborts.
+func RunReviewEditor(worktreePath, repoName string, dryRun bool) error {
 	settingsPath := filepath.Join(worktreePath, ".claude", "settings.local.json")
-	snapshotPath := filepath.Join(worktreePath, ".claude", ".settings-snapshot.json")
+	tiersDir := TiersDir()
+	globalSettingsPath := GlobalClaudeSettingsPath()
 
-	snapshot, err := LoadClaudeSettings(snapshotPath)
+	rules, err := ComputeReviewableRules(
+		settingsPath, globalSettingsPath, tiersDir, repoName, worktreePath,
+	)
 	if err != nil {
 		return err
 	}
 
-	current, err := LoadClaudeSettings(settingsPath)
-	if err != nil {
-		return err
-	}
-
-	newRules := DiffRules(snapshot, current)
-	if len(newRules) == 0 {
+	if len(rules) == 0 {
+		fmt.Println("no new permissions to review")
 		return nil
 	}
 
-	tiersDir := TiersDir()
-	var decisions []ReviewDecision
+	content := FormatEditorContent(rules, repoName)
 
-	for _, rule := range newRules {
-		var action string
+	tmpFile, err := os.CreateTemp("", "spinclass-perms-review-*.txt")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpFile.Name())
 
-		selectPrompt := huh.NewSelect[string]().
-			Title(fmt.Sprintf("New permission: %s", rule)).
-			Options(
-				huh.NewOption("Promote to global (all repos)", ReviewPromoteGlobal),
-				huh.NewOption(fmt.Sprintf("Promote to %s (this repo)", repoName), ReviewPromoteRepo),
-				huh.NewOption("Keep for this worktree only", ReviewKeep),
-				huh.NewOption("Discard", ReviewDiscard),
-			).
-			Value(&action)
+	if _, err := tmpFile.WriteString(content); err != nil {
+		tmpFile.Close()
+		return err
+	}
+	tmpFile.Close()
 
-		if err := selectPrompt.Run(); err != nil {
+	for {
+		if err := openEditor(tmpFile.Name()); err != nil {
+			return fmt.Errorf("editor failed: %w", err)
+		}
+
+		edited, err := os.ReadFile(tmpFile.Name())
+		if err != nil {
 			return err
 		}
 
-		decisions = append(decisions, ReviewDecision{
-			Rule:   rule,
-			Action: action,
-		})
+		decisions, err := ParseEditorContent(string(edited))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Parse error: %v\nRe-opening editor.\n", err)
+			continue
+		}
+
+		if len(decisions) == 0 {
+			fmt.Println("no decisions — aborting")
+			return nil
+		}
+
+		// Print the parsed decisions for review
+		fmt.Println()
+		for _, d := range decisions {
+			friendly := FriendlyName(d.Rule)
+			if friendly != "" {
+				fmt.Printf("  %-8s %s  # %s\n", d.Action, d.Rule, friendly)
+			} else {
+				fmt.Printf("  %-8s %s\n", d.Action, d.Rule)
+			}
+		}
+		fmt.Println()
+
+		var choice string
+		prompt := huh.NewSelect[string]().
+			Title("Review complete").
+			Options(
+				huh.NewOption("Accept", "accept"),
+				huh.NewOption("Edit again", "edit"),
+				huh.NewOption("Abort", "abort"),
+			).
+			Value(&choice)
+
+		if err := prompt.Run(); err != nil {
+			return err
+		}
+
+		switch choice {
+		case "accept":
+			if dryRun {
+				DryRunDecisions(os.Stdout, tiersDir, repoName, decisions)
+				return nil
+			}
+			return RouteDecisions(tiersDir, repoName, settingsPath, decisions)
+		case "edit":
+			continue
+		case "abort":
+			fmt.Println("aborted")
+			return nil
+		}
+	}
+}
+
+func openEditor(path string) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "vi"
 	}
 
-	return RouteDecisions(tiersDir, repoName, settingsPath, decisions)
+	cmd := exec.Command(editor, path)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
