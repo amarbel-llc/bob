@@ -1,9 +1,11 @@
 package perms
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -147,5 +149,31 @@ func TestRouteDecisionsKeep(t *testing.T) {
 	}
 	if remaining[1] != "Edit" {
 		t.Errorf("expected Edit, got %q", remaining[1])
+	}
+}
+
+func TestDryRunDecisions(t *testing.T) {
+	var buf bytes.Buffer
+	decisions := []ReviewDecision{
+		{Rule: "Bash(go test:*)", Action: ReviewPromoteGlobal},
+		{Rule: "Edit", Action: ReviewPromoteRepo},
+		{Rule: "Bash(rm -rf:*)", Action: ReviewDiscard},
+		{Rule: "Read", Action: ReviewKeep},
+	}
+
+	DryRunDecisions(&buf, "/tmp/tiers", "myrepo", decisions)
+	out := buf.String()
+
+	if !strings.Contains(out, "would promote to global tier") {
+		t.Error("expected global tier output")
+	}
+	if !strings.Contains(out, "Bash(go test:*)") {
+		t.Error("expected promoted rule in output")
+	}
+	if !strings.Contains(out, "would discard") {
+		t.Error("expected discard output")
+	}
+	if !strings.Contains(out, "would keep") {
+		t.Error("expected keep output")
 	}
 }
