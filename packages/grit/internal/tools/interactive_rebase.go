@@ -217,7 +217,10 @@ func handleInteractiveRebaseExecute(ctx context.Context, args json.RawMessage, _
 		return command.TextErrorResult(fmt.Sprintf("failed to write temp script: %v", err)), nil
 	}
 	seqScript.Close()
-	os.Chmod(seqScript.Name(), 0o755)
+
+	if err := os.Chmod(seqScript.Name(), 0o755); err != nil {
+		return command.TextErrorResult(fmt.Sprintf("failed to make temp script executable: %v", err)), nil
+	}
 
 	// Build env vars
 	extraEnv := []string{
@@ -259,7 +262,10 @@ func handleInteractiveRebaseExecute(ctx context.Context, args json.RawMessage, _
 			return command.TextErrorResult(fmt.Sprintf("failed to write editor script: %v", err)), nil
 		}
 		editorScript.Close()
-		os.Chmod(editorScript.Name(), 0o755)
+
+		if err := os.Chmod(editorScript.Name(), 0o755); err != nil {
+			return command.TextErrorResult(fmt.Sprintf("failed to make editor script executable: %v", err)), nil
+		}
 
 		extraEnv = append(extraEnv, fmt.Sprintf("GIT_EDITOR=%s", editorScript.Name()))
 	}

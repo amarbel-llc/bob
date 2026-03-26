@@ -16,6 +16,7 @@ func RegisterAll() (*command.App, *resourceProvider) {
 	registerRevParseCommands(app)
 	registerRebaseCommands(app)
 	registerInteractiveRebaseCommands(app)
+	registerCherryPickCommands(app)
 	registerHardResetCommands(app)
 	registerTagCommands(app)
 

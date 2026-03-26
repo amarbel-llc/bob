@@ -297,6 +297,7 @@ func registerResourceToolCommands(app *command.App, resProvider *resourceProvide
 	readOnly := true
 	notDestructive := false
 	idempotent := true
+	notOpenWorld := false
 
 	app.AddCommand(&command.Command{
 		Name: "resource-templates",
@@ -307,6 +308,7 @@ func registerResourceToolCommands(app *command.App, resProvider *resourceProvide
 			ReadOnlyHint:    &readOnly,
 			DestructiveHint: &notDestructive,
 			IdempotentHint:  &idempotent,
+			OpenWorldHint:   &notOpenWorld,
 		},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			templates, err := resProvider.ListResourceTemplates(ctx)
@@ -345,6 +347,7 @@ func registerResourceToolCommands(app *command.App, resProvider *resourceProvide
 			ReadOnlyHint:    &readOnly,
 			DestructiveHint: &notDestructive,
 			IdempotentHint:  &idempotent,
+			OpenWorldHint:   &notOpenWorld,
 		},
 		Params: []command.Param{
 			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., grit://status, grit://log?max_count=5)", Required: true},

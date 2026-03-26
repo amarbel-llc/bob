@@ -30,6 +30,27 @@ func registerBranchCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
+		Name:        "branch_delete",
+		Title:       "Delete Branch",
+		Description: command.Description{Short: "Delete a local branch (blocked on main/master for safety)"},
+		Annotations: &protocol.ToolAnnotations{
+			ReadOnlyHint:    protocol.BoolPtr(false),
+			DestructiveHint: protocol.BoolPtr(true),
+			IdempotentHint:  protocol.BoolPtr(true),
+			OpenWorldHint:   protocol.BoolPtr(false),
+		},
+		Params: []command.Param{
+			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
+			{Name: "name", Type: command.String, Description: "Name of the branch to delete", Required: true},
+			{Name: "force", Type: command.Bool, Description: "Force delete even if not fully merged (-D instead of -d)"},
+		},
+		MapsTools: []command.ToolMapping{
+			{Replaces: "Bash", CommandPrefixes: []string{"git branch -d", "git branch -D", "git branch --delete"}, UseWhen: "deleting a branch"},
+		},
+		Run: handleGitBranchDelete,
+	})
+
+	app.AddCommand(&command.Command{
 		Name:        "checkout",
 		Title:       "Switch Branches or Restore Files",
 		Description: command.Description{Short: "Switch branches or restore individual files from a ref. Use paths to restore specific files; omit paths to switch branches."},
@@ -77,6 +98,37 @@ func handleGitBranchCreate(ctx context.Context, args json.RawMessage, _ command.
 		Status:     "created",
 		Name:       params.Name,
 		StartPoint: params.StartPoint,
+	}), nil
+}
+
+func handleGitBranchDelete(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+	var params struct {
+		RepoPath string `json:"repo_path"`
+		Name     string `json:"name"`
+		Force    bool   `json:"force"`
+	}
+
+	if err := json.Unmarshal(args, &params); err != nil {
+		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
+	}
+
+	if params.Name == "main" || params.Name == "master" {
+		return command.TextErrorResult("deleting main/master is blocked for safety"), nil
+	}
+
+	flag := "-d"
+	if params.Force {
+		flag = "-D"
+	}
+
+	if _, err := git.Run(ctx, params.RepoPath, "branch", flag, params.Name); err != nil {
+		return command.TextErrorResult(fmt.Sprintf("git branch delete: %v", err)), nil
+	}
+
+	return command.JSONResult(git.MutationResult{
+		Status: "deleted",
+		Name:   params.Name,
+		Force:  params.Force,
 	}), nil
 }
 
