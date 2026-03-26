@@ -139,13 +139,19 @@ validate-mcp-get-hubbed: build-get-hubbed
     purse-first validate-mcp result/bin/get-hubbed
 
 validate-mcp-lux: build-lux
-    purse-first validate-mcp result/bin/lux
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+    mkdir -p "$tmpdir/lux"
+    touch "$tmpdir/lux/lsps.toml"
+    XDG_CONFIG_HOME="$tmpdir" purse-first validate-mcp result/bin/lux mcp-stdio
 
 validate-mcp-chix: build-chix
     purse-first validate-mcp result/bin/chix
 
 validate-mcp-caldav: build-caldav
-    purse-first validate-mcp result/bin/caldav
+    CALDAV_URL="http://localhost:1" CALDAV_USERNAME="test" CALDAV_PASSWORD="test" purse-first validate-mcp result/bin/caldav
 
 validate-mcp: validate-mcp-grit validate-mcp-get-hubbed validate-mcp-lux validate-mcp-chix validate-mcp-caldav
 
