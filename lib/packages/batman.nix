@@ -99,6 +99,7 @@ let
       pkgs.bats
       pkgs.coreutils
       pkgs.gawk
+      pkgs.parallel
       sandcastle
       tap-dancer-cli
     ];
