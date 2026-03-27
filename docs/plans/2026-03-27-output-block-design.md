@@ -59,6 +59,10 @@ impl OutputBlockWriter<'_> {
 values --- preserve SGR sequences in color mode, strip in non-color mode, always
 strip non-SGR CSI sequences.
 
+**Future work:** The output line API may benefit from richer SGR support (e.g.,
+producer-controlled coloring of output lines, or harness-side re-coloring). Out
+of scope for V1 --- V1 reuses the existing YAML diagnostic SGR filtering as-is.
+
 ### TestPoint Iterator Integration (Go)
 
 Add `OutputBlock func(*OutputBlockWriter) *Diagnostics` field to the `TestPoint`
