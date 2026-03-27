@@ -392,6 +392,61 @@ impl<'a> TapWriter<'a> {
         }
         f(&mut child)
     }
+
+    pub fn output_block<F>(&mut self, desc: &str, f: F) -> io::Result<usize>
+    where
+        F: FnOnce(&mut OutputBlockWriter) -> Option<Vec<(String, String)>>,
+    {
+        self.counter += 1;
+        let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
+        let diag = {
+            let mut ob = OutputBlockWriter {
+                w: &mut *self.w,
+                color: self.config.color(),
+            };
+            f(&mut ob)
+        };
+        match diag {
+            Some(diagnostics) => {
+                self.failed = true;
+                writeln!(
+                    self.w,
+                    "{} {} - {}",
+                    status_not_ok(self.config.color()),
+                    num,
+                    desc
+                )?;
+                let refs: Vec<(&str, &str)> = diagnostics
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .collect();
+                write_diagnostics_block(&mut *self.w, &refs, self.config.color())?;
+            }
+            None => {
+                writeln!(
+                    self.w,
+                    "{} {} - {}",
+                    status_ok(self.config.color()),
+                    num,
+                    desc
+                )?;
+            }
+        }
+        Ok(self.counter)
+    }
+}
+
+pub struct OutputBlockWriter<'a> {
+    w: &'a mut dyn Write,
+    color: bool,
+}
+
+impl OutputBlockWriter<'_> {
+    pub fn line(&mut self, text: &str) -> io::Result<()> {
+        let text = sanitize_yaml_value(text, self.color);
+        writeln!(self.w, "    {}", text)
+    }
 }
 
 struct IndentWriter<'a> {
@@ -600,6 +655,14 @@ pub fn write_pragma(w: &mut impl Write, key: &str, enabled: bool) -> io::Result<
 
 pub fn write_plan_skip(w: &mut impl Write, reason: &str) -> io::Result<()> {
     writeln!(w, "1..0 # SKIP {reason}")
+}
+
+pub fn write_output_header(w: &mut impl Write, num: usize, desc: &str) -> io::Result<()> {
+    writeln!(w, "# Output: {} - {}", num, desc)
+}
+
+pub fn write_output_line(w: &mut impl Write, text: &str) -> io::Result<()> {
+    writeln!(w, "    {}", text)
 }
 
 pub fn write_plan_locale(
@@ -2216,5 +2279,89 @@ mod tests {
         let p = s.formatted_prefix();
         assert!(!p.contains("💤"), "unexpected 💤 in prefix: {p}");
         assert!(p.ends_with(' '), "prefix should end with space: {p:?}");
+    }
+
+    #[test]
+    fn test_output_block_ok() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.output_block("build the project", |ob| {
+            ob.line("compiling main.rs").unwrap();
+            ob.line("compiling lib.rs").unwrap();
+            None
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        let want = "TAP version 14\n\
+                    # Output: 1 - build the project\n\
+                    \x20\x20\x20\x20compiling main.rs\n\
+                    \x20\x20\x20\x20compiling lib.rs\n\
+                    ok 1 - build the project\n\
+                    1..1\n";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_output_block_not_ok() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.output_block("build", |ob| {
+            ob.line("compiling...").unwrap();
+            Some(vec![
+                ("message".into(), "compilation failed".into()),
+                ("severity".into(), "fail".into()),
+            ])
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(got.contains("not ok 1 - build"));
+        assert!(got.contains("  ---"));
+        assert!(got.contains("  message: \"compilation failed\""));
+    }
+
+    #[test]
+    fn test_output_block_sgr_color_mode() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).color(true).build().unwrap();
+        tw.output_block("test", |ob| {
+            ob.line("hello \x1b[32mgreen\x1b[0m and \x1b[2Kclear")
+                .unwrap();
+            None
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(got.contains("\x1b[32m"), "SGR should be preserved");
+        assert!(!got.contains("\x1b[2K"), "non-SGR should be stripped");
+    }
+
+    #[test]
+    fn test_output_block_sgr_no_color() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).color(false).build().unwrap();
+        tw.output_block("test", |ob| {
+            ob.line("hello \x1b[32mgreen\x1b[0m").unwrap();
+            None
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(!got.contains("\x1b["), "all ANSI should be stripped");
+    }
+
+    #[test]
+    fn test_output_block_empty() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.output_block("no output", |_ob| None).unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        let want = "TAP version 14\n\
+                    # Output: 1 - no output\n\
+                    ok 1 - no output\n\
+                    1..1\n";
+        assert_eq!(got, want);
     }
 }
