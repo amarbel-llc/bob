@@ -360,11 +360,14 @@ type TestPoint struct {
 	Todo        string
 	Diagnostics *Diagnostics
 	Subtests    func(*Writer)
+	OutputBlock func(*OutputBlockWriter) *Diagnostics
 }
 
 func (tw *Writer) WriteAll(tests iter.Seq[TestPoint]) {
 	for tp := range tests {
-		if tp.Subtests != nil {
+		if tp.OutputBlock != nil {
+			tw.OutputBlock(tp.Description, tp.OutputBlock)
+		} else if tp.Subtests != nil {
 			child := tw.Subtest(tp.Description)
 			tp.Subtests(child)
 			if !child.planEmitted {

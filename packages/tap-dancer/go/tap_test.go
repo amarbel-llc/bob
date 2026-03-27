@@ -1002,3 +1002,28 @@ func TestOutputBlockEmpty(t *testing.T) {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestWriteAllOutputBlock(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.WriteAll(func(yield func(TestPoint) bool) {
+		yield(TestPoint{
+			Description: "compile",
+			Ok:          true,
+			OutputBlock: func(ob *OutputBlockWriter) *Diagnostics {
+				ob.Line("building...")
+				return nil
+			},
+		})
+	})
+	got := buf.String()
+	if !strings.Contains(got, "# Output: 1 - compile") {
+		t.Errorf("expected output header, got:\n%s", got)
+	}
+	if !strings.Contains(got, "    building...") {
+		t.Errorf("expected output body, got:\n%s", got)
+	}
+	if !strings.Contains(got, "ok 1 - compile") {
+		t.Errorf("expected test point, got:\n%s", got)
+	}
+}
