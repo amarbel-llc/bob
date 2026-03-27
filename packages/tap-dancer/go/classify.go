@@ -19,12 +19,14 @@ const (
 	lineComment
 	lineSubtestComment
 	lineEmpty
+	lineOutputHeader
 )
 
 var (
 	planRegexp      = regexp.MustCompile(`^1\.\.([\d,.\x{00a0}\x{202f} ]+)(\s+#\s+(.*))?$`)
 	testPointRegexp = regexp.MustCompile(`^(not )?ok\b`)
 	pragmaRegexp    = regexp.MustCompile(`^pragma\s+[+-]\w`)
+	outputHeaderRegexp = regexp.MustCompile(`^# Output:\s+(\d+)\s*-\s*(.+?)(?:\s+#.*)?$`)
 	// csiRegexp matches all CSI escape sequences (ESC [ ... <final byte>),
 	// not just SGR, per the ANSI Display Hints amendment security guidance.
 	csiRegexp = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
@@ -70,6 +72,10 @@ func classifyLine(line string) lineKind {
 
 	if pragmaRegexp.MatchString(line) {
 		return linePragma
+	}
+
+	if outputHeaderRegexp.MatchString(line) {
+		return lineOutputHeader
 	}
 
 	if strings.HasPrefix(line, "# Subtest") {

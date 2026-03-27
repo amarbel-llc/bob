@@ -625,3 +625,105 @@ func TestReaderLocaleRoundTrip(t *testing.T) {
 		t.Errorf("expected plan count 1234, got %d", summary.PlanCount)
 	}
 }
+
+func TestReaderOutputBlock(t *testing.T) {
+	input := "TAP version 14\n" +
+		"# Output: 1 - build\n" +
+		"    compiling main.rs\n" +
+		"    linking binary\n" +
+		"ok 1 - build\n" +
+		"1..1\n"
+	r := NewReader(strings.NewReader(input))
+
+	ev, err := r.Next() // version
+	if err != nil || ev.Type != EventVersion {
+		t.Fatalf("expected version, got %v %v", ev, err)
+	}
+
+	ev, err = r.Next() // output header
+	if err != nil || ev.Type != EventOutputHeader {
+		t.Fatalf("expected output header, got %v %v", ev, err)
+	}
+	if ev.OutputHeader == nil || ev.OutputHeader.Number != 1 || ev.OutputHeader.Description != "build" {
+		t.Fatalf("bad output header: %+v", ev.OutputHeader)
+	}
+
+	ev, err = r.Next() // output line 1
+	if err != nil || ev.Type != EventOutputLine {
+		t.Fatalf("expected output line, got %v %v", ev, err)
+	}
+	if ev.OutputLine != "compiling main.rs" {
+		t.Fatalf("bad output line: %q", ev.OutputLine)
+	}
+
+	ev, err = r.Next() // output line 2
+	if err != nil || ev.Type != EventOutputLine {
+		t.Fatalf("expected output line, got %v %v", ev, err)
+	}
+	if ev.OutputLine != "linking binary" {
+		t.Fatalf("bad output line: %q", ev.OutputLine)
+	}
+
+	ev, err = r.Next() // test point
+	if err != nil || ev.Type != EventTestPoint {
+		t.Fatalf("expected test point, got %v %v", ev, err)
+	}
+
+	ev, err = r.Next() // plan
+	if err != nil || ev.Type != EventPlan {
+		t.Fatalf("expected plan, got %v %v", ev, err)
+	}
+
+	summary := r.Summary()
+	if !summary.Valid {
+		t.Errorf("expected valid, diagnostics: %v", r.Diagnostics())
+	}
+}
+
+func TestReaderOutputBlockMismatchedID(t *testing.T) {
+	input := "TAP version 14\n" +
+		"# Output: 1 - build\n" +
+		"    compiling\n" +
+		"ok 2 - build\n" +
+		"1..1\n"
+	r := NewReader(strings.NewReader(input))
+	for {
+		if _, err := r.Next(); err != nil {
+			break
+		}
+	}
+	diags := r.Diagnostics()
+	found := false
+	for _, d := range diags {
+		if d.Rule == "output-block-id-mismatch" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected output-block-id-mismatch diagnostic, got: %v", diags)
+	}
+}
+
+func TestReaderOutputBlockDescriptionMismatch(t *testing.T) {
+	input := "TAP version 14\n" +
+		"# Output: 1 - build\n" +
+		"    compiling\n" +
+		"ok 1 - compile\n" +
+		"1..1\n"
+	r := NewReader(strings.NewReader(input))
+	for {
+		if _, err := r.Next(); err != nil {
+			break
+		}
+	}
+	diags := r.Diagnostics()
+	found := false
+	for _, d := range diags {
+		if d.Rule == "output-block-description-mismatch" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected output-block-description-mismatch warning, got: %v", diags)
+	}
+}

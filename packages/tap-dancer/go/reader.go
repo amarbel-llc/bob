@@ -22,14 +22,17 @@ const (
 )
 
 type frame struct {
-	depth          int
-	planSeen       bool
-	planCount      int
-	planLine       int
-	testCount      int
-	lastTestNumber int
-	streamedOutput bool
-	localeSep      string // grouping separator for active locale, empty = no locale
+	depth                  int
+	planSeen               bool
+	planCount              int
+	planLine               int
+	testCount              int
+	lastTestNumber         int
+	streamedOutput         bool
+	localeSep              string // grouping separator for active locale, empty = no locale
+	inOutputBlock          bool
+	outputBlockNumber      int
+	outputBlockDescription string
 }
 
 // Reader is a streaming TAP-14 parser and validator.
@@ -129,6 +132,21 @@ func (r *Reader) Next() (Event, error) {
 			continue
 		}
 
+		// Handle output block body lines (4-space indent at current depth)
+		// Must check before depth-change handling, since 4-space indent
+		// would otherwise trigger a subtest frame push.
+		if r.currentFrame().inOutputBlock && indent == (r.currentFrame().depth*4)+4 {
+			content := raw[(r.currentFrame().depth*4)+4:]
+			r.lastWasTestPoint = false
+			return Event{
+				Type:       EventOutputLine,
+				Line:       r.lineNum,
+				Depth:      r.currentFrame().depth,
+				Raw:        raw,
+				OutputLine: content,
+			}, nil
+		}
+
 		// Handle depth changes for subtests
 		if depth > r.currentFrame().depth {
 			r.stack = append(r.stack, frame{depth: depth})
@@ -196,6 +214,20 @@ func (r *Reader) Next() (Event, error) {
 				f.lastTestNumber = tp.Number
 			}
 
+			if f.inOutputBlock {
+				f.inOutputBlock = false
+				if tp.Number != f.outputBlockNumber {
+					r.addDiag(SeverityError, "output-block-id-mismatch",
+						"output block header declared test "+strconv.Itoa(f.outputBlockNumber)+
+							" but correlated test point is "+strconv.Itoa(tp.Number))
+				}
+				if tp.Description != f.outputBlockDescription {
+					r.addDiag(SeverityWarning, "output-block-description-mismatch",
+						"output block header description "+strconv.Quote(f.outputBlockDescription)+
+							" differs from test point description "+strconv.Quote(tp.Description))
+				}
+			}
+
 			// Track pass/fail/skip/todo
 			switch tp.Directive {
 			case DirectiveSkip:
@@ -257,6 +289,26 @@ func (r *Reader) Next() (Event, error) {
 			}
 			r.lastWasTestPoint = false
 			return Event{Type: EventPragma, Line: r.lineNum, Depth: depth, Raw: raw, Pragma: &p}, nil
+
+		case lineOutputHeader:
+			m := outputHeaderRegexp.FindStringSubmatch(trimmed)
+			num, _ := strconv.Atoi(m[1])
+			desc := strings.TrimSpace(m[2])
+			f := r.currentFrame()
+			f.inOutputBlock = true
+			f.outputBlockNumber = num
+			f.outputBlockDescription = desc
+			r.lastWasTestPoint = false
+			return Event{
+				Type:  EventOutputHeader,
+				Line:  r.lineNum,
+				Depth: depth,
+				Raw:   raw,
+				OutputHeader: &OutputHeaderResult{
+					Number:      num,
+					Description: desc,
+				},
+			}, nil
 
 		case lineSubtestComment:
 			comment := strings.TrimPrefix(trimmed, "#")

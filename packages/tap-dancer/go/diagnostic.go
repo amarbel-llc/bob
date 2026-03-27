@@ -60,8 +60,16 @@ const (
 	EventPragma
 	EventSubtestStart
 	EventSubtestEnd
+	EventOutputHeader
+	EventOutputLine
 	EventUnknown
 )
+
+// OutputHeaderResult holds parsed data from an Output Block header.
+type OutputHeaderResult struct {
+	Number      int    `json:"number"`
+	Description string `json:"description"`
+}
 
 // TestPointResult holds parsed data from a test point line.
 type TestPointResult struct {
@@ -102,6 +110,8 @@ type Event struct {
 	Comment        string            `json:"comment,omitempty"`
 	Pragma         *PragmaResult     `json:"pragma,omitempty"`
 	StreamedOutput bool              `json:"streamed_output,omitempty"`
+	OutputHeader   *OutputHeaderResult `json:"output_header,omitempty"`
+	OutputLine     string              `json:"output_line,omitempty"`
 }
 
 // Summary provides aggregate results after parsing a TAP document.
