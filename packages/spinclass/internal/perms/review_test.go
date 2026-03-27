@@ -26,19 +26,12 @@ func TestRouteDecisions(t *testing.T) {
 	repoData, _ := json.MarshalIndent(repoTier, "", "  ")
 	os.WriteFile(repoPath, repoData, 0o644)
 
-	// Seed settings.local.json with ["Read", "Edit", "Bash(go test:*)"]
-	settingsPath := filepath.Join(tmpDir, ".claude", "settings.local.json")
-	err := SaveClaudeSettings(settingsPath, []string{"Read", "Edit", "Bash(go test:*)"})
-	if err != nil {
-		t.Fatalf("failed to seed settings: %v", err)
-	}
-
 	decisions := []ReviewDecision{
 		{Rule: "Edit", Action: ReviewPromoteGlobal},
 		{Rule: "Bash(go test:*)", Action: ReviewPromoteRepo},
 	}
 
-	err = RouteDecisions(tiersDir, "myrepo", settingsPath, decisions)
+	err := RouteDecisions(tiersDir, "myrepo", decisions)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,18 +64,6 @@ func TestRouteDecisions(t *testing.T) {
 	if !repoFound["Bash(go test:*)"] {
 		t.Error("expected Bash(go test:*) to be promoted to repo tier")
 	}
-
-	// Verify settings.local.json no longer contains promoted rules but still has "Read"
-	remaining, err := LoadClaudeSettings(settingsPath)
-	if err != nil {
-		t.Fatalf("failed to load settings: %v", err)
-	}
-	if len(remaining) != 1 {
-		t.Fatalf("expected 1 remaining rule in settings, got %d: %v", len(remaining), remaining)
-	}
-	if remaining[0] != "Read" {
-		t.Errorf("expected Read to remain in settings, got %q", remaining[0])
-	}
 }
 
 func TestRouteDecisionsDiscard(t *testing.T) {
@@ -90,31 +71,15 @@ func TestRouteDecisionsDiscard(t *testing.T) {
 	tiersDir := filepath.Join(tmpDir, "tiers")
 	os.MkdirAll(filepath.Join(tiersDir, "repos"), 0o755)
 
-	settingsPath := filepath.Join(tmpDir, ".claude", "settings.local.json")
-	err := SaveClaudeSettings(settingsPath, []string{"Read", "Bash(rm -rf:*)"})
-	if err != nil {
-		t.Fatalf("failed to seed settings: %v", err)
-	}
-
 	decisions := []ReviewDecision{
 		{Rule: "Bash(rm -rf:*)", Action: ReviewDiscard},
 	}
 
-	err = RouteDecisions(tiersDir, "myrepo", settingsPath, decisions)
+	err := RouteDecisions(tiersDir, "myrepo", decisions)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	remaining, err := LoadClaudeSettings(settingsPath)
-	if err != nil {
-		t.Fatalf("failed to load settings: %v", err)
-	}
-	if len(remaining) != 1 {
-		t.Fatalf("expected 1 remaining rule, got %d: %v", len(remaining), remaining)
-	}
-	if remaining[0] != "Read" {
-		t.Errorf("expected Read, got %q", remaining[0])
-	}
+	// Discard is a no-op — rule just isn't promoted.
 }
 
 func TestRouteDecisionsKeep(t *testing.T) {
@@ -122,34 +87,15 @@ func TestRouteDecisionsKeep(t *testing.T) {
 	tiersDir := filepath.Join(tmpDir, "tiers")
 	os.MkdirAll(filepath.Join(tiersDir, "repos"), 0o755)
 
-	settingsPath := filepath.Join(tmpDir, ".claude", "settings.local.json")
-	err := SaveClaudeSettings(settingsPath, []string{"Read", "Edit"})
-	if err != nil {
-		t.Fatalf("failed to seed settings: %v", err)
-	}
-
 	decisions := []ReviewDecision{
 		{Rule: "Edit", Action: ReviewKeep},
 	}
 
-	err = RouteDecisions(tiersDir, "myrepo", settingsPath, decisions)
+	err := RouteDecisions(tiersDir, "myrepo", decisions)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	remaining, err := LoadClaudeSettings(settingsPath)
-	if err != nil {
-		t.Fatalf("failed to load settings: %v", err)
-	}
-	if len(remaining) != 2 {
-		t.Fatalf("expected 2 remaining rules, got %d: %v", len(remaining), remaining)
-	}
-	if remaining[0] != "Read" {
-		t.Errorf("expected Read, got %q", remaining[0])
-	}
-	if remaining[1] != "Edit" {
-		t.Errorf("expected Edit, got %q", remaining[1])
-	}
+	// Keep is a no-op — rule stays only in the log.
 }
 
 func TestDryRunDecisions(t *testing.T) {
@@ -170,10 +116,10 @@ func TestDryRunDecisions(t *testing.T) {
 	if !strings.Contains(out, "Bash(go test:*)") {
 		t.Error("expected promoted rule in output")
 	}
-	if !strings.Contains(out, "would discard") {
+	if !strings.Contains(out, "would discard (not promoted)") {
 		t.Error("expected discard output")
 	}
-	if !strings.Contains(out, "would keep") {
+	if !strings.Contains(out, "would keep (not promoted)") {
 		t.Error("expected keep output")
 	}
 }

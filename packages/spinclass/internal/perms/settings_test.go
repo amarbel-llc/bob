@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -169,6 +170,49 @@ func TestRemoveRules(t *testing.T) {
 	}
 }
 
+func TestLoadRulesFromLog(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "tool-use.log")
+
+	// Write JSONL entries
+	lines := []string{
+		`{"tool_name":"Edit","tool_input":{"file_path":"/some/file.go"}}`,
+		`{"tool_name":"Bash","tool_input":{"command":"go test ./..."}}`,
+		`{"tool_name":"Edit","tool_input":{"file_path":"/some/file.go"}}`,
+		`{"tool_name":"Glob","tool_input":{}}`,
+	}
+	os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+
+	rules, err := LoadRulesFromLog(logPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should deduplicate: Edit(/some/file.go) appears twice
+	if len(rules) != 3 {
+		t.Fatalf("expected 3 rules, got %d: %v", len(rules), rules)
+	}
+	if rules[0] != "Edit(/some/file.go)" {
+		t.Errorf("expected Edit(/some/file.go), got %q", rules[0])
+	}
+	if rules[1] != "Bash(go test ./...)" {
+		t.Errorf("expected Bash(go test ./...), got %q", rules[1])
+	}
+	if rules[2] != "Glob" {
+		t.Errorf("expected Glob, got %q", rules[2])
+	}
+}
+
+func TestLoadRulesFromLogMissing(t *testing.T) {
+	rules, err := LoadRulesFromLog(filepath.Join(t.TempDir(), "nonexistent.log"))
+	if err != nil {
+		t.Fatalf("expected no error for missing file, got %v", err)
+	}
+	if rules != nil {
+		t.Errorf("expected nil for missing file, got %v", rules)
+	}
+}
+
 func TestComputeReviewableRules(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -176,23 +220,21 @@ func TestComputeReviewableRules(t *testing.T) {
 	// matches the synthetic /Users/me paths used in this test.
 	t.Setenv("HOME", "/Users/me")
 
-	// Worktree settings: mix of rules
-	worktreeSettingsPath := filepath.Join(tmpDir, "worktree", ".claude", "settings.local.json")
-	worktreeRules := []string{
-		"Bash(go test:*)",
-		"Bash(nix build:*)",
-		"Edit",
-		"Glob",
-		"Read(/Users/me/.claude/*)",
-		"Read(/Users/me/repos/bob/.worktrees/wt/*)",
-		"Edit(/Users/me/repos/bob/.worktrees/wt/*)",
-		"Write(/Users/me/repos/bob/.worktrees/wt/*)",
-		"mcp__plugin_grit_grit__add",
-		"WebSearch",
+	// Tool-use log with a mix of tool invocations
+	logPath := filepath.Join(tmpDir, "tool-use.log")
+	logEntries := []string{
+		`{"tool_name":"Bash","tool_input":{"command":"go test ./..."}}`,
+		`{"tool_name":"Bash","tool_input":{"command":"nix build"}}`,
+		`{"tool_name":"Edit","tool_input":{"file_path":"/Users/me/repos/bob/.worktrees/wt/main.go"}}`,
+		`{"tool_name":"Glob","tool_input":{}}`,
+		`{"tool_name":"Read","tool_input":{"file_path":"/Users/me/.claude/CLAUDE.md"}}`,
+		`{"tool_name":"Read","tool_input":{"file_path":"/Users/me/repos/bob/.worktrees/wt/go.mod"}}`,
+		`{"tool_name":"Edit","tool_input":{"file_path":"/Users/me/repos/bob/.worktrees/wt/pkg/foo.go"}}`,
+		`{"tool_name":"Write","tool_input":{"file_path":"/Users/me/repos/bob/.worktrees/wt/new.go"}}`,
+		`{"tool_name":"mcp__plugin_grit_grit__add","tool_input":{}}`,
+		`{"tool_name":"WebSearch","tool_input":{}}`,
 	}
-	if err := SaveClaudeSettings(worktreeSettingsPath, worktreeRules); err != nil {
-		t.Fatal(err)
-	}
+	os.WriteFile(logPath, []byte(strings.Join(logEntries, "\n")+"\n"), 0o644)
 
 	// Global settings: some overlap
 	globalSettingsPath := filepath.Join(tmpDir, "global-settings.json")
@@ -211,7 +253,7 @@ func TestComputeReviewableRules(t *testing.T) {
 	}
 
 	got, err := ComputeReviewableRules(
-		worktreeSettingsPath,
+		logPath,
 		globalSettingsPath,
 		tiersDir,
 		"myrepo",
@@ -221,13 +263,13 @@ func TestComputeReviewableRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should contain: Bash(go test:*), Bash(nix build:*), mcp__plugin_grit_grit__add
-	// Should NOT contain: Edit (in tier), Glob (global), WebSearch (global),
+	// Should contain: Bash(go test ./...), Bash(nix build), mcp__plugin_grit_grit__add
+	// Should NOT contain: Edit (bare, in tier), Glob (global), WebSearch (global),
 	// Read/Edit/Write worktree paths, Read(~/.claude/*)
 	wantSet := map[string]bool{
-		"Bash(go test:*)":            true,
-		"Bash(nix build:*)":          true,
-		"mcp__plugin_grit_grit__add": true,
+		"Bash(go test ./...)":          true,
+		"Bash(nix build)":              true,
+		"mcp__plugin_grit_grit__add":   true,
 	}
 
 	gotSet := map[string]bool{}

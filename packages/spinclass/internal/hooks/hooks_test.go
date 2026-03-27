@@ -362,9 +362,8 @@ func TestStopHookApprovesOnSecondInvocation(t *testing.T) {
 
 func TestPostToolUseWritesLog(t *testing.T) {
 	worktree := t.TempDir()
-	claudeDir := filepath.Join(worktree, ".claude")
-	os.MkdirAll(claudeDir, 0o755)
-	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+	spinclassDir := filepath.Join(worktree, ".spinclass")
+	os.MkdirAll(spinclassDir, 0o755)
 
 	input, _ := json.Marshal(map[string]any{
 		"hook_event_name": "PostToolUse",
@@ -384,7 +383,7 @@ func TestPostToolUseWritesLog(t *testing.T) {
 		t.Errorf("expected no output, got %q", out.String())
 	}
 
-	logPath := filepath.Join(claudeDir, "tool-use.log")
+	logPath := filepath.Join(spinclassDir, "tool-use.log")
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("expected log file at %s: %v", logPath, err)
@@ -406,9 +405,8 @@ func TestPostToolUseWritesLog(t *testing.T) {
 
 func TestPostToolUseAppendsToLog(t *testing.T) {
 	worktree := t.TempDir()
-	claudeDir := filepath.Join(worktree, ".claude")
-	os.MkdirAll(claudeDir, 0o755)
-	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+	spinclassDir := filepath.Join(worktree, ".spinclass")
+	os.MkdirAll(spinclassDir, 0o755)
 
 	for _, tool := range []string{"Edit", "Bash"} {
 		input, _ := json.Marshal(map[string]any{
@@ -424,7 +422,7 @@ func TestPostToolUseAppendsToLog(t *testing.T) {
 		}
 	}
 
-	logPath := filepath.Join(claudeDir, "tool-use.log")
+	logPath := filepath.Join(spinclassDir, "tool-use.log")
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("expected log file: %v", err)
@@ -454,11 +452,10 @@ func TestPostToolUseNoClaudeDirIsSilent(t *testing.T) {
 	}
 }
 
-func TestPostToolUseSubdirFindsClaudeDir(t *testing.T) {
+func TestPostToolUseSubdirFindsSpinclassDir(t *testing.T) {
 	worktree := t.TempDir()
-	claudeDir := filepath.Join(worktree, ".claude")
-	os.MkdirAll(claudeDir, 0o755)
-	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte("{}"), 0o644)
+	spinclassDir := filepath.Join(worktree, ".spinclass")
+	os.MkdirAll(spinclassDir, 0o755)
 
 	subdir := filepath.Join(worktree, "src", "pkg")
 	os.MkdirAll(subdir, 0o755)
@@ -477,7 +474,7 @@ func TestPostToolUseSubdirFindsClaudeDir(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	logPath := filepath.Join(claudeDir, "tool-use.log")
+	logPath := filepath.Join(spinclassDir, "tool-use.log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		t.Fatal("expected log file to be created when CWD is a subdirectory")
 	}

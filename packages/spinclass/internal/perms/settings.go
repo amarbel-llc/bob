@@ -1,6 +1,7 @@
 package perms
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,13 +112,53 @@ func RemoveRules(rules, toRemove []string) []string {
 	return result
 }
 
-// ComputeReviewableRules returns worktree rules that are not already covered by
-// global Claude settings, curated tier files, or auto-injected worktree-scoped
-// rules.
+// LoadRulesFromLog reads the JSONL tool-use log and returns deduplicated
+// permission strings derived from each entry. Returns nil and no error when
+// the file does not exist.
+func LoadRulesFromLog(logPath string) ([]string, error) {
+	f, err := os.Open(logPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	seen := make(map[string]bool)
+	var rules []string
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		var entry struct {
+			ToolName  string         `json:"tool_name"`
+			ToolInput map[string]any `json:"tool_input"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			continue
+		}
+
+		rule := BuildPermissionString(entry.ToolName, entry.ToolInput)
+		if !seen[rule] {
+			seen[rule] = true
+			rules = append(rules, rule)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return rules, nil
+}
+
+// ComputeReviewableRules returns rules derived from the tool-use log that are
+// not already covered by global Claude settings, curated tier files, or
+// auto-injected worktree-scoped rules.
 func ComputeReviewableRules(
-	worktreeSettingsPath, globalSettingsPath, tiersDir, repo, worktreePath string,
+	logPath, globalSettingsPath, tiersDir, repo, worktreePath string,
 ) ([]string, error) {
-	worktreeRules, err := LoadClaudeSettings(worktreeSettingsPath)
+	worktreeRules, err := LoadRulesFromLog(logPath)
 	if err != nil {
 		return nil, err
 	}
@@ -129,28 +170,31 @@ func ComputeReviewableRules(
 
 	tierRules := LoadTiers(tiersDir, repo)
 
-	exclude := make(map[string]bool)
-	for _, r := range globalRules {
-		exclude[r] = true
-	}
-	for _, r := range tierRules {
-		exclude[r] = true
-	}
+	// Collect all rules that should exclude a log-derived rule from review.
+	// These are glob-style rules (e.g. "Read(/path/*)") that need pattern
+	// matching against the specific permission strings from the log.
+	var excludeRules []string
+	excludeRules = append(excludeRules, globalRules...)
+	excludeRules = append(excludeRules, tierRules...)
 
 	// Auto-injected worktree-scoped rules
 	home, _ := os.UserHomeDir()
 	if home != "" {
-		exclude[fmt.Sprintf("Read(%s/.claude/*)", home)] = true
+		excludeRules = append(excludeRules, fmt.Sprintf("Read(%s/.claude/*)", home))
 	}
 	if worktreePath != "" {
-		exclude[fmt.Sprintf("Read(%s/*)", worktreePath)] = true
-		exclude[fmt.Sprintf("Edit(%s/*)", worktreePath)] = true
-		exclude[fmt.Sprintf("Write(%s/*)", worktreePath)] = true
+		excludeRules = append(excludeRules, fmt.Sprintf("Read(%s/*)", worktreePath))
+		excludeRules = append(excludeRules, fmt.Sprintf("Edit(%s/*)", worktreePath))
+		excludeRules = append(excludeRules, fmt.Sprintf("Write(%s/*)", worktreePath))
 	}
 
 	var result []string
 	for _, r := range worktreeRules {
-		if !exclude[r] {
+		// Parse the log-derived rule back into tool name + input to check
+		// against exclude rules using pattern matching.
+		ruleTool, ruleArg := parseRule(r)
+		toolInput := rebuildToolInput(ruleTool, ruleArg)
+		if !MatchesAnyRule(excludeRules, ruleTool, toolInput) {
 			result = append(result, r)
 		}
 	}
@@ -160,6 +204,25 @@ func ComputeReviewableRules(
 	}
 
 	return result, nil
+}
+
+// rebuildToolInput reconstructs a tool_input map from a parsed permission
+// string so that MatchesAnyRule can match it against glob-style exclude rules.
+func rebuildToolInput(toolName, arg string) map[string]any {
+	if arg == "" {
+		return nil
+	}
+
+	switch toolName {
+	case "Bash":
+		return map[string]any{"command": arg}
+	case "Read", "Edit", "Write":
+		return map[string]any{"file_path": arg}
+	case "WebFetch":
+		return map[string]any{"url": arg}
+	default:
+		return nil
+	}
 }
 
 // GlobalClaudeSettingsPath returns the path to the user-level Claude

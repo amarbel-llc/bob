@@ -65,7 +65,7 @@ func (sf Sweatfile) ToolUseLogEnabled() bool {
 // sweatfile config.
 func GetDefault() Sweatfile {
 	sweatfile := Sweatfile{
-		GitSkipIndex: []string{},
+		GitSkipIndex: []string{".spinclass/"},
 	}
 
 	if home, err := os.UserHomeDir(); err == nil && home != "" {

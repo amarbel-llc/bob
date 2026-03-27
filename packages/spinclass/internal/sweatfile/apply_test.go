@@ -16,12 +16,16 @@ func TestHardcodedDefaultsGitExcludes(t *testing.T) {
 		t.Fatal("expected non-nil git excludes slice")
 	}
 
-	if len(defaults.GitSkipIndex) != 0 {
+	if len(defaults.GitSkipIndex) != 1 {
 		t.Fatalf(
-			"expected 0 git excludes, got %d: %v",
+			"expected 1 git exclude, got %d: %v",
 			len(defaults.GitSkipIndex),
 			defaults.GitSkipIndex,
 		)
+	}
+
+	if defaults.GitSkipIndex[0] != ".spinclass/" {
+		t.Errorf("expected .spinclass/, got %q", defaults.GitSkipIndex[0])
 	}
 }
 

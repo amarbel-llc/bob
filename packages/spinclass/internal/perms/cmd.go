@@ -216,12 +216,12 @@ func newEditCmd() *cobra.Command {
 // RunReviewEditor opens $EDITOR with reviewable rules and loops until the user
 // accepts, edits again, or aborts.
 func RunReviewEditor(worktreePath, repoName string, dryRun bool) error {
-	settingsPath := filepath.Join(worktreePath, ".claude", "settings.local.json")
+	logPath := filepath.Join(worktreePath, ".spinclass", "tool-use.log")
 	tiersDir := TiersDir()
 	globalSettingsPath := GlobalClaudeSettingsPath()
 
 	rules, err := ComputeReviewableRules(
-		settingsPath, globalSettingsPath, tiersDir, repoName, worktreePath,
+		logPath, globalSettingsPath, tiersDir, repoName, worktreePath,
 	)
 	if err != nil {
 		return err
@@ -299,7 +299,7 @@ func RunReviewEditor(worktreePath, repoName string, dryRun bool) error {
 				DryRunDecisions(os.Stdout, tiersDir, repoName, decisions)
 				return nil
 			}
-			return RouteDecisions(tiersDir, repoName, settingsPath, decisions)
+			return RouteDecisions(tiersDir, repoName, decisions)
 		case "edit":
 			continue
 		case "abort":

@@ -292,12 +292,15 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 		return err
 	}
 
+	// Create .spinclass/ directory for spinclass-owned data (tool-use log,
+	// settings snapshot) separate from Claude Code's .claude/ directory.
+	spinclassDir := filepath.Join(worktreePath, ".spinclass")
+	if err := os.MkdirAll(spinclassDir, 0o755); err != nil {
+		return err
+	}
+
 	// Write a snapshot so that `perms review` can diff against the baseline
 	// and only surface rules added during the session.
-	snapshotPath := filepath.Join(
-		worktreePath,
-		".claude",
-		".settings-snapshot.json",
-	)
+	snapshotPath := filepath.Join(spinclassDir, ".settings-snapshot.json")
 	return os.WriteFile(snapshotPath, append(data, '\n'), 0o644)
 }

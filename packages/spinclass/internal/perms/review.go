@@ -19,11 +19,9 @@ type ReviewDecision struct {
 }
 
 func RouteDecisions(
-	tiersDir, repo, settingsPath string,
+	tiersDir, repo string,
 	decisions []ReviewDecision,
 ) error {
-	var toRemove []string
-
 	for _, d := range decisions {
 		switch d.Action {
 		case ReviewPromoteGlobal:
@@ -31,33 +29,20 @@ func RouteDecisions(
 			if err := AppendToTierFile(globalPath, d.Rule); err != nil {
 				return err
 			}
-			toRemove = append(toRemove, d.Rule)
 
 		case ReviewPromoteRepo:
 			repoPath := filepath.Join(tiersDir, "repos", repo+".json")
 			if err := AppendToTierFile(repoPath, d.Rule); err != nil {
 				return err
 			}
-			toRemove = append(toRemove, d.Rule)
 
 		case ReviewDiscard:
-			toRemove = append(toRemove, d.Rule)
+			// Rules are derived from the tool-use log, not stored in
+			// settings. Discarding is a no-op — the rule simply isn't
+			// promoted.
 
 		case ReviewKeep:
-			// Leave in settings, nothing to do.
-		}
-	}
-
-	if len(toRemove) > 0 {
-		current, err := LoadClaudeSettings(settingsPath)
-		if err != nil {
-			return err
-		}
-
-		remaining := RemoveRules(current, toRemove)
-
-		if err := SaveClaudeSettings(settingsPath, remaining); err != nil {
-			return err
+			// Same as discard — the rule stays only in the log.
 		}
 	}
 
@@ -93,13 +78,13 @@ func DryRunDecisions(w io.Writer, tiersDir, repo string, decisions []ReviewDecis
 		}
 	}
 	if len(groups[ReviewDiscard]) > 0 {
-		fmt.Fprintln(w, "would discard (remove from settings.local.json):")
+		fmt.Fprintln(w, "would discard (not promoted):")
 		for _, r := range groups[ReviewDiscard] {
 			fmt.Fprintf(w, "  %s\n", r)
 		}
 	}
 	if len(groups[ReviewKeep]) > 0 {
-		fmt.Fprintln(w, "would keep (no change):")
+		fmt.Fprintln(w, "would keep (not promoted):")
 		for _, r := range groups[ReviewKeep] {
 			fmt.Fprintf(w, "  %s\n", r)
 		}

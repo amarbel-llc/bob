@@ -188,15 +188,15 @@ func isInsideMainWorktree(path, mainRepoRoot, sessionWorktree string) bool {
 }
 
 // runPostToolUseLog appends the raw hook payload as a JSONL line to the
-// tool-use log in the worktree's .claude/ directory. Fails silently — a
+// tool-use log in the worktree's .spinclass/ directory. Fails silently — a
 // logging failure must never block Claude.
 func runPostToolUseLog(input hookInput) error {
-	claudeDir := findClaudeDir(input.CWD)
-	if claudeDir == "" {
+	spinclassDir := findSpinclassDir(input.CWD)
+	if spinclassDir == "" {
 		return nil
 	}
 
-	logPath := filepath.Join(claudeDir, "tool-use.log")
+	logPath := filepath.Join(spinclassDir, "tool-use.log")
 
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -215,13 +215,13 @@ func runPostToolUseLog(input hookInput) error {
 	return nil
 }
 
-// findClaudeDir walks up from dir looking for a .claude/ directory containing
-// settings.local.json. Returns the .claude/ path or empty string if not found.
-func findClaudeDir(dir string) string {
+// findSpinclassDir walks up from dir looking for a .spinclass/ directory.
+// Returns the .spinclass/ path or empty string if not found.
+func findSpinclassDir(dir string) string {
 	current := filepath.Clean(dir)
 	for {
-		candidate := filepath.Join(current, ".claude")
-		if _, err := os.Stat(filepath.Join(candidate, "settings.local.json")); err == nil {
+		candidate := filepath.Join(current, ".spinclass")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			return candidate
 		}
 
