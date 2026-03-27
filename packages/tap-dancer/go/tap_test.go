@@ -1027,3 +1027,33 @@ func TestWriteAllOutputBlock(t *testing.T) {
 		t.Errorf("expected test point, got:\n%s", got)
 	}
 }
+
+func TestOutputBlockRoundTrip(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("build", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("compiling...")
+		ob.Line("linking...")
+		return nil
+	})
+	tw.OutputBlock("test", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("running tests...")
+		return &Diagnostics{Message: "1 test failed", Severity: "fail"}
+	})
+	tw.Plan()
+
+	r := NewReader(strings.NewReader(buf.String()))
+	summary := r.Summary()
+	if summary.TotalTests != 2 {
+		t.Errorf("expected 2 tests, got %d", summary.TotalTests)
+	}
+	if summary.Passed != 1 {
+		t.Errorf("expected 1 passed, got %d", summary.Passed)
+	}
+	if summary.Failed != 1 {
+		t.Errorf("expected 1 failed, got %d", summary.Failed)
+	}
+	if !summary.Valid {
+		t.Errorf("expected valid TAP, diagnostics: %v", r.Diagnostics())
+	}
+}
