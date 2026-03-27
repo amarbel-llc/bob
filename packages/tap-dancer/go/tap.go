@@ -214,6 +214,37 @@ func (tw *Writer) FinishLastLine() {
 	fmt.Fprint(tw.w, "\r\033[2K")
 }
 
+// OutputBlockWriter writes indented body lines inside an Output Block.
+type OutputBlockWriter struct {
+	w     io.Writer
+	color bool
+}
+
+// Line writes a single 4-space-indented output line, applying SGR filtering.
+func (ob *OutputBlockWriter) Line(text string) {
+	text = sanitizeYAMLValue(text, ob.color)
+	fmt.Fprintf(ob.w, "    %s\n", text)
+}
+
+// OutputBlock emits an Output Block per the streamed-output amendment.
+// The callback receives an OutputBlockWriter for streaming body lines.
+// Returning nil emits "ok"; returning non-nil emits "not ok" with YAML diagnostics.
+func (tw *Writer) OutputBlock(description string, fn func(*OutputBlockWriter) *Diagnostics) int {
+	tw.n++
+	num := tw.formatNumber(tw.n)
+	fmt.Fprintf(tw.w, "# Output: %s - %s\n", num, description)
+	ob := &OutputBlockWriter{w: tw.w, color: tw.color}
+	diag := fn(ob)
+	if diag != nil {
+		tw.failed = true
+		fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, description)
+		writeDiagnostics(tw.w, diag, tw.color)
+	} else {
+		fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
+	}
+	return tw.n
+}
+
 type Diagnostics struct {
 	Message  string
 	Severity string

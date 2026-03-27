@@ -915,3 +915,90 @@ func TestPragmaTracksTTYBuildLastLine(t *testing.T) {
 		t.Error("expected ttyBuildLastLine to be true after Pragma call")
 	}
 }
+
+func TestOutputBlock(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("build the project", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("compiling main.rs")
+		ob.Line("compiling lib.rs")
+		return nil
+	})
+	tw.Plan()
+	want := "TAP version 14\n" +
+		"# Output: 1 - build the project\n" +
+		"    compiling main.rs\n" +
+		"    compiling lib.rs\n" +
+		"ok 1 - build the project\n" +
+		"1..1\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestOutputBlockNotOk(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("build the project", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("compiling main.rs")
+		return &Diagnostics{Message: "compilation failed", Severity: "fail"}
+	})
+	tw.Plan()
+	got := buf.String()
+	if !strings.Contains(got, "not ok 1 - build the project") {
+		t.Errorf("expected not ok, got:\n%s", got)
+	}
+	if !strings.Contains(got, "  ---") {
+		t.Errorf("expected YAML diagnostics, got:\n%s", got)
+	}
+	if !strings.Contains(got, "  message: compilation failed") {
+		t.Errorf("expected message in diagnostics, got:\n%s", got)
+	}
+}
+
+func TestOutputBlockColorStripsNonSGR(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewColorWriter(&buf, false)
+	tw.OutputBlock("test", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("hello \033[32mgreen\033[0m and \033[2Kclear")
+		return nil
+	})
+	tw.Plan()
+	got := buf.String()
+	if strings.Contains(got, "\033[") {
+		t.Errorf("expected all ANSI stripped in non-color mode, got:\n%s", got)
+	}
+}
+
+func TestOutputBlockColorPreservesSGR(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewColorWriter(&buf, true)
+	tw.OutputBlock("test", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("hello \033[32mgreen\033[0m and \033[2Kclear")
+		return nil
+	})
+	tw.Plan()
+	got := buf.String()
+	if !strings.Contains(got, "\033[32m") {
+		t.Errorf("expected SGR preserved in color mode, got:\n%s", got)
+	}
+	if strings.Contains(got, "\033[2K") {
+		t.Errorf("expected non-SGR stripped in color mode, got:\n%s", got)
+	}
+}
+
+func TestOutputBlockEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("no output", func(ob *OutputBlockWriter) *Diagnostics {
+		return nil
+	})
+	tw.Plan()
+	want := "TAP version 14\n" +
+		"# Output: 1 - no output\n" +
+		"ok 1 - no output\n" +
+		"1..1\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
