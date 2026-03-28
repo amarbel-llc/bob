@@ -8,5 +8,6 @@ use (
 	./packages/lux
 	./packages/potato
 	./packages/spinclass
+	./packages/spinclass2
 	./packages/tap-dancer/go
 )
