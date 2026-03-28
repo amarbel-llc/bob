@@ -30,25 +30,46 @@ func (s SessionExecutor) Attach(dir string, key string, command []string, dryRun
 		entrypoint = []string{shell}
 	}
 
+	tmpDir := filepath.Join(dir, ".tmp")
+
+	// Split session key ("repo/branch") into individual env vars
+	repo, branch := key, ""
+	if i := strings.Index(key, "/"); i >= 0 {
+		repo, branch = key[:i], key[i+1:]
+	}
+
+	// Set session env vars so os.ExpandEnv can resolve them in entrypoint args
+	sessionEnv := map[string]string{
+		"SPINCLASS_SESSION":  key,
+		"SPINCLASS_REPO":     repo,
+		"SPINCLASS_BRANCH":   branch,
+		"SPINCLASS_WORKTREE": dir,
+		"TMPDIR":             tmpDir,
+		"CLAUDE_CODE_TMPDIR": tmpDir,
+	}
+	for k, v := range sessionEnv {
+		os.Setenv(k, v)
+	}
+
+	// Expand env vars in entrypoint args (e.g. "$SPINCLASS_SESSION" → "repo/branch")
+	expanded := make([]string, len(entrypoint))
+	for i, arg := range entrypoint {
+		expanded[i] = os.ExpandEnv(arg)
+	}
+
 	if dryRun {
 		tp.Skip = "dry run"
 		tp.Diagnostics = &tap.Diagnostics{
 			Extras: map[string]any{
-				"command": strings.Join(entrypoint, " "),
+				"command": strings.Join(expanded, " "),
 			},
 		}
 		return nil
 	}
 
-	tmpDir := filepath.Join(dir, ".tmp")
-
-	cmd := exec.Command(entrypoint[0], entrypoint[1:]...)
+	cmd := exec.Command(expanded[0], expanded[1:]...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"SPINCLASS_SESSION="+key,
-		"TMPDIR="+tmpDir,
-		"CLAUDE_CODE_TMPDIR="+tmpDir,
-	)
+	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
