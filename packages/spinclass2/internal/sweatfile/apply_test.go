@@ -298,7 +298,8 @@ func TestApplyClaudeSettingsWritesHooksForWorktree(t *testing.T) {
 	if hook["type"] != "command" {
 		t.Errorf("hook type: got %q", hook["type"])
 	}
-	if hook["command"] != "spinclass hooks" {
+	hookCmd := hook["command"].(string)
+	if !strings.HasSuffix(hookCmd, " hooks") {
 		t.Errorf("hook command: got %q", hook["command"])
 	}
 }

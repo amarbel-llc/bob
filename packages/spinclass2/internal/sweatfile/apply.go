@@ -44,6 +44,10 @@ func resolveSpinclassBinDir() (string, error) {
 	return filepath.Join(gitCommonDir, "spinclass", "bin"), nil
 }
 
+func binaryName() string {
+	return filepath.Base(os.Args[0])
+}
+
 func (sweatfile Sweatfile) prepareLocalBin() error {
 	dirSpinclassBin, err := resolveSpinclassBinDir()
 	if err != nil {
@@ -54,11 +58,10 @@ func (sweatfile Sweatfile) prepareLocalBin() error {
 		return err
 	}
 
+	script := fmt.Sprintf("#! /usr/bin/env -S bash -e\nexec %s exec-claude \"$@\"", binaryName())
 	if err := os.WriteFile(
 		filepath.Join(dirSpinclassBin, "claude"),
-		[]byte(`#! /usr/bin/env -S bash -e
-exec spinclass exec-claude "$@"`,
-		),
+		[]byte(script),
 		0o644,
 	); err != nil {
 		return err
@@ -252,7 +255,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},
@@ -266,7 +269,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},
@@ -280,7 +283,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},
