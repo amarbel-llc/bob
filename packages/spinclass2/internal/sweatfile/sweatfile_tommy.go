@@ -110,6 +110,25 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 			d.data.Hooks = hooksVal
 		}
 	}
+	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "session"); tableNode != nil {
+		d.consumed["session"] = true
+		sessionVal := &Session{}
+		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "start"); err == nil {
+			sessionVal.Start = v
+			d.consumed["session.start"] = true
+		}
+		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "resume"); err == nil {
+			sessionVal.Resume = v
+			d.consumed["session.resume"] = true
+		}
+		d.data.Session = sessionVal
+	} else {
+		sessionVal := &Session{}
+		found := false
+		if found {
+			d.data.Session = sessionVal
+		}
+	}
 
 	return d, nil
 }
@@ -171,6 +190,15 @@ func (d *SweatfileDocument) Encode() ([]byte, error) {
 			if err := d.cstDoc.SetInContainer(tableNode, "tool-use-log", *d.data.Hooks.ToolUseLog); err != nil {
 				return nil, err
 			}
+		}
+	}
+	if d.data.Session != nil {
+		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "session")
+		if err := d.cstDoc.SetInContainer(tableNode, "start", d.data.Session.Start); err != nil {
+			return nil, err
+		}
+		if err := d.cstDoc.SetInContainer(tableNode, "resume", d.data.Session.Resume); err != nil {
+			return nil, err
 		}
 	}
 
@@ -279,6 +307,25 @@ func DecodeSweatfileInto(data *Sweatfile, doc *document.Document, container *cst
 			data.Hooks = hooksVal
 		}
 	}
+	if tableNode := doc.FindTableInContainer(container, "session"); tableNode != nil {
+		consumed[keyPrefix+"session"] = true
+		sessionVal := &Session{}
+		if v, err := document.GetFromContainer[[]string](doc, tableNode, "start"); err == nil {
+			sessionVal.Start = v
+			consumed[keyPrefix+"session.start"] = true
+		}
+		if v, err := document.GetFromContainer[[]string](doc, tableNode, "resume"); err == nil {
+			sessionVal.Resume = v
+			consumed[keyPrefix+"session.resume"] = true
+		}
+		data.Session = sessionVal
+	} else {
+		sessionVal := &Session{}
+		found := false
+		if found {
+			data.Session = sessionVal
+		}
+	}
 
 	return nil
 }
@@ -338,6 +385,15 @@ func EncodeSweatfileFrom(data *Sweatfile, doc *document.Document, container *cst
 			if err := doc.SetInContainer(tableNode, "tool-use-log", *data.Hooks.ToolUseLog); err != nil {
 				return err
 			}
+		}
+	}
+	if data.Session != nil {
+		tableNode := doc.EnsureTableInContainer(container, "session")
+		if err := doc.SetInContainer(tableNode, "start", data.Session.Start); err != nil {
+			return err
+		}
+		if err := doc.SetInContainer(tableNode, "resume", data.Session.Resume); err != nil {
+			return err
 		}
 	}
 

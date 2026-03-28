@@ -178,6 +178,19 @@ func (sf Sweatfile) MergeWith(other Sweatfile) Sweatfile {
 		}
 	}
 
+	// Session: override semantics (deepest wins, nil = inherit)
+	if other.Session != nil {
+		if merged.Session == nil {
+			merged.Session = &Session{}
+		}
+		if len(other.Session.Start) > 0 {
+			merged.Session.Start = other.Session.Start
+		}
+		if len(other.Session.Resume) > 0 {
+			merged.Session.Resume = other.Session.Resume
+		}
+	}
+
 	if other.Hooks != nil {
 		if merged.Hooks == nil {
 			merged.Hooks = &Hooks{}

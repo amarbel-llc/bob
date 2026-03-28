@@ -1117,3 +1117,83 @@ disallow-main-worktree = true
 		t.Errorf("round-trip mismatch:\n--- want ---\n%s\n--- got ---\n%s", input, string(output))
 	}
 }
+
+func TestParseSessionTable(t *testing.T) {
+	input := `
+[session]
+start = ["zellij", "-s", "test"]
+resume = ["zellij", "attach", "test"]
+`
+	doc, err := Parse([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sf := doc.Data()
+	if sf.Session == nil {
+		t.Fatal("expected Session to be non-nil")
+	}
+	if len(sf.Session.Start) != 3 || sf.Session.Start[0] != "zellij" {
+		t.Errorf("Start = %v, want [zellij -s test]", sf.Session.Start)
+	}
+	if len(sf.Session.Resume) != 3 || sf.Session.Resume[0] != "zellij" {
+		t.Errorf("Resume = %v, want [zellij attach test]", sf.Session.Resume)
+	}
+}
+
+func TestParseSessionDefault(t *testing.T) {
+	doc, err := Parse([]byte(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sf := doc.Data()
+	if sf.Session != nil {
+		t.Error("expected Session to be nil for empty sweatfile")
+	}
+}
+
+func TestSessionAccessorDefaults(t *testing.T) {
+	sf := Sweatfile{}
+	start := sf.SessionStart()
+	if len(start) != 1 {
+		t.Fatalf("expected 1-element default start, got %v", start)
+	}
+	resume := sf.SessionResume()
+	if resume != nil {
+		t.Errorf("expected nil resume, got %v", resume)
+	}
+}
+
+func TestMergeSessionOverride(t *testing.T) {
+	base := Sweatfile{
+		Session: &Session{
+			Start:  []string{"bash"},
+			Resume: []string{"tmux", "attach"},
+		},
+	}
+	override := Sweatfile{
+		Session: &Session{
+			Start: []string{"zellij"},
+		},
+	}
+	merged := base.MergeWith(override)
+	if merged.Session == nil {
+		t.Fatal("expected Session to be non-nil after merge")
+	}
+	if len(merged.Session.Start) != 1 || merged.Session.Start[0] != "zellij" {
+		t.Errorf("Start = %v, want [zellij]", merged.Session.Start)
+	}
+	if len(merged.Session.Resume) != 2 || merged.Session.Resume[0] != "tmux" {
+		t.Errorf("Resume = %v, want [tmux attach]", merged.Session.Resume)
+	}
+}
+
+func TestMergeSessionNilInherit(t *testing.T) {
+	base := Sweatfile{
+		Session: &Session{Start: []string{"fish"}},
+	}
+	override := Sweatfile{}
+	merged := base.MergeWith(override)
+	if merged.Session == nil || len(merged.Session.Start) != 1 || merged.Session.Start[0] != "fish" {
+		t.Errorf("expected Session.Start to be inherited, got %v", merged.Session)
+	}
+}

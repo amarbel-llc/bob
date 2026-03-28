@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+type Session struct {
+	Start  []string `toml:"start"`
+	Resume []string `toml:"resume"`
+}
+
 type Hooks struct {
 	Create               *string `toml:"create"`
 	Stop                 *string `toml:"stop"`
@@ -26,6 +31,7 @@ type Sweatfile struct {
 	EnvrcDirectives    []string          `toml:"envrc-directives"`
 	Env                map[string]string `toml:"env"`
 	Hooks              *Hooks            `toml:"hooks"`
+	Session            *Session          `toml:"session"`
 }
 
 func (sf Sweatfile) StopHookCommand() *string {
@@ -59,6 +65,24 @@ func (sf Sweatfile) ToolUseLogEnabled() bool {
 	return sf.Hooks != nil &&
 		sf.Hooks.ToolUseLog != nil &&
 		*sf.Hooks.ToolUseLog
+}
+
+func (sf Sweatfile) SessionStart() []string {
+	if sf.Session != nil && len(sf.Session.Start) > 0 {
+		return sf.Session.Start
+	}
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	return []string{shell}
+}
+
+func (sf Sweatfile) SessionResume() []string {
+	if sf.Session != nil && len(sf.Session.Resume) > 0 {
+		return sf.Session.Resume
+	}
+	return nil
 }
 
 // baseline excludes and allow rules that are always applied regardless of user
