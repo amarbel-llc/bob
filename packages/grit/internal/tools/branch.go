@@ -65,6 +65,8 @@ func registerBranchCommands(app *command.App) {
 			{Name: "ref", Type: command.String, Description: "Branch name or ref to check out or restore files from (defaults to HEAD when used with paths)"},
 			{Name: "create", Type: command.Bool, Description: "Create a new branch and check it out (-b)"},
 			{Name: "paths", Type: command.Array, Description: "File paths to restore from ref (e.g. [\"src/main.go\", \"README.md\"]). When provided, restores these files instead of switching branches."},
+			{Name: "ours", Type: command.Bool, Description: "During merge conflict, check out our version of the file(s) (--ours)"},
+			{Name: "theirs", Type: command.Bool, Description: "During merge conflict, check out their version of the file(s) (--theirs)"},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git checkout", "git switch", "git restore"}, UseWhen: "switching branches or restoring files"},
@@ -138,30 +140,65 @@ func handleGitCheckout(ctx context.Context, args json.RawMessage, _ command.Prom
 		Ref      string   `json:"ref"`
 		Create   bool     `json:"create"`
 		Paths    []string `json:"paths"`
+		Ours     bool     `json:"ours"`
+		Theirs   bool     `json:"theirs"`
 	}
 
 	if err := json.Unmarshal(args, &params); err != nil {
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
 	}
 
+	if len(params.Paths) == 0 {
+		params.Paths = coerceStringToArray(args, "paths")
+	}
+
+	if params.Ours && params.Theirs {
+		return command.TextErrorResult("ours and theirs are mutually exclusive"), nil
+	}
+
+	if (params.Ours || params.Theirs) && len(params.Paths) == 0 {
+		return command.TextErrorResult("ours/theirs requires paths"), nil
+	}
+
 	if len(params.Paths) > 0 {
-		// File restore mode: git checkout <ref> -- <paths>
-		ref := params.Ref
-		if ref == "" {
-			ref = "HEAD"
+		// File restore mode: git checkout [--ours|--theirs|<ref>] -- <paths>
+		gitArgs := []string{"checkout"}
+
+		if params.Ours {
+			gitArgs = append(gitArgs, "--ours")
+		} else if params.Theirs {
+			gitArgs = append(gitArgs, "--theirs")
+		} else {
+			ref := params.Ref
+			if ref == "" {
+				ref = "HEAD"
+			}
+			gitArgs = append(gitArgs, ref)
 		}
 
-		gitArgs := []string{"checkout", ref, "--"}
+		gitArgs = append(gitArgs, "--")
 		gitArgs = append(gitArgs, params.Paths...)
 
 		if _, err := git.Run(ctx, params.RepoPath, gitArgs...); err != nil {
 			return command.TextErrorResult(fmt.Sprintf("git checkout: %v", err)), nil
 		}
 
+		status := "restored"
+		ref := params.Ref
+		if params.Ours {
+			status = "resolved_ours"
+		} else if params.Theirs {
+			status = "resolved_theirs"
+		} else if ref == "" {
+			ref = "HEAD"
+		}
+
 		return command.JSONResult(git.MutationResult{
-			Status: "restored",
+			Status: status,
 			Ref:    ref,
 			Paths:  params.Paths,
+			Ours:   params.Ours,
+			Theirs: params.Theirs,
 		}), nil
 	}
 

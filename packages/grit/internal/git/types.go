@@ -117,6 +117,8 @@ type MutationResult struct {
 	Branch      string   `json:"branch,omitempty"`
 	SetUpstream bool     `json:"set_upstream,omitempty"`
 	Force       bool     `json:"force,omitempty"`
+	Ours        bool     `json:"ours,omitempty"`
+	Theirs      bool     `json:"theirs,omitempty"`
 	All         bool     `json:"all,omitempty"`
 	Prune       bool     `json:"prune,omitempty"`
 }
