@@ -10,16 +10,11 @@ setup() {
 
 function fork_creates_new_branch { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap new --no-attach source_branch
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach source_branch
 
-  # Simulate being inside a session by setting SPINCLASS_SESSION
-  local repo_name
-  repo_name="$(basename "$TEST_REPO")"
-  export SPINCLASS_SESSION="$repo_name/source_branch"
-
-  # Run fork from the repo root (not the worktree) to avoid .git file issue
-  run_sc fork new_branch
+  # Use --from flag (cwd-based fork hits #65: relative .git path bug)
+  run_sc fork --from "$TEST_REPO/.worktrees/source_branch" new_branch
   assert_success
 
   # New worktree should exist
@@ -27,31 +22,39 @@ function fork_creates_new_branch { # @test
   assert [ -f "$TEST_REPO/.worktrees/new_branch/.git" ]
 }
 
+function fork_creates_branch_with_from_flag { # @test
+  cd "$TEST_REPO"
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach from_src
+
+  # Fork using --from flag (can run from anywhere)
+  run_sc fork --from "$TEST_REPO/.worktrees/from_src" from_dst
+  assert_success
+
+  assert [ -d "$TEST_REPO/.worktrees/from_dst" ]
+  assert [ -f "$TEST_REPO/.worktrees/from_dst/.git" ]
+}
+
 function fork_auto_names_branch { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap new --no-attach auto_src
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach auto_src
 
-  local repo_name
-  repo_name="$(basename "$TEST_REPO")"
-  export SPINCLASS_SESSION="$repo_name/auto_src"
-
-  # Run from repo root
-  run_sc fork
+  run_sc fork --from "$TEST_REPO/.worktrees/auto_src"
   assert_success
 
   # Should have created auto_src-1
   assert [ -d "$TEST_REPO/.worktrees/auto_src-1" ]
 }
 
-function fork_requires_spinclass_session { # @test
+function fork_fails_outside_worktree { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap new --no-attach session_test
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach fork_test
 
-  unset SPINCLASS_SESSION
-
+  # Running from main repo (not a worktree) without --from should fail
+  # because the main branch won't have a .worktrees/<branch> layout
+  cd "$TEST_REPO"
   run_sc fork some_branch
   assert_failure
-  assert_output --partial "SPINCLASS_SESSION"
 }

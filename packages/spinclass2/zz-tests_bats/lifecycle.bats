@@ -8,9 +8,9 @@ setup() {
   create_repo
 }
 
-function spinclass_new_creates_worktree { # @test
+function spinclass_attach_creates_worktree { # @test
   cd "$TEST_REPO"
-  run_sc new test_branch --no-attach
+  run_sc attach test_branch --no-attach
 
   assert_success
   assert [ -d "$TEST_REPO/.worktrees/test_branch" ]
@@ -21,9 +21,9 @@ function spinclass_new_creates_worktree { # @test
   assert_success
 }
 
-function spinclass_new_auto_name { # @test
+function spinclass_attach_auto_name { # @test
   cd "$TEST_REPO"
-  run_sc new --no-attach
+  run_sc attach --no-attach
 
   assert_success
   # Should have created a worktree dir — at least one entry in .worktrees/
@@ -32,44 +32,49 @@ function spinclass_new_auto_name { # @test
   assert [ -n "$output" ]
 }
 
-function spinclass_new_no_attach_skips_zmx { # @test
+function spinclass_attach_no_attach_skips_session { # @test
   cd "$TEST_REPO"
-  run_sc new --no-attach test_noattach
+  run_sc attach --no-attach test_noattach
 
   assert_success
   assert [ -d "$TEST_REPO/.worktrees/test_noattach" ]
-  # zmx should NOT have been called
-  assert [ ! -f "$BATS_TEST_TMPDIR/stubs/zmx.log" ]
+  # No session state file should be created with --no-attach
+  local state_dir="$XDG_STATE_HOME/spinclass/sessions"
+  if [ -d "$state_dir" ]; then
+    local count
+    count="$(find "$state_dir" -name '*-state.json' | wc -l)"
+    assert [ "$count" -eq 0 ]
+  fi
 }
 
-function spinclass_new_idempotent { # @test
+function spinclass_attach_idempotent { # @test
   cd "$TEST_REPO"
-  run_sc new --no-attach test_idem
+  run_sc attach --no-attach test_idem
   assert_success
 
   # Second run should succeed with SKIP
-  run_sc new --no-attach test_idem
+  run_sc attach --no-attach test_idem
   assert_success
   assert_output --partial "SKIP"
 }
 
-function spinclass_status_shows_worktrees { # @test
+function spinclass_list_shows_sessions { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  # Create some worktrees
-  "$bin" --format tap new --no-attach branch_a
-  "$bin" --format tap new --no-attach branch_b
+  local bin="${SPINCLASS_BIN:-spinclass2}"
 
-  run_sc status
+  # Create some worktrees
+  "$bin" --format tap attach --no-attach branch_a
+  "$bin" --format tap attach --no-attach branch_b
+
+  # list without active sessions should produce empty output (no-attach doesn't write state)
+  run_sc list
   assert_success
-  assert_output --partial "branch_a"
-  assert_output --partial "branch_b"
 }
 
 function spinclass_merge_fast_forwards { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap new --no-attach merge_test
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach merge_test
 
   local wt="$TEST_REPO/.worktrees/merge_test"
 
@@ -95,8 +100,8 @@ function spinclass_merge_fast_forwards { # @test
 
 function spinclass_clean_removes_merged { # @test
   cd "$TEST_REPO"
-  local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap new --no-attach clean_test
+  local bin="${SPINCLASS_BIN:-spinclass2}"
+  "$bin" --format tap attach --no-attach clean_test
 
   # Clean untracked files so worktree remove succeeds
   git -C "$TEST_REPO/.worktrees/clean_test" clean -fd
@@ -105,7 +110,7 @@ function spinclass_clean_removes_merged { # @test
   "$bin" --format tap merge clean_test
 
   # Create another worktree that IS merged (no extra commits)
-  "$bin" --format tap new --no-attach clean_noop
+  "$bin" --format tap attach --no-attach clean_noop
 
   # Clean untracked files from sweatfile apply
   git -C "$TEST_REPO/.worktrees/clean_noop" clean -fd

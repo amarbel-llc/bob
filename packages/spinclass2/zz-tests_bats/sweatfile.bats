@@ -16,7 +16,7 @@ claude-allow = ["Bash(git *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_settings
+  run_sc attach --no-attach test_settings
   assert_success
 
   local settings="$TEST_REPO/.worktrees/test_settings/.claude/settings.local.json"
@@ -42,7 +42,7 @@ claude-allow = ["Bash(nix *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_hierarchy
+  run_sc attach --no-attach test_hierarchy
   assert_success
 
   local settings="$TEST_REPO/.worktrees/test_hierarchy/.claude/settings.local.json"
@@ -63,7 +63,7 @@ EOF
   git -C "$TEST_REPO" commit -m "add flake.nix"
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_envrc_flake
+  run_sc attach --no-attach test_envrc_flake
   assert_success
 
   local envrc="$TEST_REPO/.worktrees/test_envrc_flake/.envrc"
@@ -75,7 +75,7 @@ EOF
 
 function apply_skips_use_flake_without_flake_nix { # @test
   cd "$TEST_REPO"
-  run_sc new --no-attach test_envrc_no_flake
+  run_sc attach --no-attach test_envrc_no_flake
   assert_success
 
   local envrc="$TEST_REPO/.worktrees/test_envrc_no_flake/.envrc"

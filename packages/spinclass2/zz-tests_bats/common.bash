@@ -3,7 +3,7 @@ bats_load_library bats-assert
 bats_load_library bats-assert-additions
 bats_load_library bats-emo
 
-require_bin SPINCLASS_BIN spinclass
+require_bin SPINCLASS_BIN spinclass2
 
 set_xdg() {
   loc="$(realpath "$1" 2>/dev/null)"
@@ -34,8 +34,8 @@ setup_stubs() {
   local stub_dir="$BATS_TEST_TMPDIR/stubs"
   mkdir -p "$stub_dir"
 
-  for cmd in zmx claude direnv; do
-    cat > "$stub_dir/$cmd" <<'STUB'
+  for cmd in claude direnv; do
+    cat >"$stub_dir/$cmd" <<'STUB'
 #!/usr/bin/env bash
 printf '%s' "$@" >> "$BATS_TEST_TMPDIR/stubs/CMDNAME.log"
 printf '\n' >> "$BATS_TEST_TMPDIR/stubs/CMDNAME.log"
@@ -54,7 +54,7 @@ create_repo() {
   export TEST_REPO="$BATS_TEST_TMPDIR/repo"
   mkdir -p "$TEST_REPO"
   git -C "$TEST_REPO" init
-  echo "initial" > "$TEST_REPO/file.txt"
+  echo "initial" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "initial commit"
 }
@@ -70,9 +70,19 @@ create_worktree() {
   git -C "$TEST_REPO" worktree add -b "$branch" "$WT_PATH"
 }
 
-# Run spinclass with timeout.
+# Run spinclass2 with timeout.
 # Usage: run_sc <subcommand> [args...]
 run_sc() {
-  local bin="${SPINCLASS_BIN:-spinclass}"
+  local bin="${SPINCLASS_BIN:-spinclass2}"
   run timeout --preserve-status 5s "$bin" --format tap "$@"
+}
+
+# Check if a session state file exists for a given repo+branch.
+# Usage: assert_session_state <repo-path> <branch>
+assert_session_state() {
+  local state_dir="$XDG_STATE_HOME/spinclass/sessions"
+  assert [ -d "$state_dir" ]
+  local count
+  count="$(find "$state_dir" -name '*-state.json' | wc -l)"
+  assert [ "$count" -gt 0 ]
 }

@@ -165,6 +165,9 @@ test-spinclass-bats: build-batman
     nix build .#spinclass
     SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass/zz-tests_bats/test
 
+test-spinclass2-bats: build-batman build-spinclass2
+    SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass2 PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass2/zz-tests_bats/test
+
 test-grit-bats: build-batman
     nix build .#grit
     GRIT_BIN={{justfile_directory()}}/result/bin/grit PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/grit/zz-tests_bats/test
