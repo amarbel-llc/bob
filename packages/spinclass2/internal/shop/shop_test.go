@@ -271,7 +271,7 @@ func TestNewTapExistingWorktree(t *testing.T) {
 
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
-	err := New(&buf, mock, rp, "tap", false, false, false)
+	err := Attach(&buf, mock, rp, "tap", false, false, false)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestNewNoAttach(t *testing.T) {
 
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
-	err := New(&buf, mock, rp, "tap", true, true, false)
+	err := Attach(&buf, mock, rp, "tap", true, true, false)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -464,7 +464,7 @@ func TestAttachCallsExecutorWithCorrectArgs(t *testing.T) {
 
 	mock := &mockExecutor{}
 	var buf bytes.Buffer
-	err := New(&buf, mock, rp, "tap", false, true, false)
+	err := Attach(&buf, mock, rp, "tap", false, true, false)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestNewMergeOnCloseCleanWorktree(t *testing.T) {
 	var buf bytes.Buffer
 
 	// mergeOnClose=true, noAttach=false (Attach returns immediately from mock)
-	err := New(&buf, mock, rp, "tap", true, false, false)
+	err := Attach(&buf, mock, rp, "tap", true, false, false)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}

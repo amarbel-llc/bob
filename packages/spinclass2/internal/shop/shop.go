@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/mattn/go-isatty"
 
 	"github.com/amarbel-llc/spinclass2/internal/executor"
 	"github.com/amarbel-llc/spinclass2/internal/git"
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/merge"
 	"github.com/amarbel-llc/spinclass2/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
@@ -122,7 +124,7 @@ func pullMainWorktree(rp worktree.ResolvedPath, tw *tap.Writer) error {
 	return nil
 }
 
-func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format string, mergeOnClose bool, noAttach bool, verbose bool) error {
+func Attach(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format string, mergeOnClose bool, noAttach bool, verbose bool) error {
 	var tw *tap.Writer
 	if format == "tap" {
 		tw = tap.NewWriter(w)
@@ -141,6 +143,28 @@ func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format s
 		Ok:          true,
 	}
 
+	// Write session state before attaching
+	if !noAttach {
+		st := session.State{
+			PID:          os.Getpid(),
+			SessionState: session.StateActive,
+			RepoPath:     rp.RepoPath,
+			WorktreePath: rp.AbsPath,
+			Branch:       rp.Branch,
+			SessionKey:   rp.SessionKey,
+			Env: map[string]string{
+				"SPINCLASS_SESSION": rp.SessionKey,
+			},
+		}
+		if sexec, ok := exec.(executor.SessionExecutor); ok {
+			st.Entrypoint = sexec.Entrypoint
+		}
+		st.StartedAt = time.Now().UTC()
+		if err := session.Write(st); err != nil {
+			log.Warn("failed to write session state", "err", err)
+		}
+	}
+
 	if err := exec.Attach(rp.AbsPath, rp.SessionKey, nil, noAttach, &tp); err != nil {
 		return fmt.Errorf("attach failed: %w", err)
 	}
@@ -151,6 +175,17 @@ func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format s
 			tw.Plan()
 		}
 		return nil
+	}
+
+	// Update session state to inactive after entrypoint exits
+	now := time.Now().UTC()
+	if existing, err := session.Read(rp.RepoPath, rp.Branch); err == nil {
+		existing.SessionState = session.StateInactive
+		existing.PID = 0
+		existing.ExitedAt = &now
+		if writeErr := session.Write(*existing); writeErr != nil {
+			log.Warn("failed to update session state", "err", writeErr)
+		}
 	}
 
 	interactive := isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())

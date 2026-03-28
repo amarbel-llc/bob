@@ -18,18 +18,17 @@ import (
 	"github.com/amarbel-llc/spinclass2/internal/perms"
 	"github.com/amarbel-llc/spinclass2/internal/pull"
 	"github.com/amarbel-llc/spinclass2/internal/shop"
-	"github.com/amarbel-llc/spinclass2/internal/status"
 	"github.com/amarbel-llc/spinclass2/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass2/internal/validate"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
 )
 
 var (
-	outputFormat    string
-	verbose         bool
-	newMergeOnClose bool
-	newNoAttach     bool
-	mergeGitSync    bool
+	outputFormat       string
+	verbose            bool
+	attachMergeOnClose bool
+	attachNoAttach     bool
+	mergeGitSync       bool
 )
 
 var rootCmd = &cobra.Command{
@@ -38,18 +37,16 @@ var rootCmd = &cobra.Command{
 	Long:  `spinclass manages git worktree lifecycles: creating worktrees + sessions, and offering close workflows (rebase, merge, cleanup, push).`,
 }
 
-var newCmd = &cobra.Command{
-	Use:   "new [name parts...]",
+var attachCmd = &cobra.Command{
+	Use:   "attach [name parts...]",
 	Short: "Create (if needed) and attach to a worktree session",
-	Long:  `Create a worktree if it doesn't exist, then attach to a session. Name parts are joined into a sanitized branch name (snob-case). If an existing branch matches, it is checked out. If no name is provided, a random name is generated.`,
+	Long:  `Create a worktree if it doesn't exist, then attach to a session. Auto-detects whether to start a new session or resume an active one based on the session state directory. Name parts are joined into a sanitized branch name (snob-case). If an existing branch matches, it is checked out. If no name is provided, a random name is generated.`,
 	Args:  cobra.MinimumNArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		format := outputFormat
 		if format == "" {
 			format = "tap"
 		}
-
-		exec := executor.SessionExecutor{}
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -66,45 +63,41 @@ var newCmd = &cobra.Command{
 			return err
 		}
 
-		return shop.New(
+		hierarchy, err := sweatfile.LoadWorktreeHierarchy(
+			os.Getenv("HOME"), repoPath, resolvedPath.AbsPath,
+		)
+		if err != nil {
+			hierarchy, err = sweatfile.LoadHierarchy(os.Getenv("HOME"), repoPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		merged := hierarchy.Merged
+		entrypoint := merged.SessionStart()
+
+		// Check for active session and use resume entrypoint if available
+		existing, _ := session.Read(resolvedPath.RepoPath, resolvedPath.Branch)
+		if existing != nil && existing.ResolveState() == session.StateActive {
+			if resume := merged.SessionResume(); resume != nil {
+				entrypoint = resume
+			} else {
+				log.Warn("active session exists, starting second instance",
+					"session", resolvedPath.SessionKey)
+			}
+		}
+
+		exec := executor.SessionExecutor{Entrypoint: entrypoint}
+
+		return shop.Attach(
 			os.Stdout,
 			exec,
 			resolvedPath,
 			format,
-			newMergeOnClose,
-			newNoAttach,
+			attachMergeOnClose,
+			attachNoAttach,
 			verbose,
 		)
-	},
-}
-
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show status of all repos and worktrees",
-	Long:  `Scan the current directory (or repo) for worktrees and display a tree showing branch status, dirty state, remote tracking, modification dates, and active zmx sessions.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-
-		format := outputFormat
-		if format == "" {
-			format = "table"
-		}
-
-		repos := status.CollectStatus(cwd)
-		if len(repos) == 0 {
-			log.Info("no repos found")
-			return nil
-		}
-
-		if format == "tap" {
-			status.RenderTap(repos, os.Stdout)
-		} else {
-			fmt.Println(status.Render(repos))
-		}
-		return nil
 	},
 }
 
@@ -327,14 +320,14 @@ func init() {
 		false,
 		"show detailed output (YAML diagnostics on passing test points)",
 	)
-	newCmd.Flags().BoolVar(
-		&newMergeOnClose,
+	attachCmd.Flags().BoolVar(
+		&attachMergeOnClose,
 		"merge-on-close",
 		false,
 		"auto-merge worktree into default branch on session close",
 	)
-	newCmd.Flags().BoolVar(
-		&newNoAttach,
+	attachCmd.Flags().BoolVar(
+		&attachNoAttach,
 		"no-attach",
 		false,
 		"create worktree but skip attaching (show command that would run)",
@@ -352,8 +345,7 @@ func init() {
 		false,
 		"interactively discard changes in dirty merged worktrees",
 	)
-	rootCmd.AddCommand(newCmd)
-	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(mergeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)
