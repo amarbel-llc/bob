@@ -6,7 +6,7 @@ promotion-criteria: |
   end-to-end. experimental → testing: 7 days of sc-dev use with no regressions
   vs sc. testing → accepted: delete packages/spinclass, rename spinclass2 →
   spinclass, alias sc-dev → sc.
-status: exploring
+status: proposed
 ---
 
 # Spinclass Session Entrypoint
@@ -127,31 +127,31 @@ When the spinclass process (running `sc-dev attach`) receives SIGHUP:
 
 ### CLI Changes
 
-  -------------------------------------------------------------------------------
-  Current                           New                Notes
-  --------------------------------- ------------------ --------------------------
-  `sc new`                          `sc-dev attach`    Auto-detects:
-                                                       create+start, start, or
-                                                       resume
+  ------------------------------------------------------------------------------
+  Current                          New                Notes
+  -------------------------------- ------------------ --------------------------
+  `sc new`                         `sc-dev attach`    Auto-detects:
+                                                      create+start, start, or
+                                                      resume
 
-  `sc status`                       removed            Merged into `list`
+  `sc status`                      removed            Merged into `list`
 
-  `sc list`                         `sc-dev list`      Reads from state dir,
-                                                       shows all sessions with
-                                                       live dirty state
+  `sc list`                        `sc-dev list`      Reads from state dir,
+                                                      shows all sessions with
+                                                      live dirty state
 
-  `sc merge`                        `sc-dev merge`     Unchanged behavior,
-                                                       removes state file on
-                                                       completion
+  `sc merge`                       `sc-dev merge`     Unchanged behavior,
+                                                      removes state file on
+                                                      completion
 
-  `sc clean`                        `sc-dev clean`     Also removes state files;
-                                                       auto-cleans abandoned
-                                                       sessions
+  `sc clean`                       `sc-dev clean`     Also removes state files;
+                                                      auto-cleans abandoned
+                                                      sessions
 
-  `sc fork`                         `sc-dev fork`      Resolves source from cwd
-                                                       or `--from <dir>`, reads
-                                                       state dir
-  -------------------------------------------------------------------------------
+  `sc fork`                        `sc-dev fork`      Resolves source from cwd
+                                                      or `--from <dir>`, reads
+                                                      state dir
+  ------------------------------------------------------------------------------
 
 ### `sc-dev attach` Flow
 
