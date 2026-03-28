@@ -140,6 +140,15 @@
             src = ./packages/spinclass;
           };
 
+          spinclass2Pkg = import ./lib/packages/spinclass2.nix {
+            inherit
+              pkgs
+              goWorkspaceSrc
+              goVendorHash
+              go
+              ;
+          };
+
           caldavPkg = import ./lib/packages/caldav.nix {
             inherit
               pkgs
@@ -235,6 +244,7 @@
             andSoCanYouRepoPkg
             potatoPkg
             spinclassPkg
+            spinclass2Pkg
             ;
         };
 
@@ -309,6 +319,7 @@
                 localPkgs.andSoCanYouRepoPkg
                 localPkgs.potatoPkg
                 localPkgs.spinclassPkg
+                localPkgs.spinclass2Pkg
               ];
             in
             marketplacePkgs
@@ -330,6 +341,7 @@
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
               spinclass = localPkgs.spinclassPkg;
+              spinclass2 = localPkgs.spinclass2Pkg;
               mcp-all = pkgs.symlinkJoin {
                 name = "mcp-all";
                 paths = [

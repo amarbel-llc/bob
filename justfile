@@ -31,6 +31,9 @@ build-caldav:
 build-spinclass:
     nix build .#spinclass
 
+build-spinclass2:
+    nix build .#spinclass2
+
 build-batman:
     nix build .#batman -o result-batman
 
@@ -50,6 +53,9 @@ test-lux:
 
 test-spinclass:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass/...
+
+test-spinclass2:
+    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass2/...
 
 test-caldav:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
