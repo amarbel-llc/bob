@@ -36,12 +36,19 @@ func (sweatfile Sweatfile) Apply(worktreePath string) error {
 	return nil
 }
 
-func (sweatfile Sweatfile) GetDirSpinclassBin() string {
-	return filepath.Join(".git/spinclass/bin/")
+func resolveSpinclassBinDir() (string, error) {
+	gitCommonDir, err := getGitDirCommon()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(gitCommonDir, "spinclass", "bin"), nil
 }
 
 func (sweatfile Sweatfile) prepareLocalBin() error {
-	dirSpinclassBin := sweatfile.GetDirSpinclassBin()
+	dirSpinclassBin, err := resolveSpinclassBinDir()
+	if err != nil {
+		return err
+	}
 
 	if err := os.MkdirAll(dirSpinclassBin, 0o755); err != nil {
 		return err
@@ -93,7 +100,11 @@ func (sf Sweatfile) writeEnvrc(worktreePath string) error {
 		}
 	}
 
-	dirSpinclassBinAbs, err := filepath.Abs(".git/spinclass/bin")
+	dirSpinclassBin, err := resolveSpinclassBinDir()
+	if err != nil {
+		return err
+	}
+	dirSpinclassBinAbs, err := filepath.Abs(dirSpinclassBin)
 	if err != nil {
 		return err
 	}
