@@ -6,9 +6,29 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
 )
 
+// Sessions outputs completion entries from the session state directory.
+// Each line is tab-separated: <session-key>\t<state>\n
+func Sessions(w io.Writer) {
+	states, err := session.ListAll()
+	if err != nil {
+		return
+	}
+	for _, s := range states {
+		resolved := s.ResolveState()
+		if resolved == session.StateAbandoned {
+			continue
+		}
+		// Extract branch name for completion value
+		fmt.Fprintf(w, "%s\t%s session (%s)\n", s.Branch, resolved, filepath.Base(s.RepoPath))
+	}
+}
+
+// Local outputs completion entries by scanning worktree directories.
+// Falls back to directory scanning when no session state is available.
 func Local(startDir string, w io.Writer) {
 	// If startDir is a repo, list its worktrees
 	gitDir := filepath.Join(startDir, ".git")

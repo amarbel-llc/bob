@@ -185,12 +185,19 @@ var listCmd = &cobra.Command{
 	},
 }
 
+var completionsSessions bool
+
 var completionsCmd = &cobra.Command{
 	Use:    "completions",
 	Short:  "Generate tab-separated completions",
-	Long:   `Output tab-separated completion entries for shell integration. Scans local worktrees.`,
+	Long:   `Output tab-separated completion entries for shell integration. Use --sessions to list from session state directory instead of scanning local worktrees.`,
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if completionsSessions {
+			completions.Sessions(os.Stdout)
+			return nil
+		}
+
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -343,6 +350,12 @@ func init() {
 	rootCmd.AddCommand(mergeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)
+	completionsCmd.Flags().BoolVar(
+		&completionsSessions,
+		"sessions",
+		false,
+		"list completions from session state directory",
+	)
 	rootCmd.AddCommand(completionsCmd)
 	pullCmd.Flags().BoolVarP(
 		&pullDirty,

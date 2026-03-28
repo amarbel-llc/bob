@@ -147,6 +147,7 @@
               goVendorHash
               go
               ;
+            src = ./packages/spinclass2;
           };
 
           caldavPkg = import ./lib/packages/caldav.nix {
