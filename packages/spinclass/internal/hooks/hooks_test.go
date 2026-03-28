@@ -275,6 +275,145 @@ func TestDisallowMainWorktreeDenyMessageIncludesSessionWorktree(t *testing.T) {
 	}
 }
 
+func TestBashCdToMainWorktreeDeniesWithSuggestion(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	cmd := "cd " + mainRepo + " && just build"
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for cd to main worktree")
+	}
+	var result map[string]any
+	json.Unmarshal(stdout.Bytes(), &result)
+	hso := result["hookSpecificOutput"].(map[string]any)
+	if hso["permissionDecision"] != "deny" {
+		t.Errorf("expected deny, got %v", hso["permissionDecision"])
+	}
+	reason := hso["permissionDecisionReason"].(string)
+	if !strings.Contains(reason, "just build") {
+		t.Errorf("expected suggestion to contain 'just build', got %q", reason)
+	}
+	if !strings.Contains(reason, "session worktree") {
+		t.Errorf("expected reason to mention session worktree, got %q", reason)
+	}
+}
+
+func TestBashCdToMainWorktreeWithSemicolon(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	cmd := "cd " + mainRepo + " ; just test"
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for cd to main worktree with semicolon")
+	}
+	var result map[string]any
+	json.Unmarshal(stdout.Bytes(), &result)
+	reason := result["hookSpecificOutput"].(map[string]any)["permissionDecisionReason"].(string)
+	if !strings.Contains(reason, "just test") {
+		t.Errorf("expected suggestion to contain 'just test', got %q", reason)
+	}
+}
+
+func TestBashCdToMainWorktreeSubdir(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	subdir := filepath.Join(mainRepo, "src")
+	os.MkdirAll(subdir, 0o755)
+	cmd := "cd " + subdir + " && make"
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for cd to main worktree subdir")
+	}
+	var result map[string]any
+	json.Unmarshal(stdout.Bytes(), &result)
+	reason := result["hookSpecificOutput"].(map[string]any)["permissionDecisionReason"].(string)
+	if !strings.Contains(reason, "make") {
+		t.Errorf("expected suggestion to contain 'make', got %q", reason)
+	}
+}
+
+func TestBashCdToSessionWorktreeAllowed(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	cmd := "cd " + worktreeCwd + " && just build"
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("expected no output for cd to session worktree, got %q", stdout.String())
+	}
+}
+
+func TestBashCdToUnrelatedDirAllowed(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	unrelated := t.TempDir()
+	cmd := "cd " + unrelated + " && ls"
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("expected no output for cd to unrelated dir, got %q", stdout.String())
+	}
+}
+
+func TestBashCdOnlyNoRestCommand(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	cmd := "cd " + mainRepo
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for bare cd to main worktree")
+	}
+}
+
+func TestBashCdWithQuotedPath(t *testing.T) {
+	mainRepo := t.TempDir()
+	worktreeCwd := t.TempDir()
+	cmd := `cd "` + mainRepo + `" && just`
+	input := makeInput("Bash", map[string]any{"command": cmd}, worktreeCwd)
+	var stdout bytes.Buffer
+	err := Run(bytes.NewReader(input), &stdout, mainRepo, worktreeCwd, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("expected deny output for cd with quoted path to main worktree")
+	}
+	var result map[string]any
+	json.Unmarshal(stdout.Bytes(), &result)
+	reason := result["hookSpecificOutput"].(map[string]any)["permissionDecisionReason"].(string)
+	if !strings.Contains(reason, "just") {
+		t.Errorf("expected suggestion to contain 'just', got %q", reason)
+	}
+}
+
 func TestStopHookEventRouteApproves(t *testing.T) {
 	input, _ := json.Marshal(map[string]any{
 		"hook_event_name": "Stop",

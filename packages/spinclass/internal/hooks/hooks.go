@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/shlex"
+
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 )
 
@@ -89,6 +91,13 @@ func runPreToolUse(input hookInput, w io.Writer, mainRepoRoot, sessionWorktree s
 	mainRepoRoot = resolvePath(mainRepoRoot)
 	sessionWorktree = resolvePath(sessionWorktree)
 
+	// Check for "cd <main-worktree> && <cmd>" pattern in Bash commands.
+	if input.ToolName == "Bash" {
+		if reason := checkBashCdToMainWorktree(input, mainRepoRoot, sessionWorktree); reason != "" {
+			return writeDeny(w, reason)
+		}
+	}
+
 	paths := extractPaths(input)
 	if paths == nil {
 		return nil
@@ -96,21 +105,66 @@ func runPreToolUse(input hookInput, w io.Writer, mainRepoRoot, sessionWorktree s
 
 	for _, p := range paths {
 		if isInsideMainWorktree(p, mainRepoRoot, sessionWorktree) {
-			output := map[string]any{
-				"hookSpecificOutput": map[string]any{
-					"hookEventName":      "PreToolUse",
-					"permissionDecision": "deny",
-					"permissionDecisionReason": fmt.Sprintf(
-						"Path %s is in the main worktree (%s). Restrict operations to the session worktree (%s).",
-						p, mainRepoRoot, sessionWorktree,
-					),
-				},
-			}
-			return json.NewEncoder(w).Encode(output)
+			return writeDeny(w, fmt.Sprintf(
+				"Path %s is in the main worktree (%s). Restrict operations to the session worktree (%s).",
+				p, mainRepoRoot, sessionWorktree,
+			))
 		}
 	}
 
 	return nil
+}
+
+func writeDeny(w io.Writer, reason string) error {
+	output := map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreToolUse",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": reason,
+		},
+	}
+	return json.NewEncoder(w).Encode(output)
+}
+
+// checkBashCdToMainWorktree detects commands like "cd /path/to/main/repo && just"
+// where the cd target is inside the main worktree. Returns a deny reason with
+// the corrected command, or empty string if no match.
+func checkBashCdToMainWorktree(input hookInput, mainRepoRoot, sessionWorktree string) string {
+	cmd, ok := input.ToolInput["command"].(string)
+	if !ok || cmd == "" {
+		return ""
+	}
+
+	tokens, err := shlex.Split(cmd)
+	if err != nil || len(tokens) < 2 || tokens[0] != "cd" {
+		return ""
+	}
+
+	cdTarget := tokens[1]
+
+	// Find separator (&&, ;) and extract the rest of the command.
+	var restTokens []string
+	for i := 2; i < len(tokens); i++ {
+		if tokens[i] == "&&" || tokens[i] == ";" {
+			restTokens = tokens[i+1:]
+			break
+		}
+	}
+
+	resolved := resolvePath(cdTarget)
+	if !isInsideMainWorktree(resolved, mainRepoRoot, sessionWorktree) {
+		return ""
+	}
+
+	suggestion := strings.Join(restTokens, " ")
+	if suggestion == "" {
+		suggestion = "(no command after cd)"
+	}
+
+	return fmt.Sprintf(
+		"Command changes directory to main worktree (%s). You are already in the session worktree (%s). Use: %s",
+		cdTarget, sessionWorktree, suggestion,
+	)
 }
 
 func extractPaths(input hookInput) []string {
@@ -137,8 +191,13 @@ func extractAbsolutePathsFromCommand(input hookInput) []string {
 		return nil
 	}
 
+	tokens, err := shlex.Split(cmd)
+	if err != nil {
+		return nil
+	}
+
 	var paths []string
-	for _, token := range strings.Fields(cmd) {
+	for _, token := range tokens {
 		if strings.HasPrefix(token, "/") {
 			paths = append(paths, token)
 		}
