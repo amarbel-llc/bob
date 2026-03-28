@@ -13,8 +13,9 @@ function fork_creates_new_branch { # @test
   local bin="${SPINCLASS_BIN:-spinclass2}"
   "$bin" --format tap attach --no-attach source_branch
 
-  # Use --from flag (cwd-based fork hits #65: relative .git path bug)
-  run_sc fork --from "$TEST_REPO/.worktrees/source_branch" new_branch
+  # Fork from inside the worktree (cwd-based)
+  cd "$TEST_REPO/.worktrees/source_branch"
+  run_sc fork new_branch
   assert_success
 
   # New worktree should exist
@@ -40,7 +41,8 @@ function fork_auto_names_branch { # @test
   local bin="${SPINCLASS_BIN:-spinclass2}"
   "$bin" --format tap attach --no-attach auto_src
 
-  run_sc fork --from "$TEST_REPO/.worktrees/auto_src"
+  cd "$TEST_REPO/.worktrees/auto_src"
+  run_sc fork
   assert_success
 
   # Should have created auto_src-1
