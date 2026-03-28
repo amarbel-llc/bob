@@ -107,11 +107,6 @@ func TestResolvedMergesAndRemovesWorktree(t *testing.T) {
 		t.Error("expected branch feature-merge to be deleted, but it still exists")
 	}
 
-	// Detach should have been called
-	if !mock.detachCalled {
-		t.Error("expected Detach() to be called")
-	}
-
 	// TAP output should contain all three steps
 	got := buf.String()
 	if !strings.Contains(got, "ok") {

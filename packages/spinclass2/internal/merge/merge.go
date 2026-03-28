@@ -13,6 +13,7 @@ import (
 
 	"github.com/amarbel-llc/spinclass2/internal/executor"
 	"github.com/amarbel-llc/spinclass2/internal/git"
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/sweatfile"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
@@ -294,14 +295,15 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 	}
 
 	if inSession {
+		// Remove session state file after successful merge
+		session.Remove(repoPath, branch)
 		return nil
 	}
 
-	if tw == nil {
-		log.Info("detaching from session")
-	}
-
-	return execr.Detach()
+	// Outside session: request close if active, then clean up state
+	executor.RequestClose(repoPath, branch)
+	session.Remove(repoPath, branch)
+	return nil
 }
 
 // isInsideSession returns true when both SPINCLASS_SESSION is set and cwd is

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -12,8 +11,9 @@ import (
 	"github.com/amarbel-llc/spinclass2/internal/clean"
 	"github.com/amarbel-llc/spinclass2/internal/completions"
 	"github.com/amarbel-llc/spinclass2/internal/executor"
-	"github.com/amarbel-llc/spinclass2/internal/session"
+	"github.com/amarbel-llc/spinclass2/internal/git"
 	"github.com/amarbel-llc/spinclass2/internal/hooks"
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/merge"
 	"github.com/amarbel-llc/spinclass2/internal/perms"
 	"github.com/amarbel-llc/spinclass2/internal/pull"
@@ -201,38 +201,31 @@ var completionsCmd = &cobra.Command{
 	},
 }
 
+var forkFromDir string
+
 var forkCmd = &cobra.Command{
 	Use:   "fork [<new-branch>]",
 	Short: "Fork current worktree into a new branch",
-	Long:  `Create a new worktree branched from the current worktree's HEAD. If new-branch is omitted, a name is auto-generated as <current-branch>-N. Must be run from inside a spinclass session (SPINCLASS_SESSION must be set). Does not attach to the new session.`,
+	Long:  `Create a new worktree branched from the current worktree's HEAD. If new-branch is omitted, a name is auto-generated as <current-branch>-N. Resolves the source worktree from the current directory or --from flag. Does not attach to the new session.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session := os.Getenv("SPINCLASS_SESSION")
-		if session == "" {
-			return fmt.Errorf(
-				"SPINCLASS_SESSION is not set: are you inside a spinclass session?",
-			)
+		sourceDir := forkFromDir
+		if sourceDir == "" {
+			var err error
+			sourceDir, err = os.Getwd()
+			if err != nil {
+				return err
+			}
 		}
 
-		// session is "<repo-dirname>/<branch>"; extract branch as everything
-		// after first "/"
-		slashIdx := strings.Index(session, "/")
-		if slashIdx < 0 {
-			return fmt.Errorf(
-				"invalid SPINCLASS_SESSION format: %q (expected <repo>/<branch>)",
-				session,
-			)
-		}
-		currentBranch := session[slashIdx+1:]
-
-		cwd, err := os.Getwd()
+		repoPath, err := worktree.DetectRepo(sourceDir)
 		if err != nil {
 			return err
 		}
 
-		repoPath, err := worktree.DetectRepo(cwd)
+		currentBranch, err := git.BranchCurrent(sourceDir)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not determine current branch in %s: %w", sourceDir, err)
 		}
 
 		currentPath := filepath.Join(
@@ -243,16 +236,17 @@ var forkCmd = &cobra.Command{
 
 		if _, err := os.Stat(currentPath); os.IsNotExist(err) {
 			return fmt.Errorf(
-				"current worktree path %s does not exist; fork requires a standard .worktrees layout",
+				"worktree path %s does not exist; fork requires a standard .worktrees layout",
 				currentPath,
 			)
 		}
 
+		sessionKey := filepath.Base(repoPath) + "/" + currentBranch
 		rp := worktree.ResolvedPath{
 			AbsPath:    currentPath,
 			RepoPath:   repoPath,
 			Branch:     currentBranch,
-			SessionKey: session,
+			SessionKey: sessionKey,
 		}
 
 		var newBranch string
@@ -360,6 +354,12 @@ func init() {
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(perms.NewPermsCmd())
 	rootCmd.AddCommand(hooks.NewHooksCmd())
+	forkCmd.Flags().StringVar(
+		&forkFromDir,
+		"from",
+		"",
+		"source worktree directory to fork from",
+	)
 	rootCmd.AddCommand(forkCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(cmdExecClaude)
