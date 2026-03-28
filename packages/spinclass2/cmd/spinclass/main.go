@@ -12,6 +12,7 @@ import (
 	"github.com/amarbel-llc/spinclass2/internal/clean"
 	"github.com/amarbel-llc/spinclass2/internal/completions"
 	"github.com/amarbel-llc/spinclass2/internal/executor"
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/hooks"
 	"github.com/amarbel-llc/spinclass2/internal/merge"
 	"github.com/amarbel-llc/spinclass2/internal/perms"
@@ -48,7 +49,7 @@ var newCmd = &cobra.Command{
 			format = "tap"
 		}
 
-		exec := executor.ZmxExecutor{}
+		exec := executor.SessionExecutor{}
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -176,10 +177,18 @@ var cleanCmd = &cobra.Command{
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List active zmx sessions",
-	Long:  `List all active zmx sessions in the sc group.`,
+	Short: "List tracked sessions",
+	Long:  `List all tracked sessions from the state directory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return executor.ZmxExecutor{}.List()
+		states, err := session.ListAll()
+		if err != nil {
+			return err
+		}
+		for _, s := range states {
+			resolved := s.ResolveState()
+			fmt.Printf("%s\t%s\t%s\n", s.SessionKey, resolved, s.WorktreePath)
+		}
+		return nil
 	},
 }
 
