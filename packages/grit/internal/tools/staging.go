@@ -64,6 +64,15 @@ func handleGitAdd(ctx context.Context, args json.RawMessage, _ command.Prompter)
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
 	}
 
+	// Recover from paths being passed as a JSON string instead of an array.
+	if len(params.Paths) == 0 {
+		params.Paths = coerceStringToArray(args, "paths")
+	}
+
+	if len(params.Paths) == 0 {
+		return command.TextErrorResult("paths is required and must be an array of strings"), nil
+	}
+
 	gitArgs := []string{"add", "--"}
 	gitArgs = append(gitArgs, params.Paths...)
 

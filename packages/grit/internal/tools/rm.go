@@ -44,6 +44,14 @@ func handleGitRm(ctx context.Context, args json.RawMessage, _ command.Prompter) 
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
 	}
 
+	if len(params.Paths) == 0 {
+		params.Paths = coerceStringToArray(args, "paths")
+	}
+
+	if len(params.Paths) == 0 {
+		return command.TextErrorResult("paths is required and must be an array of strings"), nil
+	}
+
 	gitArgs := []string{"rm"}
 	if params.Force {
 		gitArgs = append(gitArgs, "-f")
