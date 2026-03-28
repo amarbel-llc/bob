@@ -246,16 +246,34 @@ func isInsideMainWorktree(path, mainRepoRoot, sessionWorktree string) bool {
 	return resolved == mainRepoRoot || strings.HasPrefix(resolved, mainRepoRoot+string(filepath.Separator))
 }
 
-// runPostToolUseLog appends the raw hook payload as a JSONL line to the
-// tool-use log in the worktree's .spinclass/ directory. Fails silently — a
-// logging failure must never block Claude.
+// logDir returns the XDG_LOG_HOME-based log directory for spinclass.
+// Per amarbel-llc/xdg basedir spec: $XDG_LOG_HOME defaults to $HOME/.local/log.
+func logDir() string {
+	base := os.Getenv("XDG_LOG_HOME")
+	if base == "" {
+		home, _ := os.UserHomeDir()
+		base = filepath.Join(home, ".local", "log")
+	}
+	return filepath.Join(base, "spinclass", "tool-uses")
+}
+
+// runPostToolUseLog appends the raw hook payload as a JSONL line to
+// $XDG_LOG_HOME/spinclass/tool-uses/<session-key>.jsonl. Fails silently —
+// a logging failure must never block Claude.
 func runPostToolUseLog(input hookInput) error {
-	spinclassDir := findSpinclassDir(input.CWD)
-	if spinclassDir == "" {
+	session := os.Getenv("SPINCLASS_SESSION")
+	if session == "" {
 		return nil
 	}
 
-	logPath := filepath.Join(spinclassDir, "tool-use.log")
+	dir := logDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil // fail silently
+	}
+
+	// Sanitize session key for filename: "repo/branch" → "repo--branch"
+	filename := strings.ReplaceAll(session, "/", "--") + ".jsonl"
+	logPath := filepath.Join(dir, filename)
 
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -274,20 +292,3 @@ func runPostToolUseLog(input hookInput) error {
 	return nil
 }
 
-// findSpinclassDir walks up from dir looking for a .spinclass/ directory.
-// Returns the .spinclass/ path or empty string if not found.
-func findSpinclassDir(dir string) string {
-	current := filepath.Clean(dir)
-	for {
-		candidate := filepath.Join(current, ".spinclass")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-
-		parent := filepath.Dir(current)
-		if parent == current {
-			return ""
-		}
-		current = parent
-	}
-}
