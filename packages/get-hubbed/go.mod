@@ -1,6 +1,6 @@
 module github.com/friedenberg/get-hubbed
 
-go 1.25.6
+go 1.26
 
 replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 

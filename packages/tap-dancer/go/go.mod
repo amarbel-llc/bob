@@ -1,6 +1,6 @@
 module github.com/amarbel-llc/bob/packages/tap-dancer/go
 
-go 1.24.0
+go 1.26
 
 require (
 	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.4
