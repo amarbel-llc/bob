@@ -4,10 +4,12 @@
   inputs = {
     purse-first.url = "github:amarbel-llc/purse-first";
 
-    # Follow purse-first's pins for consistency.
+    # Follow purse-first's pins for stable nixpkgs.
     nixpkgs.follows = "purse-first/nixpkgs";
-    nixpkgs-master.follows = "purse-first/nixpkgs-master";
     utils.follows = "purse-first/utils";
+
+    # Master nixpkgs pinned directly for go_1_26 availability.
+    nixpkgs-master.url = "github:NixOS/nixpkgs/e2dde111aea2c0699531dc616112a96cd55ab8b5";
 
     # Build tooling
     gomod2nix = {
