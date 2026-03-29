@@ -44,9 +44,9 @@ var rootCmd = &cobra.Command{
 }
 
 var attachCmd = &cobra.Command{
-	Use:   "attach [name parts...]",
-	Short: "Create (if needed) and attach to a worktree session",
-	Long:  `Create a worktree if it doesn't exist, then attach to a session. Auto-detects whether to start a new session or resume an active one based on the session state directory. Name parts are joined into a sanitized branch name (snob-case). If an existing branch matches, it is checked out. If no name is provided, a random name is generated.`,
+	Use:   "attach [description...]",
+	Short: "Create and attach to a new worktree session",
+	Long:  `Create a new worktree with a random branch name and attach to a session. Words after "attach" are joined as a freeform session description. Auto-detects whether to start a new session or resume an active one based on the session state directory.`,
 	Args:  cobra.MinimumNArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		format := outputFormat
@@ -185,7 +185,7 @@ var listCmd = &cobra.Command{
 		}
 		for _, s := range states {
 			resolved := s.ResolveState()
-			fmt.Printf("%s\t%s\t%s\n", s.SessionKey, resolved, s.WorktreePath)
+			fmt.Printf("%s\t%s\t%s\t%s\n", s.SessionKey, resolved, s.WorktreePath, s.Description)
 		}
 		return nil
 	},

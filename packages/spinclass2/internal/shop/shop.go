@@ -160,6 +160,7 @@ func Attach(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, forma
 			WorktreePath: rp.AbsPath,
 			Branch:       rp.Branch,
 			SessionKey:   rp.SessionKey,
+			Description:  rp.Description,
 			Env: map[string]string{
 				"SPINCLASS_SESSION": rp.SessionKey,
 			},

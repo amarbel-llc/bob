@@ -27,7 +27,11 @@ func Sessions(w io.Writer, repoPath string) {
 			continue
 		}
 		// Extract branch name for completion value
-		fmt.Fprintf(w, "%s\t%s session (%s)\n", s.Branch, resolved, filepath.Base(s.RepoPath))
+		label := fmt.Sprintf("%s session (%s)", resolved, filepath.Base(s.RepoPath))
+		if s.Description != "" {
+			label += " — " + s.Description
+		}
+		fmt.Fprintf(w, "%s\t%s\n", s.Branch, label)
 	}
 }
 

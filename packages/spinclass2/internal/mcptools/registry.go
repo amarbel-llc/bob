@@ -7,6 +7,7 @@ func RegisterAll() *command.App {
 	app.Version = "0.1.0"
 
 	registerMergeThisSession(app)
+	registerUpdateDescription(app)
 
 	return app
 }

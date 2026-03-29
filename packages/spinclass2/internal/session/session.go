@@ -23,6 +23,7 @@ type State struct {
 	WorktreePath string            `json:"worktree_path"`
 	Branch       string            `json:"branch"`
 	SessionKey   string            `json:"session_key"`
+	Description  string            `json:"description,omitempty"`
 	Entrypoint   []string          `json:"entrypoint"`
 	Env          map[string]string `json:"env"`
 	StartedAt    time.Time         `json:"started_at"`
