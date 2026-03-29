@@ -306,11 +306,11 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 	return nil
 }
 
-// isInsideSession returns true when both SPINCLASS_SESSION is set and cwd is
+// isInsideSession returns true when both SPINCLASS_SESSION_ID is set and cwd is
 // within the worktree directory. Both checks are required to avoid false
 // positives from stale env vars or running merge from a different location.
 func isInsideSession(cwd, wtPath string) bool {
-	session := os.Getenv("SPINCLASS_SESSION")
+	session := os.Getenv("SPINCLASS_SESSION_ID")
 	if session == "" {
 		return false
 	}

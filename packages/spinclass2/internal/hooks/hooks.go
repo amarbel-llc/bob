@@ -261,7 +261,7 @@ func logDir() string {
 // $XDG_LOG_HOME/spinclass/tool-uses/<session-key>.jsonl. Fails silently —
 // a logging failure must never block Claude.
 func runPostToolUseLog(input hookInput) error {
-	session := os.Getenv("SPINCLASS_SESSION")
+	session := os.Getenv("SPINCLASS_SESSION_ID")
 	if session == "" {
 		return nil
 	}

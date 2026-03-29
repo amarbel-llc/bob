@@ -15,7 +15,7 @@ function tool_use_log_writes_to_xdg_log_home { # @test
   "$bin" --format tap attach --no-attach log_test
 
   local wt="$TEST_REPO/.worktrees/log_test"
-  export SPINCLASS_SESSION="repo/log_test"
+  export SPINCLASS_SESSION_ID="repo/log_test"
 
   # Pipe a PostToolUse hook payload to spinclass2 hooks
   cd "$wt"
@@ -38,7 +38,7 @@ function tool_use_log_respects_xdg_log_home { # @test
   local bin="${SPINCLASS_BIN:-spinclass2}"
   local custom_log="$BATS_TEST_TMPDIR/custom-logs"
   export XDG_LOG_HOME="$custom_log"
-  export SPINCLASS_SESSION="myrepo/custom-log-test"
+  export SPINCLASS_SESSION_ID="myrepo/custom-log-test"
 
   cd "$TEST_REPO"
   "$bin" --format tap attach --no-attach custom_log_test
@@ -57,7 +57,7 @@ function tool_use_log_respects_xdg_log_home { # @test
 
 function tool_use_log_silent_without_session { # @test
   local bin="${SPINCLASS_BIN:-spinclass2}"
-  unset SPINCLASS_SESSION
+  unset SPINCLASS_SESSION_ID
 
   cd "$TEST_REPO"
   run bash -c 'echo '"'"'{"hook_event_name":"PostToolUse","session_id":"test","tool_name":"Read","tool_input":{},"cwd":"'"$TEST_REPO"'"}'"'"' | '"$bin"' hooks'

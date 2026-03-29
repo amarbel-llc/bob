@@ -502,7 +502,7 @@ func TestStopHookApprovesOnSecondInvocation(t *testing.T) {
 func TestPostToolUseWritesLog(t *testing.T) {
 	logHome := t.TempDir()
 	t.Setenv("XDG_LOG_HOME", logHome)
-	t.Setenv("SPINCLASS_SESSION", "myrepo/feature-x")
+	t.Setenv("SPINCLASS_SESSION_ID", "myrepo/feature-x")
 
 	worktree := t.TempDir()
 
@@ -547,7 +547,7 @@ func TestPostToolUseWritesLog(t *testing.T) {
 func TestPostToolUseAppendsToLog(t *testing.T) {
 	logHome := t.TempDir()
 	t.Setenv("XDG_LOG_HOME", logHome)
-	t.Setenv("SPINCLASS_SESSION", "repo/append-test")
+	t.Setenv("SPINCLASS_SESSION_ID", "repo/append-test")
 
 	worktree := t.TempDir()
 
@@ -578,7 +578,7 @@ func TestPostToolUseAppendsToLog(t *testing.T) {
 }
 
 func TestPostToolUseNoSessionIsSilent(t *testing.T) {
-	t.Setenv("SPINCLASS_SESSION", "")
+	t.Setenv("SPINCLASS_SESSION_ID", "")
 	cwd := t.TempDir()
 
 	input, _ := json.Marshal(map[string]any{
@@ -599,7 +599,7 @@ func TestPostToolUseNoSessionIsSilent(t *testing.T) {
 func TestPostToolUseLogsFromSubdir(t *testing.T) {
 	logHome := t.TempDir()
 	t.Setenv("XDG_LOG_HOME", logHome)
-	t.Setenv("SPINCLASS_SESSION", "repo/subdir-test")
+	t.Setenv("SPINCLASS_SESSION_ID", "repo/subdir-test")
 
 	worktree := t.TempDir()
 	subdir := filepath.Join(worktree, "src", "pkg")

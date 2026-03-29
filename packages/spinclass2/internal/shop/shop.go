@@ -162,7 +162,7 @@ func Attach(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, forma
 			SessionKey:   rp.SessionKey,
 			Description:  rp.Description,
 			Env: map[string]string{
-				"SPINCLASS_SESSION": rp.SessionKey,
+				"SPINCLASS_SESSION_ID": rp.SessionKey,
 			},
 		}
 		if sexec, ok := exec.(executor.SessionExecutor); ok {

@@ -40,7 +40,7 @@ func (s SessionExecutor) Attach(dir string, key string, command []string, dryRun
 
 	// Set session env vars so os.ExpandEnv can resolve them in entrypoint args
 	sessionEnv := map[string]string{
-		"SPINCLASS_SESSION":  key,
+		"SPINCLASS_SESSION_ID":  key,
 		"SPINCLASS_REPO":     repo,
 		"SPINCLASS_BRANCH":   branch,
 		"SPINCLASS_WORKTREE": dir,
@@ -51,7 +51,7 @@ func (s SessionExecutor) Attach(dir string, key string, command []string, dryRun
 		os.Setenv(k, v)
 	}
 
-	// Expand env vars in entrypoint args (e.g. "$SPINCLASS_SESSION" → "repo/branch")
+	// Expand env vars in entrypoint args (e.g. "$SPINCLASS_SESSION_ID" → "repo/branch")
 	expanded := make([]string, len(entrypoint))
 	for i, arg := range entrypoint {
 		expanded[i] = os.ExpandEnv(arg)

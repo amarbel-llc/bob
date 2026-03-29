@@ -90,18 +90,18 @@ function apply_skips_use_flake_without_flake_nix { # @test
 }
 
 function session_entrypoint_expands_env_vars { # @test
-  # Create a sweatfile with session.start referencing $SPINCLASS_SESSION
+  # Create a sweatfile with session.start referencing $SPINCLASS_SESSION_ID
   cat > "$TEST_REPO/sweatfile" <<'EOF'
 [session-entry]
-start = ["echo", "$SPINCLASS_SESSION", "$SPINCLASS_BRANCH"]
+start = ["echo", "$SPINCLASS_SESSION_ID", "$SPINCLASS_BRANCH"]
 EOF
 
   cd "$TEST_REPO"
   run_sc attach --no-attach env_expand_test
   assert_success
 
-  # The TAP output should contain the expanded session key, not the literal "$SPINCLASS_SESSION"
+  # The TAP output should contain the expanded session key, not the literal "$SPINCLASS_SESSION_ID"
   assert_output --partial "repo/env_expand_test"
   assert_output --partial "env_expand_test"
-  refute_output --partial '$SPINCLASS_SESSION'
+  refute_output --partial '$SPINCLASS_SESSION_ID'
 }

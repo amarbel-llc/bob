@@ -8,7 +8,7 @@ import (
 
 func TestSessionExecutorDryRunExpandsEnvVars(t *testing.T) {
 	exec := SessionExecutor{
-		Entrypoint: []string{"zmx", "-g", "sc-dev", "attach", "$SPINCLASS_SESSION"},
+		Entrypoint: []string{"zmx", "-g", "sc-dev", "attach", "$SPINCLASS_SESSION_ID"},
 	}
 	tp := tap.TestPoint{}
 	err := exec.Attach("/tmp/test", "myrepo/feat-x", nil, true, &tp)

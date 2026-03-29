@@ -18,7 +18,7 @@ func TestSessionStateRoundTrip(t *testing.T) {
 		Branch:       "my-branch",
 		SessionKey:   "bob/my-branch",
 		Entrypoint:   []string{"zellij"},
-		Env:          map[string]string{"SPINCLASS_SESSION": "bob/my-branch"},
+		Env:          map[string]string{"SPINCLASS_SESSION_ID": "bob/my-branch"},
 		StartedAt:    time.Now().UTC().Truncate(time.Second),
 	}
 
