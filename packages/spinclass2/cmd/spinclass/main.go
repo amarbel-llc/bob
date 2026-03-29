@@ -193,14 +193,15 @@ var completionsCmd = &cobra.Command{
 	Long:   `Output tab-separated completion entries for shell integration. Use --sessions to list from session state directory instead of scanning local worktrees.`,
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if completionsSessions {
-			completions.Sessions(os.Stdout)
-			return nil
-		}
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
+		}
+
+		if completionsSessions {
+			repoPath, _ := worktree.DetectRepo(cwd)
+			completions.Sessions(os.Stdout, repoPath)
+			return nil
 		}
 
 		completions.Local(cwd, os.Stdout)

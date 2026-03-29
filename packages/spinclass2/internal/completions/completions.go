@@ -12,7 +12,8 @@ import (
 
 // Sessions outputs completion entries from the session state directory.
 // Each line is tab-separated: <session-key>\t<state>\n
-func Sessions(w io.Writer) {
+// When repoPath is non-empty, only sessions belonging to that repo are listed.
+func Sessions(w io.Writer, repoPath string) {
 	states, err := session.ListAll()
 	if err != nil {
 		return
@@ -20,6 +21,9 @@ func Sessions(w io.Writer) {
 	for _, s := range states {
 		resolved := s.ResolveState()
 		if resolved == session.StateAbandoned {
+			continue
+		}
+		if repoPath != "" && s.RepoPath != repoPath {
 			continue
 		}
 		// Extract branch name for completion value

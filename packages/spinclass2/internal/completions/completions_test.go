@@ -114,7 +114,7 @@ func TestSessionsListsFromStateDir(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	Sessions(&buf)
+	Sessions(&buf, "")
 
 	output := buf.String()
 	if !strings.Contains(output, "feat-a") {
@@ -143,11 +143,67 @@ func TestSessionsSkipsAbandoned(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	Sessions(&buf)
+	Sessions(&buf, "")
 
 	output := buf.String()
 	if strings.Contains(output, "gone") {
 		t.Errorf("expected abandoned session to be excluded, got %q", output)
+	}
+}
+
+func TestSessionsFiltersByRepo(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	repoA := filepath.Join(dir, "repo-a")
+	repoB := filepath.Join(dir, "repo-b")
+
+	// Create worktree paths so sessions aren't marked abandoned
+	wtA := filepath.Join(repoA, ".worktrees", "feat-a")
+	wtB := filepath.Join(repoB, ".worktrees", "feat-b")
+	os.MkdirAll(wtA, 0o755)
+	os.MkdirAll(wtB, 0o755)
+
+	for _, s := range []session.State{
+		{
+			PID:          0,
+			SessionState: session.StateInactive,
+			RepoPath:     repoA,
+			WorktreePath: wtA,
+			Branch:       "feat-a",
+			SessionKey:   "repo-a/feat-a",
+			Entrypoint:   []string{"/bin/sh"},
+		},
+		{
+			PID:          0,
+			SessionState: session.StateInactive,
+			RepoPath:     repoB,
+			WorktreePath: wtB,
+			Branch:       "feat-b",
+			SessionKey:   "repo-b/feat-b",
+			Entrypoint:   []string{"/bin/sh"},
+		},
+	} {
+		if err := session.Write(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Unfiltered: both sessions
+	var all bytes.Buffer
+	Sessions(&all, "")
+	if !strings.Contains(all.String(), "feat-a") || !strings.Contains(all.String(), "feat-b") {
+		t.Errorf("unfiltered should list both sessions, got %q", all.String())
+	}
+
+	// Filtered to repo-a: only feat-a
+	var filtered bytes.Buffer
+	Sessions(&filtered, repoA)
+	if !strings.Contains(filtered.String(), "feat-a") {
+		t.Errorf("filtered should include feat-a, got %q", filtered.String())
+	}
+	if strings.Contains(filtered.String(), "feat-b") {
+		t.Errorf("filtered should exclude feat-b, got %q", filtered.String())
 	}
 }
 
