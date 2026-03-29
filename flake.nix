@@ -56,18 +56,54 @@
       # Computed after first `go work vendor` — placeholder until then.
       goVendorHash = "sha256-lkjmwMcn1bmVp7CnFFcnKWv9N9Zqp2iecBptCNmQw9M=";
 
-      buildDevenvs =
+      buildDevShellPackages =
         system:
         let
           pkgs = import nixpkgs { inherit system; };
           pkgs-master = import nixpkgs-master { inherit system; };
+          pkgs-rust = import nixpkgs-master.outPath {
+            inherit system;
+            overlays = [
+              rust-overlay.overlays.default
+              (final: prev: {
+                rustToolchain = prev.rust-bin.stable.latest.default.override {
+                  extensions = [
+                    "rust-src"
+                    "rustfmt"
+                  ];
+                };
+              })
+            ];
+          };
         in
-        {
-          go = import ./devenvs/go { inherit pkgs pkgs-master gomod2nix; };
-          shell = import ./devenvs/shell { inherit pkgs; };
-          bats = import ./devenvs/bats { inherit pkgs; };
-          rust = import ./devenvs/rust { inherit pkgs pkgs-master rust-overlay; };
-        };
+        [
+          # Go (from pkgs-master for latest)
+          pkgs-master.go
+          pkgs-master.delve
+          pkgs-master.gofumpt
+          pkgs-master.golangci-lint
+          pkgs-master.golines
+          pkgs-master.gopls
+          pkgs-master.gotools
+          pkgs-master.govulncheck
+          (gomod2nix.packages.${system}.default)
+
+          # Rust
+          pkgs-rust.rustToolchain
+          pkgs-rust.cargo-deny
+          pkgs-rust.cargo-edit
+          pkgs-rust.cargo-watch
+          pkgs-rust.rust-analyzer
+          pkgs.openssl
+          pkgs.pkg-config
+
+          # Shell
+          pkgs.bats
+          pkgs.nodePackages.bash-language-server
+          pkgs.shellcheck
+          pkgs.shfmt
+          pkgs.parallel
+        ];
 
       buildPackages =
         system:
@@ -286,18 +322,8 @@
             pkgs.neovim
             localPkgs.batmanPkgs.default
             purse-first.packages.${system}.purse-first
-          ];
-        devShellInputsFrom =
-          system:
-          let
-            devenvs = buildDevenvs system;
-          in
-          [
-            devenvs.go.devShells.default
-            devenvs.shell.devShells.default
-            devenvs.bats.devShells.default
-            devenvs.rust.devShells.default
-          ];
+          ]
+          ++ buildDevShellPackages system;
         devShellHook = ''
           echo "bob - dev environment"
         '';
@@ -309,7 +335,6 @@
         let
           pkgs = import nixpkgs { inherit system; };
           localPkgs = buildPackages system;
-          devenvs = buildDevenvs system;
         in
         {
           packages =
@@ -357,10 +382,11 @@
 
           devShells = {
             default = marketplaceOutputs.devShells.${system}.default;
-            go = devenvs.go.devShells.default;
-            shell = devenvs.shell.devShells.default;
-            bats = devenvs.bats.devShells.default;
-            rust = devenvs.rust.devShells.default;
+            go = pkgs.mkShell {
+              packages = [
+                (import nixpkgs-master { inherit system; }).go
+              ];
+            };
           };
         }
       )
