@@ -1935,15 +1935,15 @@ mod tests {
     fn builder_auto_no_color_when_set() {
         let _lock = ENV_MUTEX.lock().unwrap();
         let original = std::env::var("NO_COLOR").ok();
-        std::env::set_var("NO_COLOR", "1");
+        unsafe { std::env::set_var("NO_COLOR", "1") };
 
         let mut buf = Vec::new();
         let tw = TapWriterBuilder::auto(&mut buf).build().unwrap();
         assert!(!tw.config.color());
 
         match original {
-            Some(v) => std::env::set_var("NO_COLOR", v),
-            None => std::env::remove_var("NO_COLOR"),
+            Some(v) => unsafe { std::env::set_var("NO_COLOR", v) },
+            None => unsafe { std::env::remove_var("NO_COLOR") },
         }
     }
 
@@ -1951,14 +1951,14 @@ mod tests {
     fn builder_auto_color_when_no_color_absent() {
         let _lock = ENV_MUTEX.lock().unwrap();
         let original = std::env::var("NO_COLOR").ok();
-        std::env::remove_var("NO_COLOR");
+        unsafe { std::env::remove_var("NO_COLOR") };
 
         let mut buf = Vec::new();
         let tw = TapWriterBuilder::auto(&mut buf).build().unwrap();
         assert!(tw.config.color());
 
         if let Some(v) = original {
-            std::env::set_var("NO_COLOR", v);
+            unsafe { std::env::set_var("NO_COLOR", v) };
         }
     }
 
@@ -1966,7 +1966,7 @@ mod tests {
     fn builder_auto_override_color() {
         let _lock = ENV_MUTEX.lock().unwrap();
         let original = std::env::var("NO_COLOR").ok();
-        std::env::remove_var("NO_COLOR");
+        unsafe { std::env::remove_var("NO_COLOR") };
 
         let mut buf = Vec::new();
         let tw = TapWriterBuilder::auto(&mut buf)
@@ -1976,7 +1976,7 @@ mod tests {
         assert!(!tw.config.color());
 
         if let Some(v) = original {
-            std::env::set_var("NO_COLOR", v);
+            unsafe { std::env::set_var("NO_COLOR", v) };
         }
     }
 
@@ -1986,9 +1986,9 @@ mod tests {
         let orig_all = std::env::var("LC_ALL").ok();
         let orig_num = std::env::var("LC_NUMERIC").ok();
         let orig_lang = std::env::var("LANG").ok();
-        std::env::set_var("LANG", "C");
-        std::env::remove_var("LC_ALL");
-        std::env::remove_var("LC_NUMERIC");
+        unsafe { std::env::set_var("LANG", "C") };
+        unsafe { std::env::remove_var("LC_ALL") };
+        unsafe { std::env::remove_var("LC_NUMERIC") };
 
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf)
@@ -2003,16 +2003,16 @@ mod tests {
 
         // Restore
         match orig_all {
-            Some(v) => std::env::set_var("LC_ALL", v),
-            None => std::env::remove_var("LC_ALL"),
+            Some(v) => unsafe { std::env::set_var("LC_ALL", v) },
+            None => unsafe { std::env::remove_var("LC_ALL") },
         }
         match orig_num {
-            Some(v) => std::env::set_var("LC_NUMERIC", v),
-            None => std::env::remove_var("LC_NUMERIC"),
+            Some(v) => unsafe { std::env::set_var("LC_NUMERIC", v) },
+            None => unsafe { std::env::remove_var("LC_NUMERIC") },
         }
         match orig_lang {
-            Some(v) => std::env::set_var("LANG", v),
-            None => std::env::remove_var("LANG"),
+            Some(v) => unsafe { std::env::set_var("LANG", v) },
+            None => unsafe { std::env::remove_var("LANG") },
         }
     }
 
@@ -2022,9 +2022,9 @@ mod tests {
         let orig_all = std::env::var("LC_ALL").ok();
         let orig_num = std::env::var("LC_NUMERIC").ok();
         let orig_lang = std::env::var("LANG").ok();
-        std::env::set_var("LANG", "en_US.UTF-8");
-        std::env::remove_var("LC_ALL");
-        std::env::remove_var("LC_NUMERIC");
+        unsafe { std::env::set_var("LANG", "en_US.UTF-8") };
+        unsafe { std::env::remove_var("LC_ALL") };
+        unsafe { std::env::remove_var("LC_NUMERIC") };
 
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf)
@@ -2040,16 +2040,16 @@ mod tests {
 
         // Restore
         match orig_all {
-            Some(v) => std::env::set_var("LC_ALL", v),
-            None => std::env::remove_var("LC_ALL"),
+            Some(v) => unsafe { std::env::set_var("LC_ALL", v) },
+            None => unsafe { std::env::remove_var("LC_ALL") },
         }
         match orig_num {
-            Some(v) => std::env::set_var("LC_NUMERIC", v),
-            None => std::env::remove_var("LC_NUMERIC"),
+            Some(v) => unsafe { std::env::set_var("LC_NUMERIC", v) },
+            None => unsafe { std::env::remove_var("LC_NUMERIC") },
         }
         match orig_lang {
-            Some(v) => std::env::set_var("LANG", v),
-            None => std::env::remove_var("LANG"),
+            Some(v) => unsafe { std::env::set_var("LANG", v) },
+            None => unsafe { std::env::remove_var("LANG") },
         }
     }
 
