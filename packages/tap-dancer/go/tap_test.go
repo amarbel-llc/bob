@@ -181,8 +181,10 @@ func TestSubtestEmitsIndentedBlock(t *testing.T) {
 
 	expected := "TAP version 14\n" +
 		"    # Subtest: nested\n" +
+		"    # Output: 1 - inner pass\n" +
 		"    ok 1 - inner pass\n" +
 		"    1..1\n" +
+		"# Output: 1 - nested\n" +
 		"ok 1 - nested\n"
 
 	if buf.String() != expected {
@@ -204,20 +206,33 @@ func TestSequentialNumbering(t *testing.T) {
 	}
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if lines[1] != "ok 1 - pass" {
+	// Each test point now has a # Output: header before it
+	if lines[1] != "# Output: 1 - pass" {
 		t.Errorf("line 1: %q", lines[1])
 	}
-	if lines[2] != "not ok 2 - fail" {
+	if lines[2] != "ok 1 - pass" {
 		t.Errorf("line 2: %q", lines[2])
 	}
-	if lines[3] != "ok 3 - skip # SKIP lazy" {
+	if lines[3] != "# Output: 2 - fail" {
 		t.Errorf("line 3: %q", lines[3])
 	}
-	if lines[4] != "not ok 4 - todo # TODO later" {
+	if lines[4] != "not ok 2 - fail" {
 		t.Errorf("line 4: %q", lines[4])
 	}
-	if lines[5] != "1..4" {
-		t.Errorf("plan line: %q", lines[5])
+	if lines[5] != "# Output: 3 - skip" {
+		t.Errorf("line 5: %q", lines[5])
+	}
+	if lines[6] != "ok 3 - skip # SKIP lazy" {
+		t.Errorf("line 6: %q", lines[6])
+	}
+	if lines[7] != "# Output: 4 - todo" {
+		t.Errorf("line 7: %q", lines[7])
+	}
+	if lines[8] != "not ok 4 - todo # TODO later" {
+		t.Errorf("line 8: %q", lines[8])
+	}
+	if lines[9] != "1..4" {
+		t.Errorf("plan line: %q", lines[9])
 	}
 }
 
@@ -235,10 +250,13 @@ func TestNestedSubtestTwoLevelsDeep(t *testing.T) {
 	expected := "TAP version 14\n" +
 		"    # Subtest: outer\n" +
 		"        # Subtest: inner\n" +
+		"        # Output: 1 - deep test\n" +
 		"        ok 1 - deep test\n" +
 		"        1..1\n" +
+		"    # Output: 1 - inner\n" +
 		"    ok 1 - inner\n" +
 		"    1..1\n" +
+		"# Output: 1 - outer\n" +
 		"ok 1 - outer\n"
 
 	if buf.String() != expected {
@@ -393,7 +411,9 @@ func TestWriteAllBasicOk(t *testing.T) {
 		{Description: "second", Ok: true},
 	}))
 	expected := "TAP version 14\n" +
+		"# Output: 1 - first\n" +
 		"ok 1 - first\n" +
+		"# Output: 2 - second\n" +
 		"ok 2 - second\n" +
 		"1..2\n"
 	if buf.String() != expected {
@@ -468,8 +488,10 @@ func TestWriteAllSubtest(t *testing.T) {
 	}))
 	expected := "TAP version 14\n" +
 		"    # Subtest: nested\n" +
+		"    # Output: 1 - inner pass\n" +
 		"    ok 1 - inner pass\n" +
 		"    1..1\n" +
+		"# Output: 1 - nested\n" +
 		"ok 1 - nested\n" +
 		"1..1\n"
 	if buf.String() != expected {
@@ -913,6 +935,52 @@ func TestPragmaTracksTTYBuildLastLine(t *testing.T) {
 	tw.Pragma("tty-build-last-line", true)
 	if !tw.ttyBuildLastLine {
 		t.Error("expected ttyBuildLastLine to be true after Pragma call")
+	}
+}
+
+func TestOkEmitsOutputHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Ok("lint")
+	out := buf.String()
+	want := "TAP version 14\n# Output: 1 - lint\nok 1 - lint\n"
+	if out != want {
+		t.Errorf("expected:\n%s\ngot:\n%s", want, out)
+	}
+}
+
+func TestNotOkEmitsOutputHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.NotOk("build", nil)
+	out := buf.String()
+	if !strings.Contains(out, "# Output: 1 - build\n") {
+		t.Errorf("expected Output header before not ok, got:\n%s", out)
+	}
+	headerIdx := strings.Index(out, "# Output: 1 - build\n")
+	notOkIdx := strings.Index(out, "not ok 1 - build\n")
+	if headerIdx >= notOkIdx {
+		t.Errorf("Output header must appear before not ok line")
+	}
+}
+
+func TestSkipEmitsOutputHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Skip("optional", "not needed")
+	out := buf.String()
+	if !strings.Contains(out, "# Output: 1 - optional\n") {
+		t.Errorf("expected Output header before skip, got:\n%s", out)
+	}
+}
+
+func TestTodoEmitsOutputHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Todo("pending", "not yet")
+	out := buf.String()
+	if !strings.Contains(out, "# Output: 1 - pending\n") {
+		t.Errorf("expected Output header before todo, got:\n%s", out)
 	}
 }
 

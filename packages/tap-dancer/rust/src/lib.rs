@@ -210,6 +210,7 @@ impl<'a> TapWriter<'a> {
     pub fn ok(&mut self, desc: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -224,6 +225,7 @@ impl<'a> TapWriter<'a> {
         self.counter += 1;
         self.failed = true;
         let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -238,6 +240,7 @@ impl<'a> TapWriter<'a> {
         self.counter += 1;
         self.failed = true;
         let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -252,6 +255,7 @@ impl<'a> TapWriter<'a> {
     pub fn skip(&mut self, desc: &str, reason: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {} # {} {}",
@@ -267,6 +271,7 @@ impl<'a> TapWriter<'a> {
     pub fn todo(&mut self, desc: &str, reason: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
+        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {} # {} {}",
@@ -342,6 +347,7 @@ impl<'a> TapWriter<'a> {
         };
 
         let num = self.config.format_number(result.number);
+        writeln!(self.w, "# Output: {} - {}", num, result.name)?;
         if let Some(ref directive) = result.directive {
             writeln!(self.w, "{status} {num} - {} # {directive}", result.name)?;
         } else {
@@ -2279,6 +2285,59 @@ mod tests {
         let p = s.formatted_prefix();
         assert!(!p.contains("💤"), "unexpected 💤 in prefix: {p}");
         assert!(p.ends_with(' '), "prefix should end with space: {p:?}");
+    }
+
+    #[test]
+    fn test_ok_emits_output_header() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.ok("lint").unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        let want = "TAP version 14\n\
+                    # Output: 1 - lint\n\
+                    ok 1 - lint\n\
+                    1..1\n";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_not_ok_emits_output_header() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.not_ok("build").unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(
+            got.contains("# Output: 1 - build\n"),
+            "expected Output header, got:\n{got}"
+        );
+        let header_idx = got.find("# Output: 1 - build\n").unwrap();
+        let not_ok_idx = got.find("not ok 1 - build\n").unwrap();
+        assert!(header_idx < not_ok_idx, "Output header must precede not ok");
+    }
+
+    #[test]
+    fn test_skip_emits_output_header() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.skip("optional", "not needed").unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(
+            got.contains("# Output: 1 - optional\n"),
+            "expected Output header, got:\n{got}"
+        );
+    }
+
+    #[test]
+    fn test_todo_emits_output_header() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.todo("pending", "not yet").unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(
+            got.contains("# Output: 1 - pending\n"),
+            "expected Output header, got:\n{got}"
+        );
     }
 
     #[test]
