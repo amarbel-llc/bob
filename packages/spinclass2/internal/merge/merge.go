@@ -50,7 +50,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		}
 
 		if target != "" {
-			wtPath, branch, err = resolveWorktree(repoPath, target)
+			wtPath, branch, err = ResolveWorktree(repoPath, target)
 		} else {
 			wtPath, branch, err = chooseWorktree(repoPath)
 		}
@@ -59,7 +59,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		}
 	}
 
-	defaultBranch, err := resolveDefaultBranch(repoPath)
+	defaultBranch, err := ResolveDefaultBranch(repoPath)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 
 	if defaultBranch == "" {
 		var err error
-		defaultBranch, err = resolveDefaultBranch(repoPath)
+		defaultBranch, err = ResolveDefaultBranch(repoPath)
 		if err != nil {
 			return err
 		}
@@ -321,7 +321,7 @@ func isInsideSession(cwd, wtPath string) bool {
 	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
 }
 
-func resolveWorktree(repoPath, target string) (wtPath, branch string, err error) {
+func ResolveWorktree(repoPath, target string) (wtPath, branch string, err error) {
 	paths := worktree.ListWorktrees(repoPath)
 	for _, p := range paths {
 		if filepath.Base(p) == target {
@@ -366,7 +366,7 @@ func chooseWorktree(repoPath string) (wtPath, branch string, err error) {
 	return "", "", fmt.Errorf("selected worktree not found: %s", selected)
 }
 
-func resolveDefaultBranch(repoPath string) (string, error) {
+func ResolveDefaultBranch(repoPath string) (string, error) {
 	branch, err := git.DefaultBranch(repoPath)
 	if errors.Is(err, git.ErrAmbiguousDefaultBranch) {
 		return promptDefaultBranch()

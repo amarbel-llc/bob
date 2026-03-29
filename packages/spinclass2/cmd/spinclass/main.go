@@ -1,22 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 
-	"github.com/charmbracelet/log"
+	charmbraceletLog "github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 	"github.com/amarbel-llc/spinclass2/internal/clean"
 	"github.com/amarbel-llc/spinclass2/internal/completions"
 	"github.com/amarbel-llc/spinclass2/internal/executor"
 	"github.com/amarbel-llc/spinclass2/internal/git"
 	"github.com/amarbel-llc/spinclass2/internal/hooks"
-	"github.com/amarbel-llc/spinclass2/internal/session"
+	"github.com/amarbel-llc/spinclass2/internal/mcptools"
 	"github.com/amarbel-llc/spinclass2/internal/merge"
 	"github.com/amarbel-llc/spinclass2/internal/perms"
 	"github.com/amarbel-llc/spinclass2/internal/pull"
+	"github.com/amarbel-llc/spinclass2/internal/session"
 	"github.com/amarbel-llc/spinclass2/internal/shop"
 	"github.com/amarbel-llc/spinclass2/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass2/internal/validate"
@@ -82,7 +88,7 @@ var attachCmd = &cobra.Command{
 			if resume := merged.SessionResume(); resume != nil {
 				entrypoint = resume
 			} else {
-				log.Warn("active session exists, starting second instance",
+				charmbraceletLog.Warn("active session exists, starting second instance",
 					"session", resolvedPath.SessionKey)
 			}
 		}
@@ -308,6 +314,38 @@ var cmdExecClaude = &cobra.Command{
 	},
 }
 
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "Start MCP server on stdio",
+	Long:  `Start a JSON-RPC MCP server on stdin/stdout. Intended to be launched by an MCP client such as Claude Code.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		app := mcptools.RegisterAll()
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+
+		t := transport.NewStdio(os.Stdin, os.Stdout)
+		registry := server.NewToolRegistryV1()
+		app.RegisterMCPToolsV1(registry)
+
+		srv, err := server.New(t, server.Options{
+			ServerName:    app.Name,
+			ServerVersion: app.Version,
+			Instructions:  "Git worktree session manager. Use the merge tool to merge a worktree branch into the default branch.",
+			Tools:         registry,
+		})
+		if err != nil {
+			log.Fatalf("creating server: %v", err)
+		}
+
+		if err := srv.Run(ctx); err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(
 		&outputFormat,
@@ -377,6 +415,7 @@ func init() {
 	rootCmd.AddCommand(forkCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(cmdExecClaude)
+	rootCmd.AddCommand(serveCmd)
 }
 
 func main() {
