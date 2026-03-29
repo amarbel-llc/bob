@@ -406,3 +406,29 @@ func TestIsInsideSession(t *testing.T) {
 		}
 	})
 }
+
+func TestIsInsideWorktree(t *testing.T) {
+	t.Run("cwd matches wtPath", func(t *testing.T) {
+		if !isInsideWorktree("/tmp/repo/.worktrees/branch", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected true when cwd equals wtPath")
+		}
+	})
+
+	t.Run("cwd is subdirectory", func(t *testing.T) {
+		if !isInsideWorktree("/tmp/repo/.worktrees/branch/src/pkg", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected true when cwd is inside wtPath")
+		}
+	})
+
+	t.Run("cwd is outside wtPath", func(t *testing.T) {
+		if isInsideWorktree("/tmp/other-repo", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected false when cwd is outside wtPath")
+		}
+	})
+
+	t.Run("cwd is sibling prefix", func(t *testing.T) {
+		if isInsideWorktree("/tmp/repo/.worktrees/branch-other", "/tmp/repo/.worktrees/branch") {
+			t.Error("expected false for sibling path that shares prefix")
+		}
+	})
+}

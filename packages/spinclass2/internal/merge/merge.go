@@ -174,7 +174,14 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		}
 	}
 
-	if !inSession {
+	// Skip worktree removal when running from inside the worktree being
+	// merged (can't remove cwd) or when inside an active session.
+	insideWorktree := false
+	if cwd, err := os.Getwd(); err == nil {
+		insideWorktree = isInsideWorktree(cwd, wtPath)
+	}
+
+	if !inSession && !insideWorktree {
 		if tw == nil {
 			log.Info("removing worktree", "path", wtPath)
 		}
@@ -318,6 +325,13 @@ func isInsideSession(cwd, wtPath string) bool {
 	cleanCwd := filepath.Clean(cwd)
 	cleanWt := filepath.Clean(wtPath)
 
+	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
+}
+
+// isInsideWorktree returns true when cwd is within the worktree directory.
+func isInsideWorktree(cwd, wtPath string) bool {
+	cleanCwd := filepath.Clean(cwd)
+	cleanWt := filepath.Clean(wtPath)
 	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
 }
 
