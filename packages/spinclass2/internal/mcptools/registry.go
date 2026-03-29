@@ -6,7 +6,7 @@ func RegisterAll() *command.App {
 	app := command.NewApp("spinclass2", "MCP server for git worktree session management")
 	app.Version = "0.1.0"
 
-	registerMerge(app)
+	registerMergeThisSession(app)
 
 	return app
 }

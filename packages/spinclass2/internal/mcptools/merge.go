@@ -10,16 +10,17 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	"github.com/amarbel-llc/spinclass2/internal/executor"
+	"github.com/amarbel-llc/spinclass2/internal/git"
 	"github.com/amarbel-llc/spinclass2/internal/merge"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
 )
 
-func registerMerge(app *command.App) {
+func registerMergeThisSession(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:  "merge",
-		Title: "Merge Worktree",
+		Name:  "merge-this-session",
+		Title: "Merge This Session",
 		Description: command.Description{
-			Short: "Merge a worktree branch into the default branch and clean up",
+			Short: "Merge the current session's worktree into the default branch and clean up",
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -29,33 +30,22 @@ func registerMerge(app *command.App) {
 		},
 		Params: []command.Param{
 			{
-				Name:        "target",
-				Type:        command.String,
-				Description: "Branch or worktree name to merge into the default branch",
-				Required:    true,
-			},
-			{
 				Name:        "git_sync",
 				Type:        command.Bool,
 				Description: "Pull and push after merge (default false)",
 			},
 		},
-		Run: handleMerge,
+		Run: handleMergeThisSession,
 	})
 }
 
-func handleMerge(_ context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
+func handleMergeThisSession(_ context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
-		Target  string `json:"target"`
-		GitSync bool   `json:"git_sync"`
+		GitSync bool `json:"git_sync"`
 	}
 
 	if err := json.Unmarshal(args, &params); err != nil {
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-	}
-
-	if params.Target == "" {
-		return command.TextErrorResult("target is required"), nil
 	}
 
 	cwd, err := os.Getwd()
@@ -63,14 +53,18 @@ func handleMerge(_ context.Context, args json.RawMessage, _ command.Prompter) (*
 		return command.TextErrorResult(fmt.Sprintf("could not get working directory: %v", err)), nil
 	}
 
-	repoPath, err := worktree.DetectRepo(cwd)
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("not in a git repository: %v", err)), nil
+	if !worktree.IsWorktree(cwd) {
+		return command.TextErrorResult("not inside a worktree session"), nil
 	}
 
-	wtPath, branch, err := merge.ResolveWorktree(repoPath, params.Target)
+	repoPath, err := git.CommonDir(cwd)
 	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("worktree not found: %v", err)), nil
+		return command.TextErrorResult(fmt.Sprintf("could not determine repo path: %v", err)), nil
+	}
+
+	branch, err := git.BranchCurrent(cwd)
+	if err != nil {
+		return command.TextErrorResult(fmt.Sprintf("could not determine current branch: %v", err)), nil
 	}
 
 	defaultBranch, err := merge.ResolveDefaultBranch(repoPath)
@@ -85,11 +79,11 @@ func handleMerge(_ context.Context, args json.RawMessage, _ command.Prompter) (*
 		nil,
 		"tap",
 		repoPath,
-		wtPath,
+		cwd,
 		branch,
 		defaultBranch,
 		params.GitSync,
-		false,
+		true,
 		true,
 	)
 

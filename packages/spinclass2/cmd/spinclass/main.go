@@ -315,9 +315,9 @@ var cmdExecClaude = &cobra.Command{
 }
 
 var serveCmd = &cobra.Command{
-	Use:   "serve",
+	Use:   "serve-mcp",
 	Short: "Start MCP server on stdio",
-	Long:  `Start a JSON-RPC MCP server on stdin/stdout. Intended to be launched by an MCP client such as Claude Code.`,
+	Long:  `Start a JSON-RPC MCP server on stdin/stdout. Intended to be launched by an MCP client such as Claude Code via .mcp.json.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		app := mcptools.RegisterAll()
 
