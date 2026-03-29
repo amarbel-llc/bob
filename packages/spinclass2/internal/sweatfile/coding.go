@@ -16,14 +16,14 @@ func Parse(data []byte) (*SweatfileDocument, error) {
 	// Tommy's GetFromContainer returns nil for empty TOML arrays (e.g. []).
 	// MergeWith relies on nil vs empty to distinguish "absent" from "clear",
 	// so normalize consumed array keys to non-nil empty slices.
-	if doc.consumed["git-excludes"] && doc.data.GitSkipIndex == nil {
-		doc.data.GitSkipIndex = []string{}
+	if doc.consumed["claude.allow"] && doc.data.Claude != nil && doc.data.Claude.Allow == nil {
+		doc.data.Claude.Allow = []string{}
 	}
-	if doc.consumed["claude-allow"] && doc.data.ClaudeAllow == nil {
-		doc.data.ClaudeAllow = []string{}
+	if doc.consumed["git.excludes"] && doc.data.Git != nil && doc.data.Git.Excludes == nil {
+		doc.data.Git.Excludes = []string{}
 	}
-	if doc.consumed["envrc-directives"] && doc.data.EnvrcDirectives == nil {
-		doc.data.EnvrcDirectives = []string{}
+	if doc.consumed["direnv.envrc"] && doc.data.Direnv != nil && doc.data.Direnv.Envrc == nil {
+		doc.data.Direnv.Envrc = []string{}
 	}
 	return doc, nil
 }

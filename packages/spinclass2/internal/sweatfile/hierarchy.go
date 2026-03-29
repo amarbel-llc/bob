@@ -124,73 +124,78 @@ func LoadWorktreeHierarchy(
 func (sf Sweatfile) MergeWith(other Sweatfile) Sweatfile {
 	merged := sf
 
-	if other.SystemPrompt != nil {
-		if *other.SystemPrompt == "" {
-			merged.SystemPrompt = other.SystemPrompt
-		} else if sf.SystemPrompt != nil && *sf.SystemPrompt != "" {
-			joined := *sf.SystemPrompt + " " + *other.SystemPrompt
-			merged.SystemPrompt = &joined
-		} else {
-			merged.SystemPrompt = other.SystemPrompt
+	// [claude]
+	if other.Claude != nil {
+		if merged.Claude == nil {
+			merged.Claude = &Claude{}
+		}
+		if other.Claude.SystemPrompt != nil {
+			if *other.Claude.SystemPrompt == "" {
+				merged.Claude.SystemPrompt = other.Claude.SystemPrompt
+			} else if merged.Claude.SystemPrompt != nil && *merged.Claude.SystemPrompt != "" {
+				joined := *merged.Claude.SystemPrompt + " " + *other.Claude.SystemPrompt
+				merged.Claude.SystemPrompt = &joined
+			} else {
+				merged.Claude.SystemPrompt = other.Claude.SystemPrompt
+			}
+		}
+		if other.Claude.SystemPromptAppend != nil {
+			if *other.Claude.SystemPromptAppend == "" {
+				merged.Claude.SystemPromptAppend = other.Claude.SystemPromptAppend
+			} else if merged.Claude.SystemPromptAppend != nil && *merged.Claude.SystemPromptAppend != "" {
+				joined := *merged.Claude.SystemPromptAppend + " " + *other.Claude.SystemPromptAppend
+				merged.Claude.SystemPromptAppend = &joined
+			} else {
+				merged.Claude.SystemPromptAppend = other.Claude.SystemPromptAppend
+			}
+		}
+		// allow: nil=inherit, empty=clear, non-empty=append
+		if other.Claude.Allow != nil {
+			if len(other.Claude.Allow) == 0 {
+				merged.Claude.Allow = []string{}
+			} else {
+				merged.Claude.Allow = append(merged.Claude.Allow, other.Claude.Allow...)
+			}
 		}
 	}
 
-	if other.SystemPromptAppend != nil {
-		if *other.SystemPromptAppend == "" {
-			merged.SystemPromptAppend = other.SystemPromptAppend
-		} else if sf.SystemPromptAppend != nil && *sf.SystemPromptAppend != "" {
-			joined := *sf.SystemPromptAppend + " " + *other.SystemPromptAppend
-			merged.SystemPromptAppend = &joined
-		} else {
-			merged.SystemPromptAppend = other.SystemPromptAppend
+	// [git]
+	if other.Git != nil {
+		if merged.Git == nil {
+			merged.Git = &Git{}
+		}
+		if other.Git.Excludes != nil {
+			if len(other.Git.Excludes) == 0 {
+				merged.Git.Excludes = []string{}
+			} else {
+				merged.Git.Excludes = append(merged.Git.Excludes, other.Git.Excludes...)
+			}
 		}
 	}
 
-	// Arrays: nil = inherit, empty = clear, non-empty = append
-	if other.GitSkipIndex != nil {
-		if len(other.GitSkipIndex) == 0 {
-			merged.GitSkipIndex = []string{}
-		} else {
-			merged.GitSkipIndex = append(sf.GitSkipIndex, other.GitSkipIndex...)
+	// [direnv]
+	if other.Direnv != nil {
+		if merged.Direnv == nil {
+			merged.Direnv = &Direnv{}
 		}
-	}
-	if other.ClaudeAllow != nil {
-		if len(other.ClaudeAllow) == 0 {
-			merged.ClaudeAllow = []string{}
-		} else {
-			merged.ClaudeAllow = append(sf.ClaudeAllow, other.ClaudeAllow...)
+		if other.Direnv.Envrc != nil {
+			if len(other.Direnv.Envrc) == 0 {
+				merged.Direnv.Envrc = []string{}
+			} else {
+				merged.Direnv.Envrc = append(merged.Direnv.Envrc, other.Direnv.Envrc...)
+			}
 		}
-	}
-	if other.EnvrcDirectives != nil {
-		if len(other.EnvrcDirectives) == 0 {
-			merged.EnvrcDirectives = []string{}
-		} else {
-			merged.EnvrcDirectives = append(sf.EnvrcDirectives, other.EnvrcDirectives...)
-		}
-	}
-
-	if other.Env != nil {
-		if merged.Env == nil {
-			merged.Env = make(map[string]string)
-		}
-		for k, v := range other.Env {
-			merged.Env[k] = v
+		if other.Direnv.Dotenv != nil {
+			if merged.Direnv.Dotenv == nil {
+				merged.Direnv.Dotenv = make(map[string]string)
+			}
+			for k, v := range other.Direnv.Dotenv {
+				merged.Direnv.Dotenv[k] = v
+			}
 		}
 	}
 
-	// Session: override semantics (deepest wins, nil = inherit)
-	if other.Session != nil {
-		if merged.Session == nil {
-			merged.Session = &Session{}
-		}
-		if len(other.Session.Start) > 0 {
-			merged.Session.Start = other.Session.Start
-		}
-		if len(other.Session.Resume) > 0 {
-			merged.Session.Resume = other.Session.Resume
-		}
-	}
-
+	// [hooks]
 	if other.Hooks != nil {
 		if merged.Hooks == nil {
 			merged.Hooks = &Hooks{}
@@ -209,6 +214,19 @@ func (sf Sweatfile) MergeWith(other Sweatfile) Sweatfile {
 		}
 		if other.Hooks.ToolUseLog != nil {
 			merged.Hooks.ToolUseLog = other.Hooks.ToolUseLog
+		}
+	}
+
+	// [session-entry]
+	if other.SessionEntry != nil {
+		if merged.SessionEntry == nil {
+			merged.SessionEntry = &SessionEntry{}
+		}
+		if len(other.SessionEntry.Start) > 0 {
+			merged.SessionEntry.Start = other.SessionEntry.Start
+		}
+		if len(other.SessionEntry.Resume) > 0 {
+			merged.SessionEntry.Resume = other.SessionEntry.Resume
 		}
 	}
 

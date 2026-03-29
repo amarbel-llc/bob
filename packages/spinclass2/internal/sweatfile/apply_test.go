@@ -83,20 +83,24 @@ func TestPrepareLocalBinWorksInsideWorktree(t *testing.T) {
 func TestHardcodedDefaultsGitExcludes(t *testing.T) {
 	defaults := GetDefault()
 
-	if defaults.GitSkipIndex == nil {
+	if defaults.Git == nil {
+		t.Fatal("expected non-nil Git struct")
+	}
+
+	if defaults.Git.Excludes == nil {
 		t.Fatal("expected non-nil git excludes slice")
 	}
 
-	if len(defaults.GitSkipIndex) != 1 {
+	if len(defaults.Git.Excludes) != 1 {
 		t.Fatalf(
 			"expected 1 git exclude, got %d: %v",
-			len(defaults.GitSkipIndex),
-			defaults.GitSkipIndex,
+			len(defaults.Git.Excludes),
+			defaults.Git.Excludes,
 		)
 	}
 
-	if defaults.GitSkipIndex[0] != ".spinclass/" {
-		t.Errorf("expected .spinclass/, got %q", defaults.GitSkipIndex[0])
+	if defaults.Git.Excludes[0] != ".spinclass/" {
+		t.Errorf("expected .spinclass/, got %q", defaults.Git.Excludes[0])
 	}
 }
 
@@ -105,28 +109,32 @@ func TestHardcodedDefaultsClaudeAllow(t *testing.T) {
 
 	home, _ := os.UserHomeDir()
 	if home == "" {
-		if defaults.ClaudeAllow != nil {
+		if defaults.Claude != nil {
 			t.Errorf(
-				"expected nil ClaudeAllow when HOME is empty, got %v",
-				defaults.ClaudeAllow,
+				"expected nil Claude when HOME is empty, got %v",
+				defaults.Claude,
 			)
 		}
 		return
 	}
 
-	if len(defaults.ClaudeAllow) != 1 {
+	if defaults.Claude == nil {
+		t.Fatal("expected non-nil Claude struct")
+	}
+
+	if len(defaults.Claude.Allow) != 1 {
 		t.Fatalf(
 			"expected 1 claude allow rule, got %d: %v",
-			len(defaults.ClaudeAllow),
-			defaults.ClaudeAllow,
+			len(defaults.Claude.Allow),
+			defaults.Claude.Allow,
 		)
 	}
 
 	wantRule := "Read(" + filepath.Join(home, ".claude") + "/*)"
-	if defaults.ClaudeAllow[0] != wantRule {
+	if defaults.Claude.Allow[0] != wantRule {
 		t.Errorf(
-			"ClaudeAllow[0]: got %q, want %q",
-			defaults.ClaudeAllow[0],
+			"Claude.Allow[0]: got %q, want %q",
+			defaults.Claude.Allow[0],
 			wantRule,
 		)
 	}
@@ -136,7 +144,7 @@ func TestApplyClaudeSettings(t *testing.T) {
 	dir := t.TempDir()
 	rules := []string{"Read", "Glob", "Bash(git *)"}
 
-	err := ApplyClaudeSettings(dir, Sweatfile{ClaudeAllow: rules})
+	err := ApplyClaudeSettings(dir, Sweatfile{Claude: &Claude{Allow: rules}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -236,7 +244,7 @@ func TestApplyClaudeSettingsOverwritesExistingKeys(t *testing.T) {
 	data, _ := json.MarshalIndent(existing, "", "  ")
 	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), data, 0o644)
 
-	err := ApplyClaudeSettings(dir, Sweatfile{ClaudeAllow: []string{"Read"}})
+	err := ApplyClaudeSettings(dir, Sweatfile{Claude: &Claude{Allow: []string{"Read"}}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -511,7 +519,7 @@ func TestWriteEnvrcWithDirectives(t *testing.T) {
 	)
 	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
-	sf := Sweatfile{EnvrcDirectives: []string{"source_up", "dotenv_if_exists"}}
+	sf := Sweatfile{Direnv: &Direnv{Envrc: []string{"source_up", "dotenv_if_exists"}}}
 	err := sf.prepareDirenv(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -603,9 +611,11 @@ func TestWriteSpinclassEnv(t *testing.T) {
 	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{
-			"FOO": "bar",
-			"BAZ": "qux",
+		Direnv: &Direnv{
+			Dotenv: map[string]string{
+				"FOO": "bar",
+				"BAZ": "qux",
+			},
 		},
 	}
 	err := sf.Apply(dir)
@@ -636,8 +646,10 @@ func TestWriteSpinclassEnvInterpolatesWorktree(t *testing.T) {
 	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{
-			"INCLUDE_PATH": "$WORKTREE/lib:.",
+		Direnv: &Direnv{
+			Dotenv: map[string]string{
+				"INCLUDE_PATH": "$WORKTREE/lib:.",
+			},
 		},
 	}
 	err := sf.Apply(dir)
@@ -668,7 +680,9 @@ func TestEnvAutoDotenvDirective(t *testing.T) {
 	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{"FOO": "bar"},
+		Direnv: &Direnv{
+			Dotenv: map[string]string{"FOO": "bar"},
+		},
 	}
 	err := sf.Apply(dir)
 	if err != nil {

@@ -29,30 +29,73 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 
 	d := &SweatfileDocument{cstDoc: doc, consumed: make(map[string]bool)}
 
-	if v, err := document.GetFromContainer[string](d.cstDoc, d.cstDoc.Root(), "system-prompt"); err == nil {
-		d.data.SystemPrompt = &v
-		d.consumed["system-prompt"] = true
+	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "claude"); tableNode != nil {
+		d.consumed["claude"] = true
+		claudeVal := &Claude{}
+		if v, err := document.GetFromContainer[string](d.cstDoc, tableNode, "system-prompt"); err == nil {
+			claudeVal.SystemPrompt = &v
+			d.consumed["claude.system-prompt"] = true
+		}
+		if v, err := document.GetFromContainer[string](d.cstDoc, tableNode, "system-prompt-append"); err == nil {
+			claudeVal.SystemPromptAppend = &v
+			d.consumed["claude.system-prompt-append"] = true
+		}
+		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "allow"); err == nil {
+			claudeVal.Allow = v
+			d.consumed["claude.allow"] = true
+		}
+		d.data.Claude = claudeVal
+	} else {
+		claudeVal := &Claude{}
+		found := false
+		if v, err := document.GetFromContainer[string](d.cstDoc, d.cstDoc.Root(), "system-prompt"); err == nil {
+			claudeVal.SystemPrompt = &v
+			found = true
+			d.consumed["system-prompt"] = true
+		}
+		if v, err := document.GetFromContainer[string](d.cstDoc, d.cstDoc.Root(), "system-prompt-append"); err == nil {
+			claudeVal.SystemPromptAppend = &v
+			found = true
+			d.consumed["system-prompt-append"] = true
+		}
+		if found {
+			d.data.Claude = claudeVal
+		}
 	}
-	if v, err := document.GetFromContainer[string](d.cstDoc, d.cstDoc.Root(), "system-prompt-append"); err == nil {
-		d.data.SystemPromptAppend = &v
-		d.consumed["system-prompt-append"] = true
+	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "git"); tableNode != nil {
+		d.consumed["git"] = true
+		gitVal := &Git{}
+		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "excludes"); err == nil {
+			gitVal.Excludes = v
+			d.consumed["git.excludes"] = true
+		}
+		d.data.Git = gitVal
+	} else {
+		gitVal := &Git{}
+		found := false
+		if found {
+			d.data.Git = gitVal
+		}
 	}
-	if v, err := document.GetFromContainer[[]string](d.cstDoc, d.cstDoc.Root(), "git-excludes"); err == nil {
-		d.data.GitSkipIndex = v
-		d.consumed["git-excludes"] = true
-	}
-	if v, err := document.GetFromContainer[[]string](d.cstDoc, d.cstDoc.Root(), "claude-allow"); err == nil {
-		d.data.ClaudeAllow = v
-		d.consumed["claude-allow"] = true
-	}
-	if v, err := document.GetFromContainer[[]string](d.cstDoc, d.cstDoc.Root(), "envrc-directives"); err == nil {
-		d.data.EnvrcDirectives = v
-		d.consumed["envrc-directives"] = true
-	}
-	if tableNode := d.cstDoc.FindTable("env"); tableNode != nil {
-		d.data.Env = document.GetStringMapFromTable(tableNode)
-		d.consumed["env"] = true
-		document.MarkAllConsumed(tableNode, "env", d.consumed)
+	if direnvNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "direnv"); direnvNode != nil {
+		d.consumed["direnv"] = true
+		direnvVal := &Direnv{}
+		if v, err := document.GetFromContainer[[]string](d.cstDoc, direnvNode, "envrc"); err == nil {
+			direnvVal.Envrc = v
+			d.consumed["direnv.envrc"] = true
+		}
+		if dotenvNode := d.cstDoc.FindTableInContainer(direnvNode, "dotenv"); dotenvNode != nil {
+			direnvVal.Dotenv = document.GetStringMapFromTable(dotenvNode)
+			d.consumed["direnv.dotenv"] = true
+			document.MarkAllConsumed(dotenvNode, "direnv.dotenv", d.consumed)
+		}
+		d.data.Direnv = direnvVal
+	} else {
+		direnvVal := &Direnv{}
+		found := false
+		if found {
+			d.data.Direnv = direnvVal
+		}
 	}
 	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "hooks"); tableNode != nil {
 		d.consumed["hooks"] = true
@@ -110,23 +153,23 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 			d.data.Hooks = hooksVal
 		}
 	}
-	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "session"); tableNode != nil {
-		d.consumed["session"] = true
-		sessionVal := &Session{}
+	if tableNode := d.cstDoc.FindTableInContainer(d.cstDoc.Root(), "session-entry"); tableNode != nil {
+		d.consumed["session-entry"] = true
+		sessionEntryVal := &SessionEntry{}
 		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "start"); err == nil {
-			sessionVal.Start = v
-			d.consumed["session.start"] = true
+			sessionEntryVal.Start = v
+			d.consumed["session-entry.start"] = true
 		}
 		if v, err := document.GetFromContainer[[]string](d.cstDoc, tableNode, "resume"); err == nil {
-			sessionVal.Resume = v
-			d.consumed["session.resume"] = true
+			sessionEntryVal.Resume = v
+			d.consumed["session-entry.resume"] = true
 		}
-		d.data.Session = sessionVal
+		d.data.SessionEntry = sessionEntryVal
 	} else {
-		sessionVal := &Session{}
+		sessionEntryVal := &SessionEntry{}
 		found := false
 		if found {
-			d.data.Session = sessionVal
+			d.data.SessionEntry = sessionEntryVal
 		}
 	}
 
@@ -136,31 +179,40 @@ func DecodeSweatfile(input []byte) (*SweatfileDocument, error) {
 func (d *SweatfileDocument) Data() *Sweatfile { return &d.data }
 
 func (d *SweatfileDocument) Encode() ([]byte, error) {
-	if d.data.SystemPrompt != nil {
-		if err := d.cstDoc.SetInContainer(d.cstDoc.Root(), "system-prompt", *d.data.SystemPrompt); err != nil {
-			return nil, err
-		}
-	}
-	if d.data.SystemPromptAppend != nil {
-		if err := d.cstDoc.SetInContainer(d.cstDoc.Root(), "system-prompt-append", *d.data.SystemPromptAppend); err != nil {
-			return nil, err
-		}
-	}
-	if err := d.cstDoc.SetInContainer(d.cstDoc.Root(), "git-excludes", d.data.GitSkipIndex); err != nil {
-		return nil, err
-	}
-	if err := d.cstDoc.SetInContainer(d.cstDoc.Root(), "claude-allow", d.data.ClaudeAllow); err != nil {
-		return nil, err
-	}
-	if err := d.cstDoc.SetInContainer(d.cstDoc.Root(), "envrc-directives", d.data.EnvrcDirectives); err != nil {
-		return nil, err
-	}
-	if len(d.data.Env) > 0 {
-		tableNode := d.cstDoc.EnsureTable("env")
-		document.DeleteAllInContainer(tableNode)
-		for k, v := range d.data.Env {
-			if err := d.cstDoc.SetInContainer(tableNode, k, v); err != nil {
+	if d.data.Claude != nil {
+		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "claude")
+		if d.data.Claude.SystemPrompt != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "system-prompt", *d.data.Claude.SystemPrompt); err != nil {
 				return nil, err
+			}
+		}
+		if d.data.Claude.SystemPromptAppend != nil {
+			if err := d.cstDoc.SetInContainer(tableNode, "system-prompt-append", *d.data.Claude.SystemPromptAppend); err != nil {
+				return nil, err
+			}
+		}
+		if err := d.cstDoc.SetInContainer(tableNode, "allow", d.data.Claude.Allow); err != nil {
+			return nil, err
+		}
+	}
+	if d.data.Git != nil {
+		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "git")
+		if err := d.cstDoc.SetInContainer(tableNode, "excludes", d.data.Git.Excludes); err != nil {
+			return nil, err
+		}
+	}
+	if d.data.Direnv != nil {
+		direnvNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "direnv")
+		if err := d.cstDoc.SetInContainer(direnvNode, "envrc", d.data.Direnv.Envrc); err != nil {
+			return nil, err
+		}
+		if len(d.data.Direnv.Dotenv) > 0 {
+			dotenvNode := d.cstDoc.EnsureTableInContainer(direnvNode, "dotenv")
+			document.DeleteAllInContainer(dotenvNode)
+			for k, v := range d.data.Direnv.Dotenv {
+				if err := d.cstDoc.SetInContainer(dotenvNode, k, v); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -192,12 +244,12 @@ func (d *SweatfileDocument) Encode() ([]byte, error) {
 			}
 		}
 	}
-	if d.data.Session != nil {
-		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "session")
-		if err := d.cstDoc.SetInContainer(tableNode, "start", d.data.Session.Start); err != nil {
+	if d.data.SessionEntry != nil {
+		tableNode := d.cstDoc.EnsureTableInContainer(d.cstDoc.Root(), "session-entry")
+		if err := d.cstDoc.SetInContainer(tableNode, "start", d.data.SessionEntry.Start); err != nil {
 			return nil, err
 		}
-		if err := d.cstDoc.SetInContainer(tableNode, "resume", d.data.Session.Resume); err != nil {
+		if err := d.cstDoc.SetInContainer(tableNode, "resume", d.data.SessionEntry.Resume); err != nil {
 			return nil, err
 		}
 	}
@@ -226,30 +278,73 @@ func (d *SweatfileDocument) SetInlineComment(key, comment string) {
 }
 
 func DecodeSweatfileInto(data *Sweatfile, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	if v, err := document.GetFromContainer[string](doc, container, "system-prompt"); err == nil {
-		data.SystemPrompt = &v
-		consumed[keyPrefix+"system-prompt"] = true
+	if tableNode := doc.FindTableInContainer(container, "claude"); tableNode != nil {
+		consumed[keyPrefix+"claude"] = true
+		claudeVal := &Claude{}
+		if v, err := document.GetFromContainer[string](doc, tableNode, "system-prompt"); err == nil {
+			claudeVal.SystemPrompt = &v
+			consumed[keyPrefix+"claude.system-prompt"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, tableNode, "system-prompt-append"); err == nil {
+			claudeVal.SystemPromptAppend = &v
+			consumed[keyPrefix+"claude.system-prompt-append"] = true
+		}
+		if v, err := document.GetFromContainer[[]string](doc, tableNode, "allow"); err == nil {
+			claudeVal.Allow = v
+			consumed[keyPrefix+"claude.allow"] = true
+		}
+		data.Claude = claudeVal
+	} else {
+		claudeVal := &Claude{}
+		found := false
+		if v, err := document.GetFromContainer[string](doc, container, "system-prompt"); err == nil {
+			claudeVal.SystemPrompt = &v
+			found = true
+			consumed[keyPrefix+"system-prompt"] = true
+		}
+		if v, err := document.GetFromContainer[string](doc, container, "system-prompt-append"); err == nil {
+			claudeVal.SystemPromptAppend = &v
+			found = true
+			consumed[keyPrefix+"system-prompt-append"] = true
+		}
+		if found {
+			data.Claude = claudeVal
+		}
 	}
-	if v, err := document.GetFromContainer[string](doc, container, "system-prompt-append"); err == nil {
-		data.SystemPromptAppend = &v
-		consumed[keyPrefix+"system-prompt-append"] = true
+	if tableNode := doc.FindTableInContainer(container, "git"); tableNode != nil {
+		consumed[keyPrefix+"git"] = true
+		gitVal := &Git{}
+		if v, err := document.GetFromContainer[[]string](doc, tableNode, "excludes"); err == nil {
+			gitVal.Excludes = v
+			consumed[keyPrefix+"git.excludes"] = true
+		}
+		data.Git = gitVal
+	} else {
+		gitVal := &Git{}
+		found := false
+		if found {
+			data.Git = gitVal
+		}
 	}
-	if v, err := document.GetFromContainer[[]string](doc, container, "git-excludes"); err == nil {
-		data.GitSkipIndex = v
-		consumed[keyPrefix+"git-excludes"] = true
-	}
-	if v, err := document.GetFromContainer[[]string](doc, container, "claude-allow"); err == nil {
-		data.ClaudeAllow = v
-		consumed[keyPrefix+"claude-allow"] = true
-	}
-	if v, err := document.GetFromContainer[[]string](doc, container, "envrc-directives"); err == nil {
-		data.EnvrcDirectives = v
-		consumed[keyPrefix+"envrc-directives"] = true
-	}
-	if tableNode := doc.FindTable("env"); tableNode != nil {
-		data.Env = document.GetStringMapFromTable(tableNode)
-		consumed[keyPrefix+"env"] = true
-		document.MarkAllConsumed(tableNode, "env", consumed)
+	if direnvNode := doc.FindTableInContainer(container, "direnv"); direnvNode != nil {
+		consumed[keyPrefix+"direnv"] = true
+		direnvVal := &Direnv{}
+		if v, err := document.GetFromContainer[[]string](doc, direnvNode, "envrc"); err == nil {
+			direnvVal.Envrc = v
+			consumed[keyPrefix+"direnv.envrc"] = true
+		}
+		if dotenvNode := doc.FindTableInContainer(direnvNode, "dotenv"); dotenvNode != nil {
+			direnvVal.Dotenv = document.GetStringMapFromTable(dotenvNode)
+			consumed[keyPrefix+"direnv.dotenv"] = true
+			document.MarkAllConsumed(dotenvNode, "direnv.dotenv", consumed)
+		}
+		data.Direnv = direnvVal
+	} else {
+		direnvVal := &Direnv{}
+		found := false
+		if found {
+			data.Direnv = direnvVal
+		}
 	}
 	if tableNode := doc.FindTableInContainer(container, "hooks"); tableNode != nil {
 		consumed[keyPrefix+"hooks"] = true
@@ -307,23 +402,23 @@ func DecodeSweatfileInto(data *Sweatfile, doc *document.Document, container *cst
 			data.Hooks = hooksVal
 		}
 	}
-	if tableNode := doc.FindTableInContainer(container, "session"); tableNode != nil {
-		consumed[keyPrefix+"session"] = true
-		sessionVal := &Session{}
+	if tableNode := doc.FindTableInContainer(container, "session-entry"); tableNode != nil {
+		consumed[keyPrefix+"session-entry"] = true
+		sessionEntryVal := &SessionEntry{}
 		if v, err := document.GetFromContainer[[]string](doc, tableNode, "start"); err == nil {
-			sessionVal.Start = v
-			consumed[keyPrefix+"session.start"] = true
+			sessionEntryVal.Start = v
+			consumed[keyPrefix+"session-entry.start"] = true
 		}
 		if v, err := document.GetFromContainer[[]string](doc, tableNode, "resume"); err == nil {
-			sessionVal.Resume = v
-			consumed[keyPrefix+"session.resume"] = true
+			sessionEntryVal.Resume = v
+			consumed[keyPrefix+"session-entry.resume"] = true
 		}
-		data.Session = sessionVal
+		data.SessionEntry = sessionEntryVal
 	} else {
-		sessionVal := &Session{}
+		sessionEntryVal := &SessionEntry{}
 		found := false
 		if found {
-			data.Session = sessionVal
+			data.SessionEntry = sessionEntryVal
 		}
 	}
 
@@ -331,31 +426,40 @@ func DecodeSweatfileInto(data *Sweatfile, doc *document.Document, container *cst
 }
 
 func EncodeSweatfileFrom(data *Sweatfile, doc *document.Document, container *cst.Node) error {
-	if data.SystemPrompt != nil {
-		if err := doc.SetInContainer(container, "system-prompt", *data.SystemPrompt); err != nil {
-			return err
-		}
-	}
-	if data.SystemPromptAppend != nil {
-		if err := doc.SetInContainer(container, "system-prompt-append", *data.SystemPromptAppend); err != nil {
-			return err
-		}
-	}
-	if err := doc.SetInContainer(container, "git-excludes", data.GitSkipIndex); err != nil {
-		return err
-	}
-	if err := doc.SetInContainer(container, "claude-allow", data.ClaudeAllow); err != nil {
-		return err
-	}
-	if err := doc.SetInContainer(container, "envrc-directives", data.EnvrcDirectives); err != nil {
-		return err
-	}
-	if len(data.Env) > 0 {
-		tableNode := doc.EnsureTable("env")
-		document.DeleteAllInContainer(tableNode)
-		for k, v := range data.Env {
-			if err := doc.SetInContainer(tableNode, k, v); err != nil {
+	if data.Claude != nil {
+		tableNode := doc.EnsureTableInContainer(container, "claude")
+		if data.Claude.SystemPrompt != nil {
+			if err := doc.SetInContainer(tableNode, "system-prompt", *data.Claude.SystemPrompt); err != nil {
 				return err
+			}
+		}
+		if data.Claude.SystemPromptAppend != nil {
+			if err := doc.SetInContainer(tableNode, "system-prompt-append", *data.Claude.SystemPromptAppend); err != nil {
+				return err
+			}
+		}
+		if err := doc.SetInContainer(tableNode, "allow", data.Claude.Allow); err != nil {
+			return err
+		}
+	}
+	if data.Git != nil {
+		tableNode := doc.EnsureTableInContainer(container, "git")
+		if err := doc.SetInContainer(tableNode, "excludes", data.Git.Excludes); err != nil {
+			return err
+		}
+	}
+	if data.Direnv != nil {
+		direnvNode := doc.EnsureTableInContainer(container, "direnv")
+		if err := doc.SetInContainer(direnvNode, "envrc", data.Direnv.Envrc); err != nil {
+			return err
+		}
+		if len(data.Direnv.Dotenv) > 0 {
+			dotenvNode := doc.EnsureTableInContainer(direnvNode, "dotenv")
+			document.DeleteAllInContainer(dotenvNode)
+			for k, v := range data.Direnv.Dotenv {
+				if err := doc.SetInContainer(dotenvNode, k, v); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -387,12 +491,12 @@ func EncodeSweatfileFrom(data *Sweatfile, doc *document.Document, container *cst
 			}
 		}
 	}
-	if data.Session != nil {
-		tableNode := doc.EnsureTableInContainer(container, "session")
-		if err := doc.SetInContainer(tableNode, "start", data.Session.Start); err != nil {
+	if data.SessionEntry != nil {
+		tableNode := doc.EnsureTableInContainer(container, "session-entry")
+		if err := doc.SetInContainer(tableNode, "start", data.SessionEntry.Start); err != nil {
 			return err
 		}
-		if err := doc.SetInContainer(tableNode, "resume", data.Session.Resume); err != nil {
+		if err := doc.SetInContainer(tableNode, "resume", data.SessionEntry.Resume); err != nil {
 			return err
 		}
 	}

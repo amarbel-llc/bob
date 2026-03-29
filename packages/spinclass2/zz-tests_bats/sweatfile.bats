@@ -12,7 +12,8 @@ function apply_writes_claude_settings { # @test
   # Create a sweatfile with claude-allow rules
   mkdir -p "$TEST_REPO"
   cat > "$TEST_REPO/sweatfile" <<'EOF'
-claude-allow = ["Bash(git *)"]
+[claude]
+allow = ["Bash(git *)"]
 EOF
 
   cd "$TEST_REPO"
@@ -33,12 +34,14 @@ function apply_merges_hierarchy { # @test
   # Global sweatfile (hierarchy loads from $HOME/.config, not XDG_CONFIG_HOME)
   mkdir -p "$HOME/.config/spinclass"
   cat > "$HOME/.config/spinclass/sweatfile" <<'EOF'
-claude-allow = ["Bash(git *)"]
+[claude]
+allow = ["Bash(git *)"]
 EOF
 
   # Repo sweatfile
   cat > "$TEST_REPO/sweatfile" <<'EOF'
-claude-allow = ["Bash(nix *)"]
+[claude]
+allow = ["Bash(nix *)"]
 EOF
 
   cd "$TEST_REPO"
@@ -89,7 +92,7 @@ function apply_skips_use_flake_without_flake_nix { # @test
 function session_entrypoint_expands_env_vars { # @test
   # Create a sweatfile with session.start referencing $SPINCLASS_SESSION
   cat > "$TEST_REPO/sweatfile" <<'EOF'
-[session]
+[session-entry]
 start = ["echo", "$SPINCLASS_SESSION", "$SPINCLASS_BRANCH"]
 EOF
 

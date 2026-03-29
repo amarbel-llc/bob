@@ -64,7 +64,10 @@ func parseRuleSyntax(rule string) (string, error) {
 
 func CheckClaudeAllow(sf sweatfile.Sweatfile) []Issue {
 	var issues []Issue
-	for _, rule := range sf.ClaudeAllow {
+	if sf.Claude == nil {
+		return issues
+	}
+	for _, rule := range sf.Claude.Allow {
 		toolName, err := parseRuleSyntax(rule)
 		if err != nil {
 			issues = append(issues, Issue{
@@ -89,7 +92,10 @@ func CheckClaudeAllow(sf sweatfile.Sweatfile) []Issue {
 
 func CheckGitExcludes(sf sweatfile.Sweatfile) []Issue {
 	var issues []Issue
-	for _, exc := range sf.GitSkipIndex {
+	if sf.Git == nil {
+		return issues
+	}
+	for _, exc := range sf.Git.Excludes {
 		if exc == "" {
 			issues = append(issues, Issue{
 				Message:  "empty exclude pattern",
@@ -111,26 +117,30 @@ func CheckGitExcludes(sf sweatfile.Sweatfile) []Issue {
 func CheckMerged(sf sweatfile.Sweatfile) []Issue {
 	var issues []Issue
 
-	if dups := findDuplicates(sf.GitSkipIndex); len(dups) > 0 {
-		issues = append(issues, Issue{
-			Message: fmt.Sprintf(
-				"duplicate git-excludes: %s",
-				strings.Join(dups, ", "),
-			),
-			Severity: SeverityWarning,
-			Field:    "git-excludes",
-		})
+	if sf.Git != nil {
+		if dups := findDuplicates(sf.Git.Excludes); len(dups) > 0 {
+			issues = append(issues, Issue{
+				Message: fmt.Sprintf(
+					"duplicate git excludes: %s",
+					strings.Join(dups, ", "),
+				),
+				Severity: SeverityWarning,
+				Field:    "git.excludes",
+			})
+		}
 	}
 
-	if dups := findDuplicates(sf.ClaudeAllow); len(dups) > 0 {
-		issues = append(issues, Issue{
-			Message: fmt.Sprintf(
-				"duplicate claude-allow: %s",
-				strings.Join(dups, ", "),
-			),
-			Severity: SeverityWarning,
-			Field:    "claude-allow",
-		})
+	if sf.Claude != nil {
+		if dups := findDuplicates(sf.Claude.Allow); len(dups) > 0 {
+			issues = append(issues, Issue{
+				Message: fmt.Sprintf(
+					"duplicate claude allow: %s",
+					strings.Join(dups, ", "),
+				),
+				Severity: SeverityWarning,
+				Field:    "claude.allow",
+			})
+		}
 	}
 
 	return issues
@@ -221,7 +231,7 @@ func Run(w io.Writer, home, repoDir string) int {
 			sub.Ok("no unknown fields")
 		}
 
-		if len(src.File.ClaudeAllow) > 0 {
+		if src.File.Claude != nil && len(src.File.Claude.Allow) > 0 {
 			if issues := CheckClaudeAllow(src.File); len(issues) > 0 {
 				for _, iss := range issues {
 					if iss.Severity == SeverityError {
@@ -242,7 +252,7 @@ func Run(w io.Writer, home, repoDir string) int {
 			}
 		}
 
-		if len(src.File.GitSkipIndex) > 0 {
+		if src.File.Git != nil && len(src.File.Git.Excludes) > 0 {
 			if issues := CheckGitExcludes(src.File); len(issues) > 0 {
 				for _, iss := range issues {
 					diag := map[string]string{
@@ -283,7 +293,7 @@ func Run(w io.Writer, home, repoDir string) int {
 
 	applySub := tw.Subtest("apply (dry-run)")
 	merged := result.Merged.MergeWith(sweatfile.GetDefault())
-	if issues := CheckGitExcludes(sweatfile.Sweatfile{GitSkipIndex: merged.GitSkipIndex}); len(
+	if issues := CheckGitExcludes(sweatfile.Sweatfile{Git: merged.Git}); len(
 		issues,
 	) > 0 {
 		for _, iss := range issues {
