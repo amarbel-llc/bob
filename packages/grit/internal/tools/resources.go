@@ -60,6 +60,13 @@ func NewResourceProvider() (*resourceProvider, error) {
 		MimeType:    "application/json",
 	}, nil)
 
+	registry.RegisterResource(protocol.Resource{
+		URI:         "grit://stashes",
+		Name:        "Stash List",
+		Description: "Stash entries with index and message",
+		MimeType:    "application/json",
+	}, nil)
+
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "grit://log?repo_path={repo_path}&max_count={max_count}&ref={ref}&paths={paths}&all={all}",
 		Name:        "Commit Log",
@@ -112,6 +119,8 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 		return p.readRemotes(ctx, uri, repoPath)
 	case "tags":
 		return p.readTags(ctx, uri, repoPath)
+	case "stashes":
+		return p.readStashes(ctx, uri, repoPath)
 	case "log":
 		return p.readLog(ctx, uri, repoPath, parsed.Query())
 	case "commits":
@@ -187,6 +196,20 @@ func (p *resourceProvider) readTags(ctx context.Context, uri, repoPath string) (
 
 	tags := git.ParseTagList(out)
 	return marshalResourceResult(uri, tags)
+}
+
+func (p *resourceProvider) readStashes(ctx context.Context, uri, repoPath string) (*protocol.ResourceReadResult, error) {
+	out, err := git.Run(ctx, repoPath, "stash", "list", fmt.Sprintf("--format=%s", git.StashListFormat))
+	if err != nil {
+		// No stash ref means empty stash list, not an error
+		if strings.Contains(err.Error(), "unknown revision") {
+			return marshalResourceResult(uri, []git.StashEntry{})
+		}
+		return nil, fmt.Errorf("git stash list: %w", err)
+	}
+
+	entries := git.ParseStashList(out)
+	return marshalResourceResult(uri, entries)
 }
 
 func (p *resourceProvider) readLog(ctx context.Context, uri, repoPath string, q url.Values) (*protocol.ResourceReadResult, error) {

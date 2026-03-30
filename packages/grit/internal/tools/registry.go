@@ -19,6 +19,8 @@ func RegisterAll() (*command.App, *resourceProvider) {
 	registerCherryPickCommands(app)
 	registerHardResetCommands(app)
 	registerTagCommands(app)
+	registerStashCommands(app)
+	registerMergeCommands(app)
 
 	resProvider, err := NewResourceProvider()
 	if err != nil {

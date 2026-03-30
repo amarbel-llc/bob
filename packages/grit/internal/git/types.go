@@ -168,3 +168,16 @@ type TagVerifyResult struct {
 	Signer  string `json:"signer,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+type StashEntry struct {
+	Index   int    `json:"index"`
+	Branch  string `json:"branch,omitempty"`
+	Message string `json:"message"`
+}
+
+type MergeResult struct {
+	Status    string   `json:"status"`
+	Branch    string   `json:"branch,omitempty"`
+	Conflicts []string `json:"conflicts,omitempty"`
+	Summary   string   `json:"summary,omitempty"`
+}
