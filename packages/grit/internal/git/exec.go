@@ -93,10 +93,10 @@ func RunBothOutputs(ctx context.Context, dir string, args ...string) (string, st
 
 	if err := cmd.Run(); err != nil {
 		if diag := diagnoseWorktreeError(dir, err); diag != nil {
-			return "", stderr.String(), diag
+			return stdout.String(), stderr.String(), diag
 		}
 
-		return "", stderr.String(), err
+		return stdout.String(), stderr.String(), err
 	}
 
 	return stdout.String(), stderr.String(), nil

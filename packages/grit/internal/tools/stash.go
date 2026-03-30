@@ -127,9 +127,10 @@ func handleGitStashApply(ctx context.Context, args json.RawMessage, _ command.Pr
 		gitArgs = append(gitArgs, params.StashRef)
 	}
 
-	_, err := git.Run(ctx, params.RepoPath, gitArgs...)
+	stdout, stderr, err := git.RunBothOutputs(ctx, params.RepoPath, gitArgs...)
 	if err != nil {
-		if strings.Contains(err.Error(), "CONFLICT") || strings.Contains(err.Error(), "could not apply") {
+		combined := stdout + stderr
+		if strings.Contains(combined, "CONFLICT") || strings.Contains(combined, "could not apply") {
 			conflicts := extractConflictFiles(ctx, params.RepoPath)
 			return command.JSONResult(git.MergeResult{
 				Status:    "conflict",
