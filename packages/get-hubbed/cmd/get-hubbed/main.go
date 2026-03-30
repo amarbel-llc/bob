@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 	"github.com/friedenberg/get-hubbed/internal/clone"
+	"github.com/friedenberg/get-hubbed/internal/hooks"
 	"github.com/friedenberg/get-hubbed/internal/tools"
 )
 
@@ -20,13 +25,33 @@ func main() {
 		if err := app.HandleGeneratePlugin(os.Args[2:], os.Stdout); err != nil {
 			log.Fatalf("generating plugin: %v", err)
 		}
+
+		// Patch hooks.json to also match WebFetch tool uses
+		pluginDir := resolvePluginDir(os.Args[2:])
+		if err := hooks.PatchHooksMatcher(pluginDir, "WebFetch"); err != nil {
+			log.Fatalf("patching hooks matcher: %v", err)
+		}
+
 		return
 	}
 
 	if len(os.Args) >= 2 && os.Args[1] == "hook" {
-		if err := app.HandleHook(os.Stdin, os.Stdout); err != nil {
-			log.Fatalf("handling hook: %v", err)
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("reading hook input: %v", err)
 		}
+
+		handled, err := hooks.HandleWebFetchHook(input, os.Stdout)
+		if err != nil {
+			log.Fatalf("handling webfetch hook: %v", err)
+		}
+
+		if !handled {
+			if err := app.HandleHook(bytes.NewReader(input), os.Stdout); err != nil {
+				log.Fatalf("handling hook: %v", err)
+			}
+		}
+
 		return
 	}
 
@@ -95,4 +120,18 @@ func main() {
 	if err := srv.Run(ctx); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// resolvePluginDir determines where generate-plugin wrote its output.
+// Mirrors the HandleGeneratePlugin dispatch: 0 args = ".", 1 arg = that dir.
+// Returns the share/purse-first/get-hubbed subdirectory where hooks.json lives.
+func resolvePluginDir(args []string) string {
+	base := "."
+	for _, a := range args {
+		if a != "-" && !strings.HasPrefix(a, "-") {
+			base = a
+			break
+		}
+	}
+	return filepath.Join(base, "share", "purse-first", "get-hubbed")
 }
