@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	"github.com/amarbel-llc/spinclass2/internal/git"
 	"github.com/amarbel-llc/spinclass2/internal/worktree"
 )
 
@@ -216,7 +217,11 @@ func newEditCmd() *cobra.Command {
 // RunReviewEditor opens $EDITOR with reviewable rules and loops until the user
 // accepts, edits again, or aborts.
 func RunReviewEditor(worktreePath, repoName string, dryRun bool) error {
-	logPath := filepath.Join(worktreePath, ".spinclass", "tool-use.log")
+	branch, err := git.BranchCurrent(worktreePath)
+	if err != nil {
+		return fmt.Errorf("could not detect branch: %w", err)
+	}
+	logPath := ToolUseLogPath(repoName, branch)
 	tiersDir := TiersDir()
 	globalSettingsPath := GlobalClaudeSettingsPath()
 
