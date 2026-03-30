@@ -181,3 +181,14 @@ type MergeResult struct {
 	Conflicts []string `json:"conflicts,omitempty"`
 	Summary   string   `json:"summary,omitempty"`
 }
+
+type WorktreeEntry struct {
+	Path       string `json:"path"`
+	Head       string `json:"head"`
+	Branch     string `json:"branch,omitempty"`
+	IsBare     bool   `json:"is_bare,omitempty"`
+	IsMain     bool   `json:"is_main"`
+	Locked     bool   `json:"locked,omitempty"`
+	LockReason string `json:"lock_reason,omitempty"`
+	Prunable   bool   `json:"prunable,omitempty"`
+}

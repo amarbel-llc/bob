@@ -67,6 +67,13 @@ func NewResourceProvider() (*resourceProvider, error) {
 		MimeType:    "application/json",
 	}, nil)
 
+	registry.RegisterResource(protocol.Resource{
+		URI:         "grit://worktrees",
+		Name:        "Worktree List",
+		Description: "Git worktrees with path, HEAD, branch, and lock/prune state",
+		MimeType:    "application/json",
+	}, nil)
+
 	registry.RegisterTemplate(protocol.ResourceTemplate{
 		URITemplate: "grit://log?repo_path={repo_path}&max_count={max_count}&ref={ref}&paths={paths}&all={all}",
 		Name:        "Commit Log",
@@ -121,6 +128,8 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 		return p.readTags(ctx, uri, repoPath)
 	case "stashes":
 		return p.readStashes(ctx, uri, repoPath)
+	case "worktrees":
+		return p.readWorktrees(ctx, uri, repoPath)
 	case "log":
 		return p.readLog(ctx, uri, repoPath, parsed.Query())
 	case "commits":
@@ -209,6 +218,16 @@ func (p *resourceProvider) readStashes(ctx context.Context, uri, repoPath string
 	}
 
 	entries := git.ParseStashList(out)
+	return marshalResourceResult(uri, entries)
+}
+
+func (p *resourceProvider) readWorktrees(ctx context.Context, uri, repoPath string) (*protocol.ResourceReadResult, error) {
+	out, err := git.Run(ctx, repoPath, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, fmt.Errorf("git worktree list: %w", err)
+	}
+
+	entries := git.ParseWorktreeList(out)
 	return marshalResourceResult(uri, entries)
 }
 
