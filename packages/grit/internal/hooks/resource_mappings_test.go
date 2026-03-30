@@ -109,8 +109,8 @@ func TestResourceHookDenyMessageFormat(t *testing.T) {
 	if !strings.Contains(output, "grit://status") {
 		t.Error("deny message should contain resource URI")
 	}
-	if !strings.Contains(output, "resource-read") {
-		t.Error("deny message should contain resource-read tool for subagents")
+	if !strings.Contains(output, "grit://status") {
+		t.Error("deny message should contain the resource URI")
 	}
 	if !strings.Contains(output, "deny") {
 		t.Error("deny message should contain deny decision")

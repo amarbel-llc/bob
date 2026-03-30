@@ -165,9 +165,8 @@ func HandleWebFetchHook(input []byte, w io.Writer) (bool, error) {
 func writeResourceDeny(w io.Writer, resourceURI string) error {
 	reason := fmt.Sprintf(
 		"DENIED: Use %s instead.\n"+
-			"Use get-hubbed for ALL GitHub interactions \u2014 do not use WebFetch or Bash with gh/curl for GitHub.\n"+
-			"Subagents: use mcp__plugin_get-hubbed_get-hubbed__resource-read with uri %s",
-		resourceURI, resourceURI,
+			"Use get-hubbed for ALL GitHub interactions \u2014 do not use WebFetch or Bash with gh/curl for GitHub.",
+		resourceURI,
 	)
 	return writeDenyJSON(w, reason)
 }
@@ -188,9 +187,7 @@ func writeCatchAllDeny(w io.Writer) error {
 		"Resources (read-only): get-hubbed://repo, get-hubbed://issues, get-hubbed://pulls, " +
 		"get-hubbed://contents, get-hubbed://tree, get-hubbed://blame, get-hubbed://commits, get-hubbed://runs\n" +
 		"Tools (mutations): issue-create, issue-close, issue-comment, pr-create, " +
-		"content-search, content-compare, api-get, graphql-query, graphql-mutation\n" +
-		"Discovery: resource-templates, resource-read\n" +
-		"Subagents: mcp__plugin_get-hubbed_get-hubbed__resource-read or mcp__plugin_get-hubbed_get-hubbed__<tool_name>"
+		"content-search, content-compare, api-get, graphql-query, graphql-mutation"
 	return writeDenyJSON(w, reason)
 }
 

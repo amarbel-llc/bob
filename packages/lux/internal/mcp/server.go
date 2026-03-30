@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/lux/internal/logfile"
@@ -111,92 +110,11 @@ func New(cfg *config.Config, t transport.Transport) (*Server, error) {
 	mcpApp.Version = "0.1.0"
 	mcpApp.MCPArgs = []string{"mcp-stdio"}
 
-	readOnly := true
+	notReadOnly := false
 	notDestructive := false
 	idempotent := true
 	notOpenWorld := false
 
-	mcpApp.AddCommand(&command.Command{
-		Name: "resource-templates",
-		Description: command.Description{
-			Short: "List available lux resource templates. For subagent use only — the main conversation should use MCP resources directly via ReadMcpResourceTool. Call resource-templates to discover URIs, then use resource-read to access them.",
-		},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    &readOnly,
-			DestructiveHint: &notDestructive,
-			IdempotentHint:  &idempotent,
-			OpenWorldHint:   &notOpenWorld,
-		},
-		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-			templates, err := resProvider.ListResourceTemplates(ctx)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			resources, err := resProvider.ListResources(ctx)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			var sb strings.Builder
-			sb.WriteString("Resource templates (fill in {placeholders} and pass to resource-read):\n\n")
-			for _, t := range templates {
-				fmt.Fprintf(&sb, "- %s: %s\n  %s\n", t.Name, t.URITemplate, t.Description)
-			}
-
-			if len(resources) > 0 {
-				sb.WriteString("\nStatic resources (pass URI directly to resource-read):\n\n")
-				for _, r := range resources {
-					fmt.Fprintf(&sb, "- %s: %s\n  %s\n", r.Name, r.URI, r.Description)
-				}
-			}
-
-			sb.WriteString("\nFile URIs must be file:// URIs (e.g., file:///path/to/file.go). Line and character are 0-indexed.")
-
-			return command.TextResult(sb.String()), nil
-		},
-	})
-
-	mcpApp.AddCommand(&command.Command{
-		Name: "resource-read",
-		Description: command.Description{
-			Short: "Read a lux resource by URI. For subagent use only — the main conversation should use MCP resources directly via ReadMcpResourceTool. This tool exists because subagents cannot access MCP resources directly (forwarded resource permissions are not yet supported).",
-		},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    &readOnly,
-			DestructiveHint: &notDestructive,
-			IdempotentHint:  &idempotent,
-			OpenWorldHint:   &notOpenWorld,
-		},
-		Params: []command.Param{
-			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., lux://lsp/hover?uri=file:///path/to/file.go&line=10&character=5)", Required: true},
-		},
-		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-			var a struct {
-				URI string `json:"uri"`
-			}
-			if err := json.Unmarshal(args, &a); err != nil {
-				return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-			}
-
-			result, err := resProvider.ReadResource(ctx, a.URI)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			var sb strings.Builder
-			for i, c := range result.Contents {
-				if i > 0 {
-					sb.WriteString("\n---\n")
-				}
-				sb.WriteString(c.Text)
-			}
-
-			return command.TextResult(sb.String()), nil
-		},
-	})
-
-	notReadOnly := false
 	mcpApp.AddCommand(&command.Command{
 		Name: "execute-command",
 		Description: command.Description{

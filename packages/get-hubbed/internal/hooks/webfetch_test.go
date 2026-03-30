@@ -133,8 +133,8 @@ func TestWebFetchHookDenyMessageFormat(t *testing.T) {
 	if !strings.Contains(output, "deny") {
 		t.Error("deny message should contain deny decision")
 	}
-	if !strings.Contains(output, "resource-read") {
-		t.Error("deny message should contain resource-read for subagents")
+	if !strings.Contains(output, "get-hubbed://issues") {
+		t.Error("deny message should contain the resource URI")
 	}
 	if !strings.Contains(output, "get-hubbed for ALL GitHub interactions") {
 		t.Error("deny message should instruct exclusive get-hubbed usage")

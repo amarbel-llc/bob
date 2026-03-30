@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/friedenberg/get-hubbed/internal/gh"
@@ -957,88 +956,6 @@ func (p *resourceProvider) readRunLog(ctx context.Context, uri, runID string, q 
 	}
 
 	return textResourceResult(uri, out), nil
-}
-
-func registerResourceToolCommands(app *command.App, resProvider *resourceProvider) {
-	readOnly := true
-	notDestructive := false
-	idempotent := true
-
-	app.AddCommand(&command.Command{
-		Name: "resource-templates",
-		Description: command.Description{
-			Short: "List available get-hubbed resource templates. Call this first to discover what GitHub resources are available, then use resource-read to access them.",
-		},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    &readOnly,
-			DestructiveHint: &notDestructive,
-			IdempotentHint:  &idempotent,
-		},
-		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-			templates, err := resProvider.ListResourceTemplates(ctx)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			resources, err := resProvider.ListResources(ctx)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			var sb strings.Builder
-			sb.WriteString("Resource templates (fill in {placeholders} and pass to resource-read):\n\n")
-			for _, t := range templates {
-				fmt.Fprintf(&sb, "- %s: %s\n  %s\n", t.Name, t.URITemplate, t.Description)
-			}
-
-			if len(resources) > 0 {
-				sb.WriteString("\nStatic resources (pass URI directly to resource-read):\n\n")
-				for _, r := range resources {
-					fmt.Fprintf(&sb, "- %s: %s\n  %s\n", r.Name, r.URI, r.Description)
-				}
-			}
-
-			return command.TextResult(sb.String()), nil
-		},
-	})
-
-	app.AddCommand(&command.Command{
-		Name: "resource-read",
-		Description: command.Description{
-			Short: "Read a get-hubbed resource by URI. This tool exists because subagents cannot access MCP resources directly. Call resource-templates to discover available URIs.",
-		},
-		Annotations: &protocol.ToolAnnotations{
-			ReadOnlyHint:    &readOnly,
-			DestructiveHint: &notDestructive,
-			IdempotentHint:  &idempotent,
-		},
-		Params: []command.Param{
-			{Name: "uri", Type: command.String, Description: "Resource URI (e.g., get-hubbed://repo, get-hubbed://issues?state=open)", Required: true},
-		},
-		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
-			var a struct {
-				URI string `json:"uri"`
-			}
-			if err := json.Unmarshal(args, &a); err != nil {
-				return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
-			}
-
-			result, err := resProvider.ReadResource(ctx, a.URI)
-			if err != nil {
-				return command.TextErrorResult(err.Error()), nil
-			}
-
-			var sb strings.Builder
-			for i, c := range result.Contents {
-				if i > 0 {
-					sb.WriteString("\n---\n")
-				}
-				sb.WriteString(c.Text)
-			}
-
-			return command.TextResult(sb.String()), nil
-		},
-	})
 }
 
 func textResourceResult(uri, text string) *protocol.ResourceReadResult {

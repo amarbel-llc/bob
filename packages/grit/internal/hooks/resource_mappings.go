@@ -74,7 +74,7 @@ func HandleResourceHook(input []byte, w io.Writer) (bool, error) {
 }
 
 func writeDenyAllGit(w io.Writer) error {
-	reason := "DENIED: ALL git CLI commands are blocked — this applies to EVERY git command, not just this one. Do not attempt any other git commands via Bash.\n\nUse grit's MCP tools and resources instead:\n- Mutations: commit, try_commit, checkout, add, reset, push, pull, fetch, rebase, interactive_rebase_plan, interactive_rebase_execute, branch_create, hard_reset, diff, tag_verify, stash_save, stash_apply, stash_drop, merge\n- Read-only resources: grit://status, grit://branches, grit://remotes, grit://tags, grit://stashes, grit://log, grit://commits/{ref}, grit://blame/{path}\n- Discovery: resource-templates (list available resources), resource-read (read a resource by URI)\n\nSubagents: use mcp__plugin_grit_grit__<tool_name> for mutations, or mcp__plugin_grit_grit__resource-read for read-only data."
+	reason := "DENIED: ALL git CLI commands are blocked — this applies to EVERY git command, not just this one. Do not attempt any other git commands via Bash.\n\nUse grit's MCP tools and resources instead:\n- Mutations: commit, try_commit, checkout, add, reset, push, pull, fetch, rebase, interactive_rebase_plan, interactive_rebase_execute, branch_create, hard_reset, diff, tag_verify, stash_save, stash_apply, stash_drop, merge\n- Read-only resources: grit://status, grit://branches, grit://remotes, grit://tags, grit://stashes, grit://worktrees, grit://log, grit://commits/{ref}, grit://blame/{path}\n\nSubagents: use mcp__plugin_grit_grit__<tool_name> for mutations, or mcp__plugin_grit_grit__resource-read for read-only data."
 
 	output := map[string]any{
 		"hookSpecificOutput": map[string]any{
@@ -89,8 +89,8 @@ func writeDenyAllGit(w io.Writer) error {
 
 func writeDeny(w io.Writer, m resourceMapping) error {
 	reason := fmt.Sprintf(
-		"Read the %s resource instead (%s).\nSubagents: use mcp__plugin_grit_grit__resource-read with uri %s",
-		m.resourceURI, m.description, m.resourceURI,
+		"Read the %s resource instead (%s).",
+		m.resourceURI, m.description,
 	)
 
 	output := map[string]any{

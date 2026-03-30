@@ -18,10 +18,6 @@ func RegisterAll() (*command.App, *resourceProvider) {
 		resProvider = nil
 	}
 
-	if resProvider != nil {
-		registerResourceToolCommands(app, resProvider)
-	}
-
 	return app, resProvider
 }
 
