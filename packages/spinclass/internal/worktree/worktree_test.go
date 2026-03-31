@@ -2,33 +2,32 @@ package worktree
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
-func TestResolvePathBranchName(t *testing.T) {
+func TestResolvePathArgsAreDescription(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(repoPath, []string{"feature-x"})
+	rp, err := ResolvePath(repoPath, []string{"fixing", "the", "login", "bug"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantAbs := filepath.Join(repoPath, WorktreesDir, "feature_x")
-	if rp.AbsPath != wantAbs {
-		t.Errorf("AbsPath = %q, want %q", rp.AbsPath, wantAbs)
+	if rp.Description != "fixing the login bug" {
+		t.Errorf("Description = %q, want %q", rp.Description, "fixing the login bug")
 	}
-	if rp.Branch != "feature_x" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "feature_x")
+	// Branch should be random, not derived from args
+	if rp.Branch == "" {
+		t.Error("Branch should not be empty")
 	}
 	if rp.RepoPath != repoPath {
 		t.Errorf("RepoPath = %q, want %q", rp.RepoPath, repoPath)
 	}
 }
 
-func TestResolvePathSessionKey(t *testing.T) {
+func TestResolvePathAlwaysRandomBranch(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
@@ -37,7 +36,11 @@ func TestResolvePathSessionKey(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantKey := "myrepo/feature_x"
+	// Branch should be a random name, not "feature_x"
+	if rp.Branch == "feature_x" || rp.Branch == "feature-x" {
+		t.Errorf("Branch should be random, got %q", rp.Branch)
+	}
+	wantKey := "myrepo/" + rp.Branch
 	if rp.SessionKey != wantKey {
 		t.Errorf("SessionKey = %q, want %q", rp.SessionKey, wantKey)
 	}
@@ -343,248 +346,37 @@ func TestForkName(t *testing.T) {
 	}
 }
 
-func TestResolvePathMultipleArgs(t *testing.T) {
+func TestResolvePathDescriptionFromMultipleArgs(t *testing.T) {
 	home := t.TempDir()
 	repoPath := filepath.Join(home, "repos", "myrepo")
 
 	rp, err := ResolvePath(
 		repoPath,
-		[]string{"this", "is", "the", "branch-name"},
+		[]string{"this", "is", "the", "description"},
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if rp.Branch != "this-is-the-branch_name" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "this-is-the-branch_name")
+	if rp.Description != "this is the description" {
+		t.Errorf("Description = %q, want %q", rp.Description, "this is the description")
 	}
-	if rp.ExistingBranch != "" {
-		t.Errorf(
-			"ExistingBranch = %q, want empty for new branch",
-			rp.ExistingBranch,
-		)
+	if rp.Branch == "" {
+		t.Error("Branch should be a random name, not empty")
 	}
 }
 
-func TestResolvePathDetectsLocalBranch(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(repoDir, "init")
-	runGit(repoDir, "config", "user.email", "test@test.com")
-	runGit(repoDir, "config", "user.name", "Test")
-	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
-	runGit(repoDir, "branch", "existing_branch")
+func TestResolvePathEmptyDescriptionWhenNoArgs(t *testing.T) {
+	home := t.TempDir()
+	repoPath := filepath.Join(home, "repos", "myrepo")
 
-	rp, err := ResolvePath(repoDir, []string{"existing-branch"})
+	rp, err := ResolvePath(repoPath, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if rp.ExistingBranch != "existing_branch" {
-		t.Errorf(
-			"ExistingBranch = %q, want %q",
-			rp.ExistingBranch,
-			"existing_branch",
-		)
-	}
-	if rp.Branch != "existing_branch" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "existing_branch")
-	}
-}
-
-func TestResolvePathDetectsRemoteBranch(t *testing.T) {
-	root := t.TempDir()
-
-	// Create a bare "remote" repo
-	bareDir := filepath.Join(root, "remote.git")
-	if err := os.MkdirAll(bareDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(bareDir, "init", "--bare")
-
-	// Create a local repo, add the bare as origin
-	repoDir := filepath.Join(root, "local")
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit(repoDir, "init")
-	runGit(repoDir, "config", "user.email", "test@test.com")
-	runGit(repoDir, "config", "user.name", "Test")
-	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
-	runGit(repoDir, "remote", "add", "origin", bareDir)
-
-	// Push a branch to the remote, then delete it locally
-	runGit(repoDir, "branch", "remote_only_branch")
-	runGit(repoDir, "push", "origin", "remote_only_branch")
-	runGit(repoDir, "branch", "-d", "remote_only_branch")
-	runGit(repoDir, "fetch", "origin")
-
-	rp, err := ResolvePath(repoDir, []string{"remote-only-branch"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if rp.ExistingBranch != "remote_only_branch" {
-		t.Errorf(
-			"ExistingBranch = %q, want %q",
-			rp.ExistingBranch,
-			"remote_only_branch",
-		)
-	}
-	if rp.Branch != "remote_only_branch" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "remote_only_branch")
-	}
-}
-
-func TestResolvePathPrefersUnsanitizedBranch(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(repoDir, "init")
-	runGit(repoDir, "config", "user.email", "test@test.com")
-	runGit(repoDir, "config", "user.name", "Test")
-	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
-
-	// Create a branch with the hyphenated name (as if created outside
-	// spinclass)
-	runGit(repoDir, "branch", "quiet-pecan")
-
-	// User passes "quiet-pecan" — should find the hyphenated branch,
-	// NOT normalize to "quiet_pecan" and miss it.
-	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if rp.ExistingBranch != "quiet-pecan" {
-		t.Errorf(
-			"ExistingBranch = %q, want %q",
-			rp.ExistingBranch,
-			"quiet-pecan",
-		)
-	}
-	if rp.Branch != "quiet-pecan" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet-pecan")
-	}
-	wantAbs := filepath.Join(repoDir, WorktreesDir, "quiet-pecan")
-	if rp.AbsPath != wantAbs {
-		t.Errorf("AbsPath = %q, want %q", rp.AbsPath, wantAbs)
-	}
-}
-
-func TestResolvePathFallsBackToSanitizedBranch(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(repoDir, "init")
-	runGit(repoDir, "config", "user.email", "test@test.com")
-	runGit(repoDir, "config", "user.name", "Test")
-	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
-
-	// Only the sanitized form exists
-	runGit(repoDir, "branch", "quiet_pecan")
-
-	// User passes "quiet-pecan" — unsanitized won't match, should fall back
-	// to sanitized "quiet_pecan".
-	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if rp.ExistingBranch != "quiet_pecan" {
-		t.Errorf(
-			"ExistingBranch = %q, want %q",
-			rp.ExistingBranch,
-			"quiet_pecan",
-		)
-	}
-	if rp.Branch != "quiet_pecan" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet_pecan")
-	}
-}
-
-func TestResolvePathBothFormsExistPrefersUnsanitized(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(repoDir, "init")
-	runGit(repoDir, "config", "user.email", "test@test.com")
-	runGit(repoDir, "config", "user.name", "Test")
-	runGit(repoDir, "commit", "--allow-empty", "-m", "initial")
-
-	// Both forms exist as branches
-	runGit(repoDir, "branch", "quiet-pecan")
-	runGit(repoDir, "branch", "quiet_pecan")
-
-	// Should prefer the unsanitized (user's literal input) form
-	rp, err := ResolvePath(repoDir, []string{"quiet-pecan"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if rp.ExistingBranch != "quiet-pecan" {
-		t.Errorf(
-			"ExistingBranch = %q, want %q",
-			rp.ExistingBranch,
-			"quiet-pecan",
-		)
-	}
-	if rp.Branch != "quiet-pecan" {
-		t.Errorf("Branch = %q, want %q", rp.Branch, "quiet-pecan")
+	if rp.Description != "" {
+		t.Errorf("Description = %q, want empty", rp.Description)
 	}
 }
 

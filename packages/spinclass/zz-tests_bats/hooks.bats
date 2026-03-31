@@ -8,7 +8,7 @@ setup() {
 }
 
 function tool_use_log_writes_to_xdg_log_home { # @test
-  local bin="${SPINCLASS_BIN:-spinclass2}"
+  local bin="${SPINCLASS_BIN:-spinclass}"
 
   # Create a worktree so hooks can detect worktree context
   cd "$TEST_REPO"
@@ -17,7 +17,7 @@ function tool_use_log_writes_to_xdg_log_home { # @test
   local wt="$TEST_REPO/.worktrees/log_test"
   export SPINCLASS_SESSION_ID="repo/log_test"
 
-  # Pipe a PostToolUse hook payload to spinclass2 hooks
+  # Pipe a PostToolUse hook payload to spinclass hooks
   cd "$wt"
   run bash -c 'echo '"'"'{"hook_event_name":"PostToolUse","session_id":"test","tool_name":"Edit","tool_input":{"file_path":"/some/file.go"},"cwd":"'"$wt"'"}'"'"' | '"$bin"' hooks'
   # hooks should not produce output or error
@@ -35,7 +35,7 @@ function tool_use_log_writes_to_xdg_log_home { # @test
 }
 
 function tool_use_log_respects_xdg_log_home { # @test
-  local bin="${SPINCLASS_BIN:-spinclass2}"
+  local bin="${SPINCLASS_BIN:-spinclass}"
   local custom_log="$BATS_TEST_TMPDIR/custom-logs"
   export XDG_LOG_HOME="$custom_log"
   export SPINCLASS_SESSION_ID="myrepo/custom-log-test"
@@ -56,7 +56,7 @@ function tool_use_log_respects_xdg_log_home { # @test
 }
 
 function tool_use_log_silent_without_session { # @test
-  local bin="${SPINCLASS_BIN:-spinclass2}"
+  local bin="${SPINCLASS_BIN:-spinclass}"
   unset SPINCLASS_SESSION_ID
 
   cd "$TEST_REPO"

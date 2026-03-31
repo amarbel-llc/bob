@@ -3,15 +3,8 @@ complete \
   --command spinclass \
   --no-files \
   --condition __fish_use_subcommand \
-  --arguments "new" \
+  --arguments "attach" \
   --description "create a worktree and attach"
-
-complete \
-  --command spinclass \
-  --no-files \
-  --condition __fish_use_subcommand \
-  --arguments "status" \
-  --description "show status of all repos and worktrees"
 
 complete \
   --command spinclass \
@@ -32,7 +25,7 @@ complete \
   --no-files \
   --condition __fish_use_subcommand \
   --arguments "list" \
-  --description "list worktrees"
+  --description "list tracked sessions"
 
 complete \
   --command spinclass \
@@ -71,26 +64,26 @@ complete \
   --arguments "tap table" \
   --description "output format"
 
-# Dynamic target completions for new/merge
+# Dynamic target completions for attach/merge (sessions + local worktrees)
 complete \
   --command spinclass \
   --no-files \
   --keep-order \
-  --condition "__fish_seen_subcommand_from new merge" \
-  --arguments "(spinclass completions)"
+  --condition "__fish_seen_subcommand_from attach merge" \
+  --arguments "(spinclass completions --sessions; spinclass completions)"
 
-# new flags
+# attach flags
 complete \
   --command spinclass \
   --no-files \
-  --condition "__fish_seen_subcommand_from new" \
+  --condition "__fish_seen_subcommand_from attach" \
   --long-option merge-on-close \
   --description "merge worktree on session close"
 
 complete \
   --command spinclass \
   --no-files \
-  --condition "__fish_seen_subcommand_from new" \
+  --condition "__fish_seen_subcommand_from attach" \
   --long-option no-attach \
   --description "create worktree without attaching"
 
@@ -119,6 +112,15 @@ complete \
   --short-option d \
   --long-option dirty \
   --description "include dirty repos and worktrees"
+
+# fork flags
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from fork" \
+  --long-option from \
+  --require-parameter \
+  --description "source worktree directory"
 
 # perms subcommands
 complete \

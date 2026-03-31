@@ -4,7 +4,7 @@ _spinclass_complete() {
   COMPREPLY=()
 
   if [[ "$COMP_CWORD" -eq 1 ]]; then
-    COMPREPLY=($(compgen -W "new status merge clean list pull perms fork validate" -- "$cur"))
+    COMPREPLY=($(compgen -W "attach merge clean list pull perms fork validate" -- "$cur"))
     return
   fi
 
@@ -17,10 +17,10 @@ _spinclass_complete() {
   fi
 
   case "$subcommand" in
-    new|merge)
+    attach|merge)
       if [[ "$cur" == -* ]]; then
         case "$subcommand" in
-          new)
+          attach)
             COMPREPLY=($(compgen -W "--merge-on-close --no-attach --format" -- "$cur"))
             ;;
           merge)
@@ -28,16 +28,21 @@ _spinclass_complete() {
             ;;
         esac
       else
+        # Combine session state entries and local worktree entries
         while IFS=$'\t' read -r path _desc; do
           [[ "$path" == "$cur"* ]] && COMPREPLY+=("$path")
-        done < <(spinclass completions 2>/dev/null)
+        done < <(spinclass completions --sessions 2>/dev/null; spinclass completions 2>/dev/null)
       fi
       ;;
-    status|list|validate)
+    list|validate)
       [[ "$cur" == -* ]] && COMPREPLY=($(compgen -W "--format" -- "$cur"))
       ;;
     fork)
-      [[ "$cur" == -* ]] && COMPREPLY=($(compgen -W "--format" -- "$cur"))
+      if [[ "$prev" == "--from" ]]; then
+        COMPREPLY=($(compgen -d -- "$cur"))
+      elif [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "--from --format" -- "$cur"))
+      fi
       ;;
     clean)
       [[ "$cur" == -* ]] && COMPREPLY=($(compgen -W "--interactive -i --format" -- "$cur"))

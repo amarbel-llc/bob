@@ -9,12 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amarbel-llc/spinclass2/internal/session"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 )
 
 type SessionExecutor struct {
-	Entrypoint []string
+	Entrypoint  []string
+	Description string
 }
 
 func (s SessionExecutor) Attach(dir string, key string, command []string, dryRun bool, tp *tap.TestPoint) error {
@@ -41,11 +42,12 @@ func (s SessionExecutor) Attach(dir string, key string, command []string, dryRun
 	// Set session env vars so os.ExpandEnv can resolve them in entrypoint args
 	sessionEnv := map[string]string{
 		"SPINCLASS_SESSION_ID":  key,
-		"SPINCLASS_REPO":     repo,
-		"SPINCLASS_BRANCH":   branch,
-		"SPINCLASS_WORKTREE": dir,
-		"TMPDIR":             tmpDir,
-		"CLAUDE_CODE_TMPDIR": tmpDir,
+		"SPINCLASS_REPO":        repo,
+		"SPINCLASS_BRANCH":      branch,
+		"SPINCLASS_WORKTREE":    dir,
+		"SPINCLASS_DESCRIPTION": s.Description,
+		"TMPDIR":                tmpDir,
+		"CLAUDE_CODE_TMPDIR":    tmpDir,
 	}
 	for k, v := range sessionEnv {
 		os.Setenv(k, v)

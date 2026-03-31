@@ -6,6 +6,7 @@ replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 
 require (
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.0.0-20260222022802-be680fd2b4ac
+	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.4
 	github.com/amarbel-llc/tommy v0.0.0-20260326195616-1e3aa70b25d0
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.4 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect
@@ -47,4 +47,5 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
+	mvdan.cc/sh/v3 v3.12.0 // indirect
 )

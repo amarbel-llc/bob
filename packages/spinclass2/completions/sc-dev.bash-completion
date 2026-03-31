@@ -1,2 +1,0 @@
-# Reuse _spinclass2_complete from spinclass2.bash-completion
-complete -F _spinclass2_complete sc-dev

@@ -1,34 +1,40 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
-	"strings"
 
-	"github.com/charmbracelet/log"
+	charmbraceletLog "github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 	"github.com/amarbel-llc/spinclass/internal/clean"
 	"github.com/amarbel-llc/spinclass/internal/completions"
 	"github.com/amarbel-llc/spinclass/internal/executor"
+	"github.com/amarbel-llc/spinclass/internal/git"
 	"github.com/amarbel-llc/spinclass/internal/hooks"
+	"github.com/amarbel-llc/spinclass/internal/mcptools"
 	"github.com/amarbel-llc/spinclass/internal/merge"
 	"github.com/amarbel-llc/spinclass/internal/perms"
 	"github.com/amarbel-llc/spinclass/internal/pull"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/shop"
-	"github.com/amarbel-llc/spinclass/internal/status"
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass/internal/validate"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
 
 var (
-	outputFormat    string
-	verbose         bool
-	newMergeOnClose bool
-	newNoAttach     bool
-	mergeGitSync    bool
+	outputFormat       string
+	verbose            bool
+	attachMergeOnClose bool
+	attachNoAttach     bool
+	mergeGitSync       bool
 )
 
 var rootCmd = &cobra.Command{
@@ -37,18 +43,16 @@ var rootCmd = &cobra.Command{
 	Long:  `spinclass manages git worktree lifecycles: creating worktrees + sessions, and offering close workflows (rebase, merge, cleanup, push).`,
 }
 
-var newCmd = &cobra.Command{
-	Use:   "new [name parts...]",
-	Short: "Create (if needed) and attach to a worktree session",
-	Long:  `Create a worktree if it doesn't exist, then attach to a session. Name parts are joined into a sanitized branch name (snob-case). If an existing branch matches, it is checked out. If no name is provided, a random name is generated.`,
+var attachCmd = &cobra.Command{
+	Use:   "attach [description...]",
+	Short: "Create and attach to a new worktree session",
+	Long:  `Create a new worktree with a random branch name and attach to a session. Words after "attach" are joined as a freeform session description. Auto-detects whether to start a new session or resume an active one based on the session state directory.`,
 	Args:  cobra.MinimumNArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		format := outputFormat
 		if format == "" {
 			format = "tap"
 		}
-
-		exec := executor.ZmxExecutor{}
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -65,45 +69,44 @@ var newCmd = &cobra.Command{
 			return err
 		}
 
-		return shop.New(
+		hierarchy, err := sweatfile.LoadWorktreeHierarchy(
+			os.Getenv("HOME"), repoPath, resolvedPath.AbsPath,
+		)
+		if err != nil {
+			hierarchy, err = sweatfile.LoadHierarchy(os.Getenv("HOME"), repoPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		merged := hierarchy.Merged
+		entrypoint := merged.SessionStart()
+
+		// Check for active session and use resume entrypoint if available
+		existing, _ := session.Read(resolvedPath.RepoPath, resolvedPath.Branch)
+		if existing != nil && existing.ResolveState() == session.StateActive {
+			if resume := merged.SessionResume(); resume != nil {
+				entrypoint = resume
+			} else {
+				charmbraceletLog.Warn("active session exists, starting second instance",
+					"session", resolvedPath.SessionKey)
+			}
+		}
+
+		exec := executor.SessionExecutor{
+			Entrypoint:  entrypoint,
+			Description: resolvedPath.Description,
+		}
+
+		return shop.Attach(
 			os.Stdout,
 			exec,
 			resolvedPath,
 			format,
-			newMergeOnClose,
-			newNoAttach,
+			attachMergeOnClose,
+			attachNoAttach,
 			verbose,
 		)
-	},
-}
-
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show status of all repos and worktrees",
-	Long:  `Scan the current directory (or repo) for worktrees and display a tree showing branch status, dirty state, remote tracking, modification dates, and active zmx sessions.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-
-		format := outputFormat
-		if format == "" {
-			format = "table"
-		}
-
-		repos := status.CollectStatus(cwd)
-		if len(repos) == 0 {
-			log.Info("no repos found")
-			return nil
-		}
-
-		if format == "tap" {
-			status.RenderTap(repos, os.Stdout)
-		} else {
-			fmt.Println(status.Render(repos))
-		}
-		return nil
 	},
 }
 
@@ -176,17 +179,27 @@ var cleanCmd = &cobra.Command{
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List active zmx sessions",
-	Long:  `List all active zmx sessions in the sc group.`,
+	Short: "List tracked sessions",
+	Long:  `List all tracked sessions from the state directory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return executor.ZmxExecutor{}.List()
+		states, err := session.ListAll()
+		if err != nil {
+			return err
+		}
+		for _, s := range states {
+			resolved := s.ResolveState()
+			fmt.Printf("%s\t%s\t%s\t%s\n", s.SessionKey, resolved, s.WorktreePath, s.Description)
+		}
+		return nil
 	},
 }
+
+var completionsSessions bool
 
 var completionsCmd = &cobra.Command{
 	Use:    "completions",
 	Short:  "Generate tab-separated completions",
-	Long:   `Output tab-separated completion entries for shell integration. Scans local worktrees.`,
+	Long:   `Output tab-separated completion entries for shell integration. Use --sessions to list from session state directory instead of scanning local worktrees.`,
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
@@ -194,43 +207,42 @@ var completionsCmd = &cobra.Command{
 			return err
 		}
 
+		if completionsSessions {
+			repoPath, _ := worktree.DetectRepo(cwd)
+			completions.Sessions(os.Stdout, repoPath)
+			return nil
+		}
+
 		completions.Local(cwd, os.Stdout)
 		return nil
 	},
 }
 
+var forkFromDir string
+
 var forkCmd = &cobra.Command{
 	Use:   "fork [<new-branch>]",
 	Short: "Fork current worktree into a new branch",
-	Long:  `Create a new worktree branched from the current worktree's HEAD. If new-branch is omitted, a name is auto-generated as <current-branch>-N. Must be run from inside a spinclass session (SPINCLASS_SESSION must be set). Does not attach to the new session.`,
+	Long:  `Create a new worktree branched from the current worktree's HEAD. If new-branch is omitted, a name is auto-generated as <current-branch>-N. Resolves the source worktree from the current directory or --from flag. Does not attach to the new session.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session := os.Getenv("SPINCLASS_SESSION")
-		if session == "" {
-			return fmt.Errorf(
-				"SPINCLASS_SESSION is not set: are you inside a spinclass session?",
-			)
+		sourceDir := forkFromDir
+		if sourceDir == "" {
+			var err error
+			sourceDir, err = os.Getwd()
+			if err != nil {
+				return err
+			}
 		}
 
-		// session is "<repo-dirname>/<branch>"; extract branch as everything
-		// after first "/"
-		slashIdx := strings.Index(session, "/")
-		if slashIdx < 0 {
-			return fmt.Errorf(
-				"invalid SPINCLASS_SESSION format: %q (expected <repo>/<branch>)",
-				session,
-			)
-		}
-		currentBranch := session[slashIdx+1:]
-
-		cwd, err := os.Getwd()
+		repoPath, err := worktree.DetectRepo(sourceDir)
 		if err != nil {
 			return err
 		}
 
-		repoPath, err := worktree.DetectRepo(cwd)
+		currentBranch, err := git.BranchCurrent(sourceDir)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not determine current branch in %s: %w", sourceDir, err)
 		}
 
 		currentPath := filepath.Join(
@@ -241,16 +253,17 @@ var forkCmd = &cobra.Command{
 
 		if _, err := os.Stat(currentPath); os.IsNotExist(err) {
 			return fmt.Errorf(
-				"current worktree path %s does not exist; fork requires a standard .worktrees layout",
+				"worktree path %s does not exist; fork requires a standard .worktrees layout",
 				currentPath,
 			)
 		}
 
+		sessionKey := filepath.Base(repoPath) + "/" + currentBranch
 		rp := worktree.ResolvedPath{
 			AbsPath:    currentPath,
 			RepoPath:   repoPath,
 			Branch:     currentBranch,
-			SessionKey: session,
+			SessionKey: sessionKey,
 		}
 
 		var newBranch string
@@ -304,6 +317,38 @@ var cmdExecClaude = &cobra.Command{
 	},
 }
 
+var serveCmd = &cobra.Command{
+	Use:   "serve-mcp",
+	Short: "Start MCP server on stdio",
+	Long:  `Start a JSON-RPC MCP server on stdin/stdout. Intended to be launched by an MCP client such as Claude Code via .mcp.json.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		app := mcptools.RegisterAll()
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+
+		t := transport.NewStdio(os.Stdin, os.Stdout)
+		registry := server.NewToolRegistryV1()
+		app.RegisterMCPToolsV1(registry)
+
+		srv, err := server.New(t, server.Options{
+			ServerName:    app.Name,
+			ServerVersion: app.Version,
+			Instructions:  "Git worktree session manager. Use the merge tool to merge a worktree branch into the default branch.",
+			Tools:         registry,
+		})
+		if err != nil {
+			log.Fatalf("creating server: %v", err)
+		}
+
+		if err := srv.Run(ctx); err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(
 		&outputFormat,
@@ -318,14 +363,14 @@ func init() {
 		false,
 		"show detailed output (YAML diagnostics on passing test points)",
 	)
-	newCmd.Flags().BoolVar(
-		&newMergeOnClose,
+	attachCmd.Flags().BoolVar(
+		&attachMergeOnClose,
 		"merge-on-close",
 		false,
 		"auto-merge worktree into default branch on session close",
 	)
-	newCmd.Flags().BoolVar(
-		&newNoAttach,
+	attachCmd.Flags().BoolVar(
+		&attachNoAttach,
 		"no-attach",
 		false,
 		"create worktree but skip attaching (show command that would run)",
@@ -343,11 +388,16 @@ func init() {
 		false,
 		"interactively discard changes in dirty merged worktrees",
 	)
-	rootCmd.AddCommand(newCmd)
-	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(mergeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)
+	completionsCmd.Flags().BoolVar(
+		&completionsSessions,
+		"sessions",
+		false,
+		"list completions from session state directory",
+	)
 	rootCmd.AddCommand(completionsCmd)
 	pullCmd.Flags().BoolVarP(
 		&pullDirty,
@@ -359,9 +409,16 @@ func init() {
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(perms.NewPermsCmd())
 	rootCmd.AddCommand(hooks.NewHooksCmd())
+	forkCmd.Flags().StringVar(
+		&forkFromDir,
+		"from",
+		"",
+		"source worktree directory to fork from",
+	)
 	rootCmd.AddCommand(forkCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(cmdExecClaude)
+	rootCmd.AddCommand(serveCmd)
 }
 
 func main() {

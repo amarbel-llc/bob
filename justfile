@@ -31,9 +31,6 @@ build-caldav:
 build-spinclass:
     nix build .#spinclass
 
-build-spinclass2:
-    nix build .#spinclass2
-
 build-batman:
     nix build .#batman -o result-batman
 
@@ -53,9 +50,6 @@ test-lux:
 
 test-spinclass:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass/...
-
-test-spinclass2:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass2/...
 
 test-caldav:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
@@ -142,9 +136,6 @@ validate-mcp: validate-mcp-grit validate-mcp-get-hubbed validate-mcp-lux validat
 test-spinclass-bats: build-batman
     nix build .#spinclass
     SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass/zz-tests_bats/test
-
-test-spinclass2-bats: build-batman build-spinclass2
-    SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass2 PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass2/zz-tests_bats/test
 
 test-grit-bats: build-batman
     nix build .#grit

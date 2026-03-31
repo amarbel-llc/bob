@@ -8,9 +8,9 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
-	"github.com/amarbel-llc/spinclass2/internal/git"
-	"github.com/amarbel-llc/spinclass2/internal/session"
-	"github.com/amarbel-llc/spinclass2/internal/worktree"
+	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/session"
+	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
 
 func registerUpdateDescription(app *command.App) {

@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/mattn/go-isatty"
 
 	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/merge"
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
@@ -69,20 +71,28 @@ func logSweatfileResult(result sweatfile.Hierarchy) {
 	for _, src := range result.Sources {
 		if src.Found {
 			log.Info("loaded sweatfile", "path", src.Path)
-			if len(src.File.GitSkipIndex) > 0 {
-				log.Info("  git-excludes", "values", src.File.GitSkipIndex)
+			if src.File.Git != nil && len(src.File.Git.Excludes) > 0 {
+				log.Info("  git excludes", "values", src.File.Git.Excludes)
 			}
-			if len(src.File.ClaudeAllow) > 0 {
-				log.Info("  claude-allow", "values", src.File.ClaudeAllow)
+			if src.File.Claude != nil && len(src.File.Claude.Allow) > 0 {
+				log.Info("  claude allow", "values", src.File.Claude.Allow)
 			}
 		} else {
 			log.Info("sweatfile not found (skipped)", "path", src.Path)
 		}
 	}
 	merged := result.Merged
+	var gitExcludes []string
+	var claudeAllow []string
+	if merged.Git != nil {
+		gitExcludes = merged.Git.Excludes
+	}
+	if merged.Claude != nil {
+		claudeAllow = merged.Claude.Allow
+	}
 	log.Info("merged sweatfile",
-		"git-excludes", merged.GitSkipIndex,
-		"claude-allow", merged.ClaudeAllow,
+		"git.excludes", gitExcludes,
+		"claude.allow", claudeAllow,
 	)
 }
 
@@ -122,7 +132,7 @@ func pullMainWorktree(rp worktree.ResolvedPath, tw *tap.Writer) error {
 	return nil
 }
 
-func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format string, mergeOnClose bool, noAttach bool, verbose bool) error {
+func Attach(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format string, mergeOnClose bool, noAttach bool, verbose bool) error {
 	var tw *tap.Writer
 	if format == "tap" {
 		tw = tap.NewWriter(w)
@@ -141,6 +151,29 @@ func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format s
 		Ok:          true,
 	}
 
+	// Write session state before attaching
+	if !noAttach {
+		st := session.State{
+			PID:          os.Getpid(),
+			SessionState: session.StateActive,
+			RepoPath:     rp.RepoPath,
+			WorktreePath: rp.AbsPath,
+			Branch:       rp.Branch,
+			SessionKey:   rp.SessionKey,
+			Description:  rp.Description,
+			Env: map[string]string{
+				"SPINCLASS_SESSION_ID": rp.SessionKey,
+			},
+		}
+		if sexec, ok := exec.(executor.SessionExecutor); ok {
+			st.Entrypoint = sexec.Entrypoint
+		}
+		st.StartedAt = time.Now().UTC()
+		if err := session.Write(st); err != nil {
+			log.Warn("failed to write session state", "err", err)
+		}
+	}
+
 	if err := exec.Attach(rp.AbsPath, rp.SessionKey, nil, noAttach, &tp); err != nil {
 		return fmt.Errorf("attach failed: %w", err)
 	}
@@ -151,6 +184,17 @@ func New(w io.Writer, exec executor.Executor, rp worktree.ResolvedPath, format s
 			tw.Plan()
 		}
 		return nil
+	}
+
+	// Update session state to inactive after entrypoint exits
+	now := time.Now().UTC()
+	if existing, err := session.Read(rp.RepoPath, rp.Branch); err == nil {
+		existing.SessionState = session.StateInactive
+		existing.PID = 0
+		existing.ExitedAt = &now
+		if writeErr := session.Write(*existing); writeErr != nil {
+			log.Warn("failed to update session state", "err", writeErr)
+		}
 	}
 
 	interactive := isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())

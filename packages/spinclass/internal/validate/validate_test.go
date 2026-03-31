@@ -8,7 +8,7 @@ import (
 
 func TestCheckClaudeAllowSyntaxValid(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		ClaudeAllow: []string{"Read", "Bash(git *)", "Write(/foo/*)"},
+		Claude: &sweatfile.Claude{Allow: []string{"Read", "Bash(git *)", "Write(/foo/*)"}},
 	}
 	issues := CheckClaudeAllow(sf)
 	if len(issues) != 0 {
@@ -18,7 +18,7 @@ func TestCheckClaudeAllowSyntaxValid(t *testing.T) {
 
 func TestCheckClaudeAllowSyntaxInvalid(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		ClaudeAllow: []string{"Bash(git *", "Read("},
+		Claude: &sweatfile.Claude{Allow: []string{"Bash(git *", "Read("}},
 	}
 	issues := CheckClaudeAllow(sf)
 	if len(issues) != 2 {
@@ -33,11 +33,11 @@ func TestCheckClaudeAllowSyntaxInvalid(t *testing.T) {
 
 func TestCheckClaudeAllowMCPTool(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		ClaudeAllow: []string{
+		Claude: &sweatfile.Claude{Allow: []string{
 			"mcp__plugin_lux_lux__diagnostics",
 			"mcp__plugin_grit_grit__status",
 			"mcp__foo",
-		},
+		}},
 	}
 	issues := CheckClaudeAllow(sf)
 	if len(issues) != 0 {
@@ -47,7 +47,7 @@ func TestCheckClaudeAllowMCPTool(t *testing.T) {
 
 func TestCheckClaudeAllowUnknownTool(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		ClaudeAllow: []string{"FooBar", "Read"},
+		Claude: &sweatfile.Claude{Allow: []string{"FooBar", "Read"}},
 	}
 	issues := CheckClaudeAllow(sf)
 	if len(issues) != 1 {
@@ -60,7 +60,7 @@ func TestCheckClaudeAllowUnknownTool(t *testing.T) {
 
 func TestCheckGitExcludesValid(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		GitSkipIndex: []string{".claude/", ".direnv/"},
+		Git: &sweatfile.Git{Excludes: []string{".claude/", ".direnv/"}},
 	}
 	issues := CheckGitExcludes(sf)
 	if len(issues) != 0 {
@@ -70,7 +70,7 @@ func TestCheckGitExcludesValid(t *testing.T) {
 
 func TestCheckGitExcludesEmpty(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		GitSkipIndex: []string{".claude/", "", ".direnv/"},
+		Git: &sweatfile.Git{Excludes: []string{".claude/", "", ".direnv/"}},
 	}
 	issues := CheckGitExcludes(sf)
 	if len(issues) != 1 {
@@ -80,7 +80,7 @@ func TestCheckGitExcludesEmpty(t *testing.T) {
 
 func TestCheckGitExcludesAbsolutePath(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		GitSkipIndex: []string{"/absolute/path"},
+		Git: &sweatfile.Git{Excludes: []string{"/absolute/path"}},
 	}
 	issues := CheckGitExcludes(sf)
 	if len(issues) != 1 {
@@ -90,8 +90,8 @@ func TestCheckGitExcludesAbsolutePath(t *testing.T) {
 
 func TestCheckMergedDuplicates(t *testing.T) {
 	sf := sweatfile.Sweatfile{
-		GitSkipIndex: []string{".claude/", ".direnv/", ".claude/"},
-		ClaudeAllow: []string{"Read", "Read"},
+		Git:    &sweatfile.Git{Excludes: []string{".claude/", ".direnv/", ".claude/"}},
+		Claude: &sweatfile.Claude{Allow: []string{"Read", "Read"}},
 	}
 	issues := CheckMerged(sf)
 	if len(issues) != 2 {
@@ -106,7 +106,6 @@ func TestCheckMergedDuplicates(t *testing.T) {
 
 func TestCheckUnknownFields(t *testing.T) {
 	data := []byte(`
-git-excludes = [".claude/"]
 unknown_field = "bad"
 `)
 	issues := CheckUnknownFields(data)
@@ -120,8 +119,11 @@ unknown_field = "bad"
 
 func TestCheckUnknownFieldsClean(t *testing.T) {
 	data := []byte(`
-git-excludes = [".claude/"]
-claude-allow = ["Read"]
+[git]
+excludes = [".claude/"]
+
+[claude]
+allow = ["Read"]
 `)
 	issues := CheckUnknownFields(data)
 	if len(issues) != 0 {

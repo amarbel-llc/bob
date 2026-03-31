@@ -19,57 +19,32 @@ type ResolvedPath struct {
 	RepoPath       string // absolute path to the parent git repo
 	SessionKey     string // key for zmx/executor sessions (<repo-dirname>/<branch>)
 	Branch         string // branch name
+	Description    string // freeform session description
 	ExistingBranch string // non-empty when an existing branch was detected
 }
 
 // ResolvePath resolves a worktree target relative to a git repo.
 //
-// When args is empty a random name is generated. Otherwise the args are
-// sanitised into a branch name and checked against local and remote refs
-// to detect existing branches.
+// A random branch name is always generated. Args, if provided, are joined
+// as a freeform session description (not used as the branch name).
 //
 // SessionKey is always <repo-dirname>/<branch>.
 func ResolvePath(
 	repoPath string,
 	args []string,
 ) (ResolvedPath, error) {
-	if len(args) == 0 {
-		branch := RandomName(repoPath)
-		absPath := filepath.Join(repoPath, WorktreesDir, branch)
-		repoDirname := filepath.Base(repoPath)
-		return ResolvedPath{
-			AbsPath:    absPath,
-			RepoPath:   repoPath,
-			SessionKey: repoDirname + "/" + branch,
-			Branch:     branch,
-		}, nil
-	}
-
-	unsanitizedName := strings.Join(args, "-")
-	sanitizedName := SanitizeBranchName(args)
-	if sanitizedName == "" {
-		return ResolvedPath{}, fmt.Errorf(
-			"branch name is empty after sanitization of %q",
-			args,
-		)
-	}
-
-	branch, existingBranch := detectBranch(
-		repoPath,
-		unsanitizedName,
-		sanitizedName,
-	)
-
+	branch := RandomName(repoPath)
 	absPath := filepath.Join(repoPath, WorktreesDir, branch)
 	repoDirname := filepath.Base(repoPath)
-	sessionKey := repoDirname + "/" + branch
+
+	description := strings.Join(args, " ")
 
 	return ResolvedPath{
-		AbsPath:        absPath,
-		RepoPath:       repoPath,
-		SessionKey:     sessionKey,
-		Branch:         branch,
-		ExistingBranch: existingBranch,
+		AbsPath:     absPath,
+		RepoPath:    repoPath,
+		SessionKey:  repoDirname + "/" + branch,
+		Branch:      branch,
+		Description: description,
 	}, nil
 }
 

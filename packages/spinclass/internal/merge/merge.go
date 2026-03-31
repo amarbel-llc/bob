@@ -13,6 +13,7 @@ import (
 
 	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
@@ -49,7 +50,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		}
 
 		if target != "" {
-			wtPath, branch, err = resolveWorktree(repoPath, target)
+			wtPath, branch, err = ResolveWorktree(repoPath, target)
 		} else {
 			wtPath, branch, err = chooseWorktree(repoPath)
 		}
@@ -58,7 +59,7 @@ func Run(execr executor.Executor, format string, target string, gitSync bool, ve
 		}
 	}
 
-	defaultBranch, err := resolveDefaultBranch(repoPath)
+	defaultBranch, err := ResolveDefaultBranch(repoPath)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 
 	if defaultBranch == "" {
 		var err error
-		defaultBranch, err = resolveDefaultBranch(repoPath)
+		defaultBranch, err = ResolveDefaultBranch(repoPath)
 		if err != nil {
 			return err
 		}
@@ -173,7 +174,14 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 		}
 	}
 
-	if !inSession {
+	// Skip worktree removal when running from inside the worktree being
+	// merged (can't remove cwd) or when inside an active session.
+	insideWorktree := false
+	if cwd, err := os.Getwd(); err == nil {
+		insideWorktree = isInsideWorktree(cwd, wtPath)
+	}
+
+	if !inSession && !insideWorktree {
 		if tw == nil {
 			log.Info("removing worktree", "path", wtPath)
 		}
@@ -294,21 +302,22 @@ func Resolved(execr executor.Executor, w io.Writer, tw *tap.Writer, format, repo
 	}
 
 	if inSession {
+		// Remove session state file after successful merge
+		session.Remove(repoPath, branch)
 		return nil
 	}
 
-	if tw == nil {
-		log.Info("detaching from session")
-	}
-
-	return execr.Detach()
+	// Outside session: request close if active, then clean up state
+	executor.RequestClose(repoPath, branch)
+	session.Remove(repoPath, branch)
+	return nil
 }
 
-// isInsideSession returns true when both SPINCLASS_SESSION is set and cwd is
+// isInsideSession returns true when both SPINCLASS_SESSION_ID is set and cwd is
 // within the worktree directory. Both checks are required to avoid false
 // positives from stale env vars or running merge from a different location.
 func isInsideSession(cwd, wtPath string) bool {
-	session := os.Getenv("SPINCLASS_SESSION")
+	session := os.Getenv("SPINCLASS_SESSION_ID")
 	if session == "" {
 		return false
 	}
@@ -319,7 +328,14 @@ func isInsideSession(cwd, wtPath string) bool {
 	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
 }
 
-func resolveWorktree(repoPath, target string) (wtPath, branch string, err error) {
+// isInsideWorktree returns true when cwd is within the worktree directory.
+func isInsideWorktree(cwd, wtPath string) bool {
+	cleanCwd := filepath.Clean(cwd)
+	cleanWt := filepath.Clean(wtPath)
+	return cleanCwd == cleanWt || strings.HasPrefix(cleanCwd, cleanWt+string(filepath.Separator))
+}
+
+func ResolveWorktree(repoPath, target string) (wtPath, branch string, err error) {
 	paths := worktree.ListWorktrees(repoPath)
 	for _, p := range paths {
 		if filepath.Base(p) == target {
@@ -364,7 +380,7 @@ func chooseWorktree(repoPath string) (wtPath, branch string, err error) {
 	return "", "", fmt.Errorf("selected worktree not found: %s", selected)
 }
 
-func resolveDefaultBranch(repoPath string) (string, error) {
+func ResolveDefaultBranch(repoPath string) (string, error) {
 	branch, err := git.DefaultBranch(repoPath)
 	if errors.Is(err, git.ErrAmbiguousDefaultBranch) {
 		return promptDefaultBranch()

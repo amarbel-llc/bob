@@ -6,7 +6,7 @@ promotion-criteria: |
   end-to-end. experimental → testing: 7 days of sc-dev use with no regressions
   vs sc. testing → accepted: delete packages/spinclass, rename spinclass2 →
   spinclass, alias sc-dev → sc.
-status: proposed
+status: accepted
 ---
 
 # Spinclass Session Entrypoint

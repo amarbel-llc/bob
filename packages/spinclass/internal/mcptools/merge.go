@@ -9,10 +9,10 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
-	"github.com/amarbel-llc/spinclass2/internal/executor"
-	"github.com/amarbel-llc/spinclass2/internal/git"
-	"github.com/amarbel-llc/spinclass2/internal/merge"
-	"github.com/amarbel-llc/spinclass2/internal/worktree"
+	"github.com/amarbel-llc/spinclass/internal/executor"
+	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/merge"
+	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
 
 func registerMergeThisSession(app *command.App) {

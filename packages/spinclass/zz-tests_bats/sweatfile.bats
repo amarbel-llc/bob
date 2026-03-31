@@ -12,11 +12,12 @@ function apply_writes_claude_settings { # @test
   # Create a sweatfile with claude-allow rules
   mkdir -p "$TEST_REPO"
   cat > "$TEST_REPO/sweatfile" <<'EOF'
-claude-allow = ["Bash(git *)"]
+[claude]
+allow = ["Bash(git *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_settings
+  run_sc attach --no-attach test_settings
   assert_success
 
   local settings="$TEST_REPO/.worktrees/test_settings/.claude/settings.local.json"
@@ -33,16 +34,18 @@ function apply_merges_hierarchy { # @test
   # Global sweatfile (hierarchy loads from $HOME/.config, not XDG_CONFIG_HOME)
   mkdir -p "$HOME/.config/spinclass"
   cat > "$HOME/.config/spinclass/sweatfile" <<'EOF'
-claude-allow = ["Bash(git *)"]
+[claude]
+allow = ["Bash(git *)"]
 EOF
 
   # Repo sweatfile
   cat > "$TEST_REPO/sweatfile" <<'EOF'
-claude-allow = ["Bash(nix *)"]
+[claude]
+allow = ["Bash(nix *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_hierarchy
+  run_sc attach --no-attach test_hierarchy
   assert_success
 
   local settings="$TEST_REPO/.worktrees/test_hierarchy/.claude/settings.local.json"
@@ -63,7 +66,7 @@ EOF
   git -C "$TEST_REPO" commit -m "add flake.nix"
 
   cd "$TEST_REPO"
-  run_sc new --no-attach test_envrc_flake
+  run_sc attach --no-attach test_envrc_flake
   assert_success
 
   local envrc="$TEST_REPO/.worktrees/test_envrc_flake/.envrc"
@@ -75,7 +78,7 @@ EOF
 
 function apply_skips_use_flake_without_flake_nix { # @test
   cd "$TEST_REPO"
-  run_sc new --no-attach test_envrc_no_flake
+  run_sc attach --no-attach test_envrc_no_flake
   assert_success
 
   local envrc="$TEST_REPO/.worktrees/test_envrc_no_flake/.envrc"
@@ -84,4 +87,21 @@ function apply_skips_use_flake_without_flake_nix { # @test
   assert_output --partial "source_up"
   assert_output --partial "PATH_add"
   refute_output --partial "use flake"
+}
+
+function session_entrypoint_expands_env_vars { # @test
+  # Create a sweatfile with session.start referencing $SPINCLASS_SESSION_ID
+  cat > "$TEST_REPO/sweatfile" <<'EOF'
+[session-entry]
+start = ["echo", "$SPINCLASS_SESSION_ID", "$SPINCLASS_BRANCH"]
+EOF
+
+  cd "$TEST_REPO"
+  run_sc attach --no-attach env_expand_test
+  assert_success
+
+  # The TAP output should contain the expanded session key, not the literal "$SPINCLASS_SESSION_ID"
+  assert_output --partial "repo/env_expand_test"
+  assert_output --partial "env_expand_test"
+  refute_output --partial '$SPINCLASS_SESSION_ID'
 }

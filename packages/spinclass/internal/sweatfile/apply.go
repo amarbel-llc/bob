@@ -36,22 +36,32 @@ func (sweatfile Sweatfile) Apply(worktreePath string) error {
 	return nil
 }
 
-func (sweatfile Sweatfile) GetDirSpinclassBin() string {
-	return filepath.Join(".git/spinclass/bin/")
+func resolveSpinclassBinDir() (string, error) {
+	gitCommonDir, err := getGitDirCommon()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(gitCommonDir, "spinclass", "bin"), nil
+}
+
+func binaryName() string {
+	return filepath.Base(os.Args[0])
 }
 
 func (sweatfile Sweatfile) prepareLocalBin() error {
-	dirSpinclassBin := sweatfile.GetDirSpinclassBin()
+	dirSpinclassBin, err := resolveSpinclassBinDir()
+	if err != nil {
+		return err
+	}
 
 	if err := os.MkdirAll(dirSpinclassBin, 0o755); err != nil {
 		return err
 	}
 
+	script := fmt.Sprintf("#! /usr/bin/env -S bash -e\nexec %s exec-claude \"$@\"", binaryName())
 	if err := os.WriteFile(
 		filepath.Join(dirSpinclassBin, "claude"),
-		[]byte(`#! /usr/bin/env -S bash -e
-exec spinclass exec-claude "$@"`,
-		),
+		[]byte(script),
 		0o644,
 	); err != nil {
 		return err
@@ -73,8 +83,10 @@ func (sf Sweatfile) writeEnvrc(worktreePath string) error {
 
 	bufferedWriter := bufio.NewWriter(file)
 
-	directives := sf.EnvrcDirectives
-	if directives == nil {
+	var directives []string
+	if sf.Direnv != nil && sf.Direnv.Envrc != nil {
+		directives = sf.Direnv.Envrc
+	} else {
 		directives = []string{"source_up"}
 		if _, ok := fileExists(filepath.Join(worktreePath, "flake.nix")); ok {
 			directives = append(directives, "use flake")
@@ -87,13 +99,17 @@ func (sf Sweatfile) writeEnvrc(worktreePath string) error {
 		}
 	}
 
-	if len(sf.Env) > 0 {
+	if sf.Direnv != nil && len(sf.Direnv.Dotenv) > 0 {
 		if _, err := fmt.Fprintln(bufferedWriter, "dotenv .spinclass.env"); err != nil {
 			return err
 		}
 	}
 
-	dirSpinclassBinAbs, err := filepath.Abs(".git/spinclass/bin")
+	dirSpinclassBin, err := resolveSpinclassBinDir()
+	if err != nil {
+		return err
+	}
+	dirSpinclassBinAbs, err := filepath.Abs(dirSpinclassBin)
 	if err != nil {
 		return err
 	}
@@ -110,12 +126,12 @@ func (sf Sweatfile) writeEnvrc(worktreePath string) error {
 }
 
 func (sf Sweatfile) writeSpinclassEnv(worktreePath string) error {
-	if len(sf.Env) == 0 {
+	if sf.Direnv == nil || len(sf.Direnv.Dotenv) == 0 {
 		return nil
 	}
 
-	keys := make([]string, 0, len(sf.Env))
-	for k := range sf.Env {
+	keys := make([]string, 0, len(sf.Direnv.Dotenv))
+	for k := range sf.Direnv.Dotenv {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -138,7 +154,7 @@ func (sf Sweatfile) writeSpinclassEnv(worktreePath string) error {
 	}
 
 	for _, k := range keys {
-		expanded := os.Expand(sf.Env[k], expand)
+		expanded := os.Expand(sf.Direnv.Dotenv[k], expand)
 		if _, err := fmt.Fprintf(file, "%s=%s\n", k, expanded); err != nil {
 			return err
 		}
@@ -220,7 +236,10 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 		permsMap = make(map[string]any)
 	}
 
-	allRules := append([]string{}, sweatfile.ClaudeAllow...)
+	var allRules []string
+	if sweatfile.Claude != nil {
+		allRules = append(allRules, sweatfile.Claude.Allow...)
+	}
 
 	allRules = append(allRules,
 		fmt.Sprintf("Read(%s/*)", worktreePath),
@@ -241,7 +260,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},
@@ -255,7 +274,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},
@@ -269,7 +288,7 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
-							"command": "spinclass hooks",
+							"command": binaryName() + " hooks",
 						},
 					},
 				},

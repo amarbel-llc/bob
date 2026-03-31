@@ -9,6 +9,26 @@ import (
 	"strings"
 )
 
+type Claude struct {
+	SystemPrompt       *string  `toml:"system-prompt"`
+	SystemPromptAppend *string  `toml:"system-prompt-append"`
+	Allow              []string `toml:"allow"`
+}
+
+type Git struct {
+	Excludes []string `toml:"excludes"`
+}
+
+type Direnv struct {
+	Envrc  []string          `toml:"envrc"`
+	Dotenv map[string]string `toml:"dotenv"`
+}
+
+type SessionEntry struct {
+	Start  []string `toml:"start"`
+	Resume []string `toml:"resume"`
+}
+
 type Hooks struct {
 	Create               *string `toml:"create"`
 	Stop                 *string `toml:"stop"`
@@ -19,13 +39,11 @@ type Hooks struct {
 
 //go:generate tommy generate
 type Sweatfile struct {
-	SystemPrompt       *string           `toml:"system-prompt"`
-	SystemPromptAppend *string           `toml:"system-prompt-append"`
-	GitSkipIndex       []string          `toml:"git-excludes"`
-	ClaudeAllow        []string          `toml:"claude-allow"`
-	EnvrcDirectives    []string          `toml:"envrc-directives"`
-	Env                map[string]string `toml:"env"`
-	Hooks              *Hooks            `toml:"hooks"`
+	Claude       *Claude       `toml:"claude"`
+	Git          *Git          `toml:"git"`
+	Direnv       *Direnv       `toml:"direnv"`
+	Hooks        *Hooks        `toml:"hooks"`
+	SessionEntry *SessionEntry `toml:"session-entry"`
 }
 
 func (sf Sweatfile) StopHookCommand() *string {
@@ -61,42 +79,62 @@ func (sf Sweatfile) ToolUseLogEnabled() bool {
 		*sf.Hooks.ToolUseLog
 }
 
+func (sf Sweatfile) SessionStart() []string {
+	if sf.SessionEntry != nil && len(sf.SessionEntry.Start) > 0 {
+		return sf.SessionEntry.Start
+	}
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	return []string{shell}
+}
+
+func (sf Sweatfile) SessionResume() []string {
+	if sf.SessionEntry != nil && len(sf.SessionEntry.Resume) > 0 {
+		return sf.SessionEntry.Resume
+	}
+	return nil
+}
+
 // baseline excludes and allow rules that are always applied regardless of user
 // sweatfile config.
 func GetDefault() Sweatfile {
-	sweatfile := Sweatfile{
-		GitSkipIndex: []string{".spinclass/"},
+	sf := Sweatfile{
+		Git: &Git{Excludes: []string{".spinclass/"}},
 	}
 
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		claudeDir := filepath.Join(home, ".claude")
-		sweatfile.ClaudeAllow = []string{fmt.Sprintf("Read(%s/*)", claudeDir)}
+		sf.Claude = &Claude{Allow: []string{fmt.Sprintf("Read(%s/*)", claudeDir)}}
 	}
 
-	return sweatfile
+	return sf
 }
 
 func (sweatfile Sweatfile) ExecClaude(
 	args ...string,
 ) error {
-	if sweatfile.SystemPromptAppend != nil {
-		args = append(
-			[]string{
-				"--append-system-prompt",
-				resolvePathOrString(*sweatfile.SystemPromptAppend),
-			},
-			args...,
-		)
-	}
+	if sweatfile.Claude != nil {
+		if sweatfile.Claude.SystemPromptAppend != nil {
+			args = append(
+				[]string{
+					"--append-system-prompt",
+					resolvePathOrString(*sweatfile.Claude.SystemPromptAppend),
+				},
+				args...,
+			)
+		}
 
-	if sweatfile.SystemPrompt != nil {
-		args = append(
-			[]string{
-				"--system-prompt",
-				resolvePathOrString(*sweatfile.SystemPrompt),
-			},
-			args...,
-		)
+		if sweatfile.Claude.SystemPrompt != nil {
+			args = append(
+				[]string{
+					"--system-prompt",
+					resolvePathOrString(*sweatfile.Claude.SystemPrompt),
+				},
+				args...,
+			)
+		}
 	}
 
 	pathGitDirCommon, err := getGitDirCommon()

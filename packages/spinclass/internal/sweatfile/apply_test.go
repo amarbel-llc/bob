@@ -4,28 +4,103 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
+// gitDir returns the directory containing the git binary, for use in tests
+// that override PATH but still need git available.
+func gitDir(t *testing.T) string {
+	t.Helper()
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not in PATH")
+	}
+	return filepath.Dir(gitPath)
+}
+
+func TestPrepareLocalBinWorksInsideWorktree(t *testing.T) {
+	// Proves #65: prepareLocalBin uses relative ".git/spinclass/bin/" which
+	// fails inside a worktree where .git is a file, not a directory.
+	repoDir := t.TempDir()
+
+	// Create a real git repo + worktree so git rev-parse works
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s (%v)", args, out, err)
+		}
+	}
+
+	run(repoDir, "init")
+	os.WriteFile(filepath.Join(repoDir, "f.txt"), []byte("x"), 0o644)
+	run(repoDir, "add", "f.txt")
+	run(repoDir, "commit", "-m", "init")
+
+	wtDir := filepath.Join(repoDir, ".worktrees", "test-wt")
+	os.MkdirAll(filepath.Dir(wtDir), 0o755)
+	run(repoDir, "worktree", "add", "-b", "test-wt", wtDir)
+
+	// Verify .git in worktree is a file (precondition)
+	info, err := os.Lstat(filepath.Join(wtDir, ".git"))
+	if err != nil {
+		t.Fatalf("stat .git: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("expected .git to be a file in worktree, got directory")
+	}
+
+	// cd into the worktree — this is the scenario that triggers #65
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(wtDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	sf := Sweatfile{}
+	err = sf.prepareLocalBin()
+	if err != nil {
+		t.Fatalf("prepareLocalBin failed inside worktree: %v", err)
+	}
+
+	// The bin dir should have been created inside the main repo's .git,
+	// not as a relative ".git/spinclass/bin" from the worktree
+	binPath := filepath.Join(repoDir, ".git", "spinclass", "bin")
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		t.Errorf("expected bin dir at %s", binPath)
+	}
+}
+
 func TestHardcodedDefaultsGitExcludes(t *testing.T) {
 	defaults := GetDefault()
 
-	if defaults.GitSkipIndex == nil {
+	if defaults.Git == nil {
+		t.Fatal("expected non-nil Git struct")
+	}
+
+	if defaults.Git.Excludes == nil {
 		t.Fatal("expected non-nil git excludes slice")
 	}
 
-	if len(defaults.GitSkipIndex) != 1 {
+	if len(defaults.Git.Excludes) != 1 {
 		t.Fatalf(
 			"expected 1 git exclude, got %d: %v",
-			len(defaults.GitSkipIndex),
-			defaults.GitSkipIndex,
+			len(defaults.Git.Excludes),
+			defaults.Git.Excludes,
 		)
 	}
 
-	if defaults.GitSkipIndex[0] != ".spinclass/" {
-		t.Errorf("expected .spinclass/, got %q", defaults.GitSkipIndex[0])
+	if defaults.Git.Excludes[0] != ".spinclass/" {
+		t.Errorf("expected .spinclass/, got %q", defaults.Git.Excludes[0])
 	}
 }
 
@@ -34,28 +109,32 @@ func TestHardcodedDefaultsClaudeAllow(t *testing.T) {
 
 	home, _ := os.UserHomeDir()
 	if home == "" {
-		if defaults.ClaudeAllow != nil {
+		if defaults.Claude != nil {
 			t.Errorf(
-				"expected nil ClaudeAllow when HOME is empty, got %v",
-				defaults.ClaudeAllow,
+				"expected nil Claude when HOME is empty, got %v",
+				defaults.Claude,
 			)
 		}
 		return
 	}
 
-	if len(defaults.ClaudeAllow) != 1 {
+	if defaults.Claude == nil {
+		t.Fatal("expected non-nil Claude struct")
+	}
+
+	if len(defaults.Claude.Allow) != 1 {
 		t.Fatalf(
 			"expected 1 claude allow rule, got %d: %v",
-			len(defaults.ClaudeAllow),
-			defaults.ClaudeAllow,
+			len(defaults.Claude.Allow),
+			defaults.Claude.Allow,
 		)
 	}
 
 	wantRule := "Read(" + filepath.Join(home, ".claude") + "/*)"
-	if defaults.ClaudeAllow[0] != wantRule {
+	if defaults.Claude.Allow[0] != wantRule {
 		t.Errorf(
-			"ClaudeAllow[0]: got %q, want %q",
-			defaults.ClaudeAllow[0],
+			"Claude.Allow[0]: got %q, want %q",
+			defaults.Claude.Allow[0],
 			wantRule,
 		)
 	}
@@ -65,7 +144,7 @@ func TestApplyClaudeSettings(t *testing.T) {
 	dir := t.TempDir()
 	rules := []string{"Read", "Glob", "Bash(git *)"}
 
-	err := ApplyClaudeSettings(dir, Sweatfile{ClaudeAllow: rules})
+	err := ApplyClaudeSettings(dir, Sweatfile{Claude: &Claude{Allow: rules}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +244,7 @@ func TestApplyClaudeSettingsOverwritesExistingKeys(t *testing.T) {
 	data, _ := json.MarshalIndent(existing, "", "  ")
 	os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), data, 0o644)
 
-	err := ApplyClaudeSettings(dir, Sweatfile{ClaudeAllow: []string{"Read"}})
+	err := ApplyClaudeSettings(dir, Sweatfile{Claude: &Claude{Allow: []string{"Read"}}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +306,8 @@ func TestApplyClaudeSettingsWritesHooksForWorktree(t *testing.T) {
 	if hook["type"] != "command" {
 		t.Errorf("hook type: got %q", hook["type"])
 	}
-	if hook["command"] != "spinclass hooks" {
+	hookCmd := hook["command"].(string)
+	if !strings.HasSuffix(hookCmd, " hooks") {
 		t.Errorf("hook command: got %q", hook["command"])
 	}
 }
@@ -312,7 +392,7 @@ func TestPrepareDirenvWritesEnvrcWithoutUseFlakeWhenNoFlakeNix(t *testing.T) {
 	os.WriteFile(fakeDirenv, []byte("#!/bin/sh\nexit 0\n"), 0o755)
 
 	origPath := os.Getenv("PATH")
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 	defer os.Setenv("PATH", origPath)
 
 	err := Sweatfile{}.prepareDirenv(dir)
@@ -327,13 +407,15 @@ func TestPrepareDirenvWritesEnvrcWithoutUseFlakeWhenNoFlakeNix(t *testing.T) {
 
 	content := string(data)
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-
 	// Should have source_up and PATH_add but NOT use flake
-	want := "source_up\n" + wantPathAdd
-	if content != want {
-		t.Errorf(".envrc content: got %q, want %q", content, want)
+	if !strings.Contains(content, "source_up\n") {
+		t.Errorf("expected source_up directive, got %q", content)
+	}
+	if strings.Contains(content, "use flake") {
+		t.Errorf("expected no use flake directive, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -366,7 +448,7 @@ func TestPrepareDirenvWritesEnvrc(t *testing.T) {
 	os.WriteFile(fakeDirenv, []byte("#!/bin/sh\nexit 0\n"), 0o755)
 
 	origPath := os.Getenv("PATH")
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 	defer os.Setenv("PATH", origPath)
 
 	err := Sweatfile{}.prepareDirenv(dir)
@@ -379,11 +461,15 @@ func TestPrepareDirenvWritesEnvrc(t *testing.T) {
 		t.Fatalf("reading .envrc: %v", err)
 	}
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-	want := "source_up\nuse flake\n" + wantPathAdd
-	if string(data) != want {
-		t.Errorf(".envrc content: got %q, want %q", string(data), want)
+	content := string(data)
+	if !strings.Contains(content, "source_up\n") {
+		t.Errorf("expected source_up, got %q", content)
+	}
+	if !strings.Contains(content, "use flake\n") {
+		t.Errorf("expected use flake, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -397,7 +483,7 @@ func TestPrepareDirenvOverwritesExistingEnvrc(t *testing.T) {
 	os.WriteFile(fakeDirenv, []byte("#!/bin/sh\nexit 0\n"), 0o755)
 
 	origPath := os.Getenv("PATH")
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 	defer os.Setenv("PATH", origPath)
 
 	err := Sweatfile{}.prepareDirenv(dir)
@@ -410,15 +496,15 @@ func TestPrepareDirenvOverwritesExistingEnvrc(t *testing.T) {
 		t.Fatalf("reading .envrc: %v", err)
 	}
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-	want := "source_up\nuse flake\n" + wantPathAdd
-	if string(data) != want {
-		t.Errorf(
-			".envrc content: got %q, want %q (old content should be replaced)",
-			string(data),
-			want,
-		)
+	content := string(data)
+	if strings.Contains(content, "old content") {
+		t.Errorf("expected old content to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "source_up\n") || !strings.Contains(content, "use flake\n") {
+		t.Errorf("expected source_up and use flake, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -431,9 +517,9 @@ func TestWriteEnvrcWithDirectives(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
-	sf := Sweatfile{EnvrcDirectives: []string{"source_up", "dotenv_if_exists"}}
+	sf := Sweatfile{Direnv: &Direnv{Envrc: []string{"source_up", "dotenv_if_exists"}}}
 	err := sf.prepareDirenv(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -442,11 +528,14 @@ func TestWriteEnvrcWithDirectives(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".envrc"))
 	content := string(data)
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-	want := "source_up\ndotenv_if_exists\n" + wantPathAdd
-	if content != want {
-		t.Errorf(".envrc content:\ngot  %q\nwant %q", content, want)
+	if !strings.Contains(content, "source_up\n") {
+		t.Errorf("expected source_up directive, got %q", content)
+	}
+	if !strings.Contains(content, "dotenv_if_exists\n") {
+		t.Errorf("expected dotenv_if_exists directive, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -460,7 +549,7 @@ func TestWriteEnvrcDefaultFallbackWithFlake(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{}
 	err := sf.prepareDirenv(dir)
@@ -471,11 +560,11 @@ func TestWriteEnvrcDefaultFallbackWithFlake(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".envrc"))
 	content := string(data)
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-	want := "source_up\nuse flake\n" + wantPathAdd
-	if content != want {
-		t.Errorf(".envrc content:\ngot  %q\nwant %q", content, want)
+	if !strings.Contains(content, "source_up\n") || !strings.Contains(content, "use flake\n") {
+		t.Errorf("expected source_up and use flake, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -488,7 +577,7 @@ func TestWriteEnvrcDefaultFallbackWithoutFlake(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{}
 	err := sf.prepareDirenv(dir)
@@ -499,11 +588,14 @@ func TestWriteEnvrcDefaultFallbackWithoutFlake(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".envrc"))
 	content := string(data)
 
-	binAbs, _ := filepath.Abs(".git/spinclass/bin")
-	wantPathAdd := fmt.Sprintf("PATH_add \"%s\"\n", binAbs)
-	want := "source_up\n" + wantPathAdd
-	if content != want {
-		t.Errorf(".envrc content:\ngot  %q\nwant %q", content, want)
+	if !strings.Contains(content, "source_up\n") {
+		t.Errorf("expected source_up, got %q", content)
+	}
+	if strings.Contains(content, "use flake") {
+		t.Errorf("expected no use flake, got %q", content)
+	}
+	if !strings.Contains(content, "PATH_add") || !strings.Contains(content, "spinclass/bin") {
+		t.Errorf("expected PATH_add with spinclass/bin, got %q", content)
 	}
 }
 
@@ -516,12 +608,14 @@ func TestWriteSpinclassEnv(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{
-			"FOO": "bar",
-			"BAZ": "qux",
+		Direnv: &Direnv{
+			Dotenv: map[string]string{
+				"FOO": "bar",
+				"BAZ": "qux",
+			},
 		},
 	}
 	err := sf.Apply(dir)
@@ -549,11 +643,13 @@ func TestWriteSpinclassEnvInterpolatesWorktree(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{
-			"INCLUDE_PATH": "$WORKTREE/lib:.",
+		Direnv: &Direnv{
+			Dotenv: map[string]string{
+				"INCLUDE_PATH": "$WORKTREE/lib:.",
+			},
 		},
 	}
 	err := sf.Apply(dir)
@@ -581,10 +677,12 @@ func TestEnvAutoDotenvDirective(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{
-		Env: map[string]string{"FOO": "bar"},
+		Direnv: &Direnv{
+			Dotenv: map[string]string{"FOO": "bar"},
+		},
 	}
 	err := sf.Apply(dir)
 	if err != nil {
@@ -607,7 +705,7 @@ func TestNoEnvNoDotenvDirective(t *testing.T) {
 		[]byte("#!/bin/sh\nexit 0\n"),
 		0o755,
 	)
-	t.Setenv("PATH", fakeBin)
+	t.Setenv("PATH", fakeBin+":"+gitDir(t))
 
 	sf := Sweatfile{}
 	err := sf.Apply(dir)

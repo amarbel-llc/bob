@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
 
@@ -88,6 +89,121 @@ func TestLocalHandlesNoRepos(t *testing.T) {
 
 	if buf.Len() != 0 {
 		t.Errorf("expected empty output, got %q", buf.String())
+	}
+}
+
+func TestSessionsListsFromStateDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	// Create the worktree path so ResolveState doesn't mark it abandoned
+	wtPath := filepath.Join(dir, "myrepo", ".worktrees", "feat-a")
+	os.MkdirAll(wtPath, 0o755)
+
+	s := session.State{
+		PID:          0,
+		SessionState: session.StateInactive,
+		RepoPath:     filepath.Join(dir, "myrepo"),
+		WorktreePath: wtPath,
+		Branch:       "feat-a",
+		SessionKey:   "myrepo/feat-a",
+		Entrypoint:   []string{"/bin/sh"},
+	}
+	if err := session.Write(s); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	Sessions(&buf, "")
+
+	output := buf.String()
+	if !strings.Contains(output, "feat-a") {
+		t.Errorf("expected session branch in output, got %q", output)
+	}
+	if !strings.Contains(output, "myrepo") {
+		t.Errorf("expected repo name in output, got %q", output)
+	}
+}
+
+func TestSessionsSkipsAbandoned(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	s := session.State{
+		PID:          99999,
+		SessionState: session.StateActive,
+		RepoPath:     "/nonexistent/repo",
+		WorktreePath: "/nonexistent/repo/.worktrees/gone",
+		Branch:       "gone",
+		SessionKey:   "repo/gone",
+		Entrypoint:   []string{"/bin/sh"},
+	}
+	if err := session.Write(s); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	Sessions(&buf, "")
+
+	output := buf.String()
+	if strings.Contains(output, "gone") {
+		t.Errorf("expected abandoned session to be excluded, got %q", output)
+	}
+}
+
+func TestSessionsFiltersByRepo(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	repoA := filepath.Join(dir, "repo-a")
+	repoB := filepath.Join(dir, "repo-b")
+
+	// Create worktree paths so sessions aren't marked abandoned
+	wtA := filepath.Join(repoA, ".worktrees", "feat-a")
+	wtB := filepath.Join(repoB, ".worktrees", "feat-b")
+	os.MkdirAll(wtA, 0o755)
+	os.MkdirAll(wtB, 0o755)
+
+	for _, s := range []session.State{
+		{
+			PID:          0,
+			SessionState: session.StateInactive,
+			RepoPath:     repoA,
+			WorktreePath: wtA,
+			Branch:       "feat-a",
+			SessionKey:   "repo-a/feat-a",
+			Entrypoint:   []string{"/bin/sh"},
+		},
+		{
+			PID:          0,
+			SessionState: session.StateInactive,
+			RepoPath:     repoB,
+			WorktreePath: wtB,
+			Branch:       "feat-b",
+			SessionKey:   "repo-b/feat-b",
+			Entrypoint:   []string{"/bin/sh"},
+		},
+	} {
+		if err := session.Write(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Unfiltered: both sessions
+	var all bytes.Buffer
+	Sessions(&all, "")
+	if !strings.Contains(all.String(), "feat-a") || !strings.Contains(all.String(), "feat-b") {
+		t.Errorf("unfiltered should list both sessions, got %q", all.String())
+	}
+
+	// Filtered to repo-a: only feat-a
+	var filtered bytes.Buffer
+	Sessions(&filtered, repoA)
+	if !strings.Contains(filtered.String(), "feat-a") {
+		t.Errorf("filtered should include feat-a, got %q", filtered.String())
+	}
+	if strings.Contains(filtered.String(), "feat-b") {
+		t.Errorf("filtered should exclude feat-b, got %q", filtered.String())
 	}
 }
 

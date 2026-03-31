@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/log"
 
 	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
@@ -101,7 +102,24 @@ func removeWorktree(wt worktreeInfo) error {
 	if _, err := git.BranchDelete(wt.repoPath, wt.branch); err != nil {
 		return fmt.Errorf("deleting branch %s: %w", wt.branch, err)
 	}
+	// Clean up session state file if it exists
+	session.Remove(wt.repoPath, wt.branch)
 	return nil
+}
+
+func cleanAbandonedSessions() int {
+	states, err := session.ListAll()
+	if err != nil {
+		return 0
+	}
+	cleaned := 0
+	for _, s := range states {
+		if s.ResolveState() == session.StateAbandoned {
+			session.Remove(s.RepoPath, s.Branch)
+			cleaned++
+		}
+	}
+	return cleaned
 }
 
 func discardFile(wtPath string, fc FileChange) error {
@@ -222,6 +240,14 @@ func Run(startDir string, interactive bool, format string) error {
 			} else {
 				log.Warn("skipping dirty worktree", "branch", wt.branch)
 			}
+		}
+	}
+
+	// Auto-clean abandoned session state files
+	abandoned := cleanAbandonedSessions()
+	if abandoned > 0 {
+		if tw != nil {
+			tw.Ok(fmt.Sprintf("cleaned %d abandoned session(s)", abandoned))
 		}
 	}
 

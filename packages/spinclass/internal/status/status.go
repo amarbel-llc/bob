@@ -9,8 +9,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
@@ -137,8 +137,22 @@ func CollectRepoStatus(repoPath string, sessions map[string]bool) RepoStatus {
 	return rs
 }
 
+func collectSessionMap() map[string]bool {
+	sessions := make(map[string]bool)
+	states, err := session.ListAll()
+	if err != nil {
+		return sessions
+	}
+	for _, s := range states {
+		if s.ResolveState() == session.StateActive {
+			sessions[s.SessionKey] = true
+		}
+	}
+	return sessions
+}
+
 func CollectStatus(startDir string) []RepoStatus {
-	sessions := executor.ListSessions()
+	sessions := collectSessionMap()
 	var all []RepoStatus
 
 	repos := worktree.ScanRepos(startDir)

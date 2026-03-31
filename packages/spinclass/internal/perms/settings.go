@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type claudeSettings struct {
@@ -233,4 +234,19 @@ func GlobalClaudeSettingsPath() string {
 		return ""
 	}
 	return filepath.Join(home, ".claude", "settings.local.json")
+}
+
+// ToolUseLogPath returns the XDG log path for a session's tool-use log.
+// The session key format is "repo/branch", sanitized to "repo--branch.jsonl".
+func ToolUseLogPath(repoName, branch string) string {
+	base := os.Getenv("XDG_LOG_HOME")
+	if base == "" {
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			return ""
+		}
+		base = filepath.Join(home, ".local", "log")
+	}
+	filename := strings.ReplaceAll(repoName+"/"+branch, "/", "--") + ".jsonl"
+	return filepath.Join(base, "spinclass", "tool-uses", filename)
 }
