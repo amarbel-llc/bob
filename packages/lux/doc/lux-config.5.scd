@@ -18,6 +18,10 @@ _~/.config/lux/lsps.toml_
 _~/.config/lux/formatters.toml_
 	Global formatter configuration.
 
+_~/.config/lux/filetype/\*.toml_
+	Global filetype configuration. Each file defines how a language is
+	handled: which LSP, formatters, and file matching rules to use.
+
 _.lux/lsps.toml_
 	Project-level LSP server configuration. Merged with and overrides
 	global configuration.
@@ -25,6 +29,10 @@ _.lux/lsps.toml_
 _.lux/formatters.toml_
 	Project-level formatter configuration. Merged with and overrides
 	global configuration.
+
+_.lux/filetype/\*.toml_
+	Project-level filetype configuration. Overrides global filetypes
+	with matching names.
 
 # LSP CONFIGURATION
 
@@ -109,7 +117,7 @@ programs used for formatting files.
 Each formatter is defined in a *[[formatter]]* array entry.
 
 *name* = _string_ (required)
-	Unique name for this formatter.
+	Unique name for this formatter. Referenced by filetype configs.
 
 *flake* = _string_
 	Nix flake reference providing the formatter binary. Mutually exclusive
@@ -119,18 +127,13 @@ Each formatter is defined in a *[[formatter]]* array entry.
 	Direct path to the formatter binary. Mutually exclusive with *flake*.
 
 *binary* = _string_
-	Custom binary name within the flake output.
-
-*extensions* = [_string_, ...]
-	File extensions this formatter handles.
-
-*patterns* = [_string_, ...]
-	Glob patterns for matching files.
-
-At least one of *extensions* or *patterns* is required.
+	Custom binary name within the flake output. Useful when a flake
+	provides multiple binaries (e.g., _nixpkgs#gotools_ contains
+	_goimports_).
 
 *args* = [_string_, ...]
-	Arguments passed to the formatter.
+	Arguments passed to the formatter. Use _{file}_ as a placeholder for
+	the file path (e.g., ["-srcdir", "{file}"]).
 
 *env* = {_key_ = _value_, ...}
 	Environment variables set when launching the formatter.
@@ -145,23 +148,84 @@ At least one of *extensions* or *patterns* is required.
 	When set to *true* in a project-level config, disables a formatter
 	inherited from global config.
 
+Note: formatters do not have their own file matching rules. File-to-formatter
+routing is configured in filetype configs (see *FILETYPE CONFIGURATION* below).
+
 ## Example
 
 ```
 [[formatter]]
-name = "gofmt"
-flake = "nixpkgs#go"
-binary = "gofmt"
-extensions = ["go"]
-mode = "stdin"
+name = "goimports"
+flake = "nixpkgs#gotools"
+binary = "goimports"
+args = ["-srcdir", "{file}"]
+
+[[formatter]]
+name = "gofumpt"
+flake = "nixpkgs#gofumpt"
 
 [[formatter]]
 name = "shfmt"
-path = "/usr/bin/shfmt"
-extensions = ["sh", "bash"]
-patterns = [".envrc"]
-args = ["-i", "2", "-ci"]
-mode = "stdin"
+flake = "nixpkgs#shfmt"
+args = ["-s", "-i=2"]
+```
+
+# FILETYPE CONFIGURATION
+
+Filetype configuration files live in _~/.config/lux/filetype/_ (global) and
+_.lux/filetype/_ (project-level). Each file is named after the language
+(e.g., _go.toml_, _python.toml_) and defines how that language is handled.
+
+## Per-filetype fields
+
+*extensions* = [_string_, ...]
+	File extensions this filetype matches (e.g., ["go"]). The leading dot
+	is optional.
+
+*patterns* = [_string_, ...]
+	Glob patterns for matching files (e.g., ["Makefile"]).
+
+*language_ids* = [_string_, ...]
+	LSP language identifiers (e.g., ["go", "gomod"]).
+
+At least one of *extensions*, *patterns*, or *language_ids* is required.
+
+*lsp* = _string_
+	Name of the LSP server to use (must match a name in _lsps.toml_).
+
+*formatters* = [_string_, ...]
+	Ordered list of formatter names to use (must match names in
+	_formatters.toml_). All referenced formatters must be defined or
+	lux will error at startup.
+
+*formatter_mode* = _"chain"_ | _"fallback"_
+	How multiple formatters are applied. In *chain* mode (the default),
+	output of formatter N is piped into formatter N+1. In *fallback*
+	mode, formatters are tried in order and the first success wins.
+
+*lsp_format* = _"never"_ | _"fallback"_ | _"prefer"_
+	Controls LSP formatting vs external formatters. *never* (default when
+	formatters are configured) skips LSP formatting entirely. *fallback*
+	uses external formatters first, falls back to LSP on error. *prefer*
+	uses LSP formatting if available, falls back to external formatters.
+	Defaults to *prefer* when no formatters are configured.
+
+## Example
+
+```
+# filetype/go.toml
+extensions = ["go"]
+language_ids = ["go"]
+lsp = "gopls"
+formatters = ["goimports", "gofumpt"]
+formatter_mode = "chain"
+
+# filetype/python.toml
+extensions = ["py"]
+language_ids = ["python"]
+lsp = "pyright"
+formatters = ["isort", "black"]
+formatter_mode = "chain"
 ```
 
 # MERGING BEHAVIOR
@@ -181,6 +245,11 @@ For _formatters.toml_:
 - Formatters defined only in the project config are added.
 - A project-level formatter with *disabled* = _true_ removes the
   corresponding global formatter.
+
+For _filetype/\*.toml_:
+- Filetypes with matching names (derived from filename) are overridden
+  entirely by the project-level definition.
+- Filetypes defined only in the project config are added.
 
 # PROJECT ROOT DETECTION
 
