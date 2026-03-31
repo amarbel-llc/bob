@@ -1,6 +1,7 @@
 package formatter
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +29,11 @@ func NewRouter(filetypes []*filetype.Config, formatters map[string]*config.Forma
 	for _, ft := range filetypes {
 		if len(ft.Formatters) == 0 {
 			continue
+		}
+		for _, fmtName := range ft.Formatters {
+			if _, ok := formatters[fmtName]; !ok {
+				return nil, fmt.Errorf("filetype %s references formatter %q, but it is not defined in formatters.toml", ft.Name, fmtName)
+			}
 		}
 		if err := matchers.Add(ft.Name, ft.Extensions, ft.Patterns, ft.LanguageIDs); err != nil {
 			return nil, err

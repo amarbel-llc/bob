@@ -1,6 +1,7 @@
 package formatter
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/amarbel-llc/lux/internal/config"
@@ -134,6 +135,38 @@ func TestRouterMatch_FormatterOrdering(t *testing.T) {
 		if f.Name != expectedOrder[i] {
 			t.Errorf("formatter[%d] = %q, want %q", i, f.Name, expectedOrder[i])
 		}
+	}
+}
+
+func TestNewRouter_RejectsUndefinedFormatter(t *testing.T) {
+	filetypes := []*filetype.Config{
+		{Name: "go", Extensions: []string{"go"}, Formatters: []string{"goimports", "golines"}},
+	}
+	formatters := map[string]*config.Formatter{
+		"golines": {Name: "golines", Flake: "nixpkgs#golines"},
+	}
+
+	_, err := NewRouter(filetypes, formatters)
+	if err == nil {
+		t.Fatal("expected error for undefined formatter")
+	}
+	if got := err.Error(); !strings.Contains(got, "goimports") || !strings.Contains(got, "not defined in formatters.toml") {
+		t.Errorf("unexpected error: %s", got)
+	}
+}
+
+func TestNewRouter_RejectsAllUndefinedFormatters(t *testing.T) {
+	filetypes := []*filetype.Config{
+		{Name: "go", Extensions: []string{"go"}, Formatters: []string{"goimports"}},
+	}
+	formatters := map[string]*config.Formatter{}
+
+	_, err := NewRouter(filetypes, formatters)
+	if err == nil {
+		t.Fatal("expected error for undefined formatter")
+	}
+	if got := err.Error(); !strings.Contains(got, "goimports") {
+		t.Errorf("unexpected error: %s", got)
 	}
 }
 

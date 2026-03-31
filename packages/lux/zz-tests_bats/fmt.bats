@@ -304,3 +304,158 @@ GO
   assert_failure
   assert_output --partial "no formatter configured"
 }
+
+# --- goimports invocation ---
+
+function fmt_invokes_goimports_when_configured { # @test
+  # Fake goimports: records that it was called by writing a sentinel file,
+  # then echoes stdin back (acts as identity formatter).
+  local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
+  local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
+  cat > "$fake_goimports" <<SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+touch "$sentinel"
+cat
+SCRIPT
+  chmod +x "$fake_goimports"
+
+  write_config "goimports" "$fake_goimports"
+
+  local go_file="$BATS_TEST_TMPDIR/test.go"
+  cat > "$go_file" <<'GO'
+package main
+
+func main() {}
+GO
+
+  run lux fmt --file "$go_file"
+  assert_success
+
+  [[ -f "$sentinel" ]] || {
+    echo "goimports was never invoked"
+    return 1
+  }
+}
+
+function fmt_silently_skips_formatter_not_in_formatters_toml { # @test
+  # Configure goimports in the filetype config but do NOT define it in
+  # formatters.toml. The router silently drops unknown formatter names,
+  # resulting in "no formatter configured" instead of a clear error.
+  local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
+  local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
+  cat > "$fake_goimports" <<SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+touch "$sentinel"
+cat
+SCRIPT
+  chmod +x "$fake_goimports"
+
+  # Filetype references goimports...
+  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+extensions = [".go"]
+language_ids = ["go"]
+formatters = ["goimports"]
+TOML
+
+  # ...but formatters.toml is empty (goimports not defined).
+  cat > "$lux_config_dir/formatters.toml" <<'TOML'
+TOML
+
+  local go_file="$BATS_TEST_TMPDIR/test.go"
+  cat > "$go_file" <<'GO'
+package main
+
+func main() {}
+GO
+
+  run lux fmt --file "$go_file"
+  assert_failure
+  assert_output --partial 'references formatter "goimports"'
+  assert_output --partial "not defined in formatters.toml"
+
+  # goimports was never called.
+  [[ ! -f "$sentinel" ]] || {
+    echo "goimports should not have been called"
+    return 1
+  }
+}
+
+function fmt_silently_drops_undefined_formatter_from_chain { # @test
+  # Configure a chain of [goimports, gofumpt] in the filetype but only define
+  # gofumpt in formatters.toml. The router silently drops goimports from the
+  # chain without warning — the user thinks both are running but only one is.
+  local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
+
+  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+extensions = [".go"]
+language_ids = ["go"]
+formatters = ["goimports", "gofumpt"]
+formatter_mode = "chain"
+TOML
+
+  # Only gofumpt is defined; goimports is missing.
+  cat > "$lux_config_dir/formatters.toml" <<TOML
+[[formatter]]
+name = "gofumpt"
+path = "$fake_gofumpt"
+TOML
+
+  local go_file="$BATS_TEST_TMPDIR/test.go"
+  cat > "$go_file" <<'GO'
+package main
+
+func main() {}
+GO
+
+  run lux fmt --file "$go_file" --stdout
+  assert_failure
+  assert_output --partial 'references formatter "goimports"'
+  assert_output --partial "not defined in formatters.toml"
+
+  [[ ! -f "$sentinel" ]] || {
+    echo "goimports should not have been called (it's not even defined)"
+    return 1
+  }
+}
+
+function fmt_goimports_adds_missing_import { # @test
+  # Fake goimports: simulates adding a missing import for fmt.Println.
+  local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
+  cat > "$fake_goimports" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+input=$(cat)
+# If input uses fmt.Println but doesn't import "fmt", add it.
+if echo "$input" | grep -q 'fmt\.Println' && ! echo "$input" | grep -q '"fmt"'; then
+  cat <<'GO'
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("hello")
+}
+GO
+else
+  echo "$input"
+fi
+SCRIPT
+  chmod +x "$fake_goimports"
+
+  write_config "goimports" "$fake_goimports"
+
+  local go_file="$BATS_TEST_TMPDIR/needs-import.go"
+  cat > "$go_file" <<'GO'
+package main
+
+func main() {
+	fmt.Println("hello")
+}
+GO
+
+  run lux fmt --file "$go_file" --stdout
+  assert_success
+  assert_output --partial 'import "fmt"'
+}
