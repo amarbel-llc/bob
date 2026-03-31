@@ -107,8 +107,14 @@ flake = "nixpkgs#nodePackages.bash-language-server"
 `
 
 const defaultFormattersConfig = `[[formatter]]
-name = "golines"
-flake = "nixpkgs#golines"
+name = "goimports"
+flake = "nixpkgs#gotools"
+binary = "goimports"
+args = ["-srcdir", "{file}"]
+
+[[formatter]]
+name = "gofumpt"
+flake = "nixpkgs#gofumpt"
 
 [[formatter]]
 name = "isort"
@@ -147,7 +153,8 @@ args = ["-s", "-i=2"]
 const defaultFiletypeGo = `extensions = ["go"]
 language_ids = ["go"]
 lsp = "gopls"
-formatters = ["golines"]
+formatters = ["goimports", "gofumpt"]
+formatter_mode = "chain"
 `
 
 const defaultFiletypePython = `extensions = ["py"]
