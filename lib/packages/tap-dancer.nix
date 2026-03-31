@@ -26,6 +26,11 @@ let
     pname = "tap-dancer";
     inherit version;
     subPackages = [ "packages/tap-dancer/go/cmd/tap-dancer" ];
+
+    postInstall = ''
+      $out/bin/tap-dancer generate-plugin $out
+    '';
+
     meta = with pkgs.lib; {
       description = "TAP-14 validator and writer toolkit";
       homepage = "https://github.com/amarbel-llc/tap-dancer";
