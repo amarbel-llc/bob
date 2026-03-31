@@ -10,14 +10,18 @@ setup() {
 
 function spinclass_attach_creates_worktree { # @test
   cd "$TEST_REPO"
-  run_sc attach test_branch --no-attach
-
+  run_sc attach --no-attach
   assert_success
-  assert [ -d "$TEST_REPO/.worktrees/test_branch" ]
+
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  assert [ -d "$wt_path" ]
   # Should be a git worktree (has .git file, not directory)
-  assert [ -f "$TEST_REPO/.worktrees/test_branch/.git" ]
-  # Branch should exist
-  run git -C "$TEST_REPO" rev-parse --verify refs/heads/test_branch
+  assert [ -f "$wt_path/.git" ]
+  # Branch should exist (extract from path)
+  local branch
+  branch=$(basename "$wt_path")
+  run git -C "$TEST_REPO" rev-parse --verify "refs/heads/$branch"
   assert_success
 }
 
@@ -34,10 +38,12 @@ function spinclass_attach_auto_name { # @test
 
 function spinclass_attach_no_attach_skips_session { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_noattach
-
+  run_sc attach --no-attach
   assert_success
-  assert [ -d "$TEST_REPO/.worktrees/test_noattach" ]
+
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  assert [ -d "$wt_path" ]
   # No session state file should be created with --no-attach
   local state_dir="$XDG_STATE_HOME/spinclass/sessions"
   if [ -d "$state_dir" ]; then
@@ -49,11 +55,19 @@ function spinclass_attach_no_attach_skips_session { # @test
 
 function spinclass_attach_idempotent { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_idem
-  assert_success
+  local bin="${SPINCLASS_BIN:-spinclass}"
 
-  # Second run should succeed with SKIP
-  run_sc attach --no-attach test_idem
+  # First attach — capture the worktree path
+  local first_output
+  first_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$first_output")
+  local branch
+  branch=$(basename "$wt_path")
+
+  # Second attach to same worktree (by cd'ing into it) should succeed with SKIP
+  cd "$wt_path"
+  run_sc attach --no-attach
   assert_success
   assert_output --partial "SKIP"
 }
@@ -63,8 +77,8 @@ function spinclass_list_shows_sessions { # @test
   local bin="${SPINCLASS_BIN:-spinclass}"
 
   # Create some worktrees
-  "$bin" --format tap attach --no-attach branch_a
-  "$bin" --format tap attach --no-attach branch_b
+  "$bin" --format tap attach --no-attach
+  "$bin" --format tap attach --no-attach
 
   # list without active sessions should produce empty output (no-attach doesn't write state)
   run_sc list
@@ -74,9 +88,13 @@ function spinclass_list_shows_sessions { # @test
 function spinclass_merge_fast_forwards { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach merge_test
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
 
-  local wt="$TEST_REPO/.worktrees/merge_test"
+  local wt
+  wt=$(extract_wt_path "$attach_output")
+  local branch
+  branch=$(basename "$wt")
 
   # Make a commit on the worktree branch
   echo "new content" > "$wt/new-file.txt"
@@ -87,7 +105,7 @@ function spinclass_merge_fast_forwards { # @test
   git -C "$wt" clean -fd
 
   # Merge from the main repo
-  run_sc merge merge_test
+  run_sc merge "$branch"
   assert_success
 
   # Commit should now be on main
@@ -101,22 +119,31 @@ function spinclass_merge_fast_forwards { # @test
 function spinclass_clean_removes_merged { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach clean_test
+
+  local attach1_output
+  attach1_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt1
+  wt1=$(extract_wt_path "$attach1_output")
+  local branch1
+  branch1=$(basename "$wt1")
 
   # Clean untracked files so worktree remove succeeds
-  git -C "$TEST_REPO/.worktrees/clean_test" clean -fd
+  git -C "$wt1" clean -fd
 
   # Merge the worktree first (makes the branch fully merged)
-  "$bin" --format tap merge clean_test
+  "$bin" --format tap merge "$branch1"
 
   # Create another worktree that IS merged (no extra commits)
-  "$bin" --format tap attach --no-attach clean_noop
+  local attach2_output
+  attach2_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt2
+  wt2=$(extract_wt_path "$attach2_output")
 
   # Clean untracked files from sweatfile apply
-  git -C "$TEST_REPO/.worktrees/clean_noop" clean -fd
+  git -C "$wt2" clean -fd
 
   run_sc clean
   assert_success
   # The noop worktree with zero commits ahead should be cleaned
-  assert [ ! -d "$TEST_REPO/.worktrees/clean_noop" ]
+  assert [ ! -d "$wt2" ]
 }

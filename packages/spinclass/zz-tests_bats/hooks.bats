@@ -12,10 +12,15 @@ function tool_use_log_writes_to_xdg_log_home { # @test
 
   # Create a worktree so hooks can detect worktree context
   cd "$TEST_REPO"
-  "$bin" --format tap attach --no-attach log_test
-
-  local wt="$TEST_REPO/.worktrees/log_test"
-  export SPINCLASS_SESSION_ID="repo/log_test"
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt
+  wt=$(extract_wt_path "$attach_output")
+  local branch
+  branch=$(basename "$wt")
+  local repo_name
+  repo_name=$(basename "$TEST_REPO")
+  export SPINCLASS_SESSION_ID="$repo_name/$branch"
 
   # Pipe a PostToolUse hook payload to spinclass hooks
   cd "$wt"
@@ -23,10 +28,9 @@ function tool_use_log_writes_to_xdg_log_home { # @test
   # hooks should not produce output or error
   assert_success
 
-  # Log file should exist at XDG_LOG_HOME
-  local log_file="$XDG_STATE_HOME/../log/spinclass/tool-uses/repo--log_test.jsonl"
-  # Use the actual XDG_LOG_HOME default: ~/.local/log
-  log_file="$HOME/.local/log/spinclass/tool-uses/repo--log_test.jsonl"
+  # Log file should exist at XDG_LOG_HOME default: ~/.local/log
+  # Session key slashes are replaced with -- in the filename
+  local log_file="$HOME/.local/log/spinclass/tool-uses/${repo_name}--${branch}.jsonl"
   assert [ -f "$log_file" ]
 
   # Should contain the tool name
@@ -38,17 +42,23 @@ function tool_use_log_respects_xdg_log_home { # @test
   local bin="${SPINCLASS_BIN:-spinclass}"
   local custom_log="$BATS_TEST_TMPDIR/custom-logs"
   export XDG_LOG_HOME="$custom_log"
-  export SPINCLASS_SESSION_ID="myrepo/custom-log-test"
 
   cd "$TEST_REPO"
-  "$bin" --format tap attach --no-attach custom_log_test
-  local wt="$TEST_REPO/.worktrees/custom_log_test"
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt
+  wt=$(extract_wt_path "$attach_output")
+  local branch
+  branch=$(basename "$wt")
+  local repo_name
+  repo_name=$(basename "$TEST_REPO")
+  export SPINCLASS_SESSION_ID="$repo_name/$branch"
 
   cd "$wt"
   run bash -c 'echo '"'"'{"hook_event_name":"PostToolUse","session_id":"test","tool_name":"Bash","tool_input":{},"cwd":"'"$wt"'"}'"'"' | '"$bin"' hooks'
   assert_success
 
-  local log_file="$custom_log/spinclass/tool-uses/myrepo--custom-log-test.jsonl"
+  local log_file="$custom_log/spinclass/tool-uses/${repo_name}--${branch}.jsonl"
   assert [ -f "$log_file" ]
 
   run cat "$log_file"

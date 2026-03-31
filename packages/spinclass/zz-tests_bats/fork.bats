@@ -11,10 +11,13 @@ setup() {
 function fork_creates_new_branch { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach source_branch
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$attach_output")
 
   # Fork from inside the worktree (cwd-based)
-  cd "$TEST_REPO/.worktrees/source_branch"
+  cd "$wt_path"
   run_sc fork new_branch
   assert_success
 
@@ -26,10 +29,13 @@ function fork_creates_new_branch { # @test
 function fork_creates_branch_with_from_flag { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach from_src
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$attach_output")
 
   # Fork using --from flag (can run from anywhere)
-  run_sc fork --from "$TEST_REPO/.worktrees/from_src" from_dst
+  run_sc fork --from "$wt_path" from_dst
   assert_success
 
   assert [ -d "$TEST_REPO/.worktrees/from_dst" ]
@@ -39,20 +45,25 @@ function fork_creates_branch_with_from_flag { # @test
 function fork_auto_names_branch { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach auto_src
+  local attach_output
+  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$attach_output")
+  local branch
+  branch=$(basename "$wt_path")
 
-  cd "$TEST_REPO/.worktrees/auto_src"
+  cd "$wt_path"
   run_sc fork
   assert_success
 
-  # Should have created auto_src-1
-  assert [ -d "$TEST_REPO/.worktrees/auto_src-1" ]
+  # Should have created <branch>-1
+  assert [ -d "$TEST_REPO/.worktrees/${branch}-1" ]
 }
 
 function fork_fails_outside_worktree { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
-  "$bin" --format tap attach --no-attach fork_test
+  "$bin" --format tap attach --no-attach
 
   # Running from main repo (not a worktree) without --from should fail
   # because the main branch won't have a .worktrees/<branch> layout

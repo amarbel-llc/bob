@@ -20,7 +20,10 @@ EOF
   run_sc attach --no-attach test_settings
   assert_success
 
-  local settings="$TEST_REPO/.worktrees/test_settings/.claude/settings.local.json"
+  # Extract the worktree path from TAP output (ok N - create <branch> <path>)
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  local settings="$wt_path/.claude/settings.local.json"
   assert [ -f "$settings" ]
 
   # Check that claude-allow rules appear in the settings
@@ -48,7 +51,10 @@ EOF
   run_sc attach --no-attach test_hierarchy
   assert_success
 
-  local settings="$TEST_REPO/.worktrees/test_hierarchy/.claude/settings.local.json"
+  # Extract the worktree path from TAP output
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  local settings="$wt_path/.claude/settings.local.json"
   assert [ -f "$settings" ]
 
   # Both rules should appear (global + repo merged)
@@ -69,7 +75,10 @@ EOF
   run_sc attach --no-attach test_envrc_flake
   assert_success
 
-  local envrc="$TEST_REPO/.worktrees/test_envrc_flake/.envrc"
+  # Extract the worktree path from TAP output
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  local envrc="$wt_path/.envrc"
   assert [ -f "$envrc" ]
   run cat "$envrc"
   assert_output --partial "source_up"
@@ -81,7 +90,10 @@ function apply_skips_use_flake_without_flake_nix { # @test
   run_sc attach --no-attach test_envrc_no_flake
   assert_success
 
-  local envrc="$TEST_REPO/.worktrees/test_envrc_no_flake/.envrc"
+  # Extract the worktree path from TAP output
+  local wt_path
+  wt_path=$(extract_wt_path "$output")
+  local envrc="$wt_path/.envrc"
   assert [ -f "$envrc" ]
   run cat "$envrc"
   assert_output --partial "source_up"
@@ -100,8 +112,8 @@ EOF
   run_sc attach --no-attach env_expand_test
   assert_success
 
-  # The TAP output should contain the expanded session key, not the literal "$SPINCLASS_SESSION_ID"
-  assert_output --partial "repo/env_expand_test"
-  assert_output --partial "env_expand_test"
+  # The TAP output should show expanded env vars (repo/<random-branch>), not literals
+  assert_output --partial "repo/"
   refute_output --partial '$SPINCLASS_SESSION_ID'
+  refute_output --partial '$SPINCLASS_BRANCH'
 }

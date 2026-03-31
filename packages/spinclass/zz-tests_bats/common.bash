@@ -77,6 +77,13 @@ run_sc() {
   run timeout --preserve-status 5s "$bin" --format tap "$@"
 }
 
+# Extract the worktree absolute path from TAP output of an attach command.
+# Looks for "ok N - create <branch> <path>" and returns <path>.
+# Usage: extract_wt_path "$output"
+extract_wt_path() {
+  echo "$1" | grep -oP 'ok \d+ - create \S+ \K\S+'
+}
+
 # Check if a session state file exists for a given repo+branch.
 # Usage: assert_session_state <repo-path> <branch>
 assert_session_state() {
