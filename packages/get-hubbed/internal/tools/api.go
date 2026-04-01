@@ -2,8 +2,10 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
@@ -146,11 +148,67 @@ func handleAPIGet(ctx context.Context, args json.RawMessage) (*protocol.ToolCall
 		return protocol.ErrorResultV1(fmt.Sprintf("gh api: %v", err)), nil
 	}
 
+	out = decodeBase64Content(out)
+
 	return &protocol.ToolCallResultV1{
 		Content: []protocol.ContentBlockV1{
 			protocol.TextContentV1(out),
 		},
 	}, nil
+}
+
+// decodeBase64Content detects GitHub API responses containing base64-encoded
+// content fields and decodes them to plain text. Handles both single objects
+// and arrays (e.g. directory listings).
+func decodeBase64Content(raw string) string {
+	var data any
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return raw
+	}
+
+	changed := false
+	switch v := data.(type) {
+	case map[string]any:
+		if decodeBase64Object(v) {
+			changed = true
+		}
+	case []any:
+		for _, item := range v {
+			if obj, ok := item.(map[string]any); ok {
+				if decodeBase64Object(obj) {
+					changed = true
+				}
+			}
+		}
+	}
+
+	if !changed {
+		return raw
+	}
+
+	out, err := json.Marshal(data)
+	if err != nil {
+		return raw
+	}
+	return string(out)
+}
+
+func decodeBase64Object(obj map[string]any) bool {
+	enc, _ := obj["encoding"].(string)
+	content, _ := obj["content"].(string)
+	if enc != "base64" || content == "" {
+		return false
+	}
+
+	cleaned := strings.ReplaceAll(content, "\n", "")
+	decoded, err := base64.StdEncoding.DecodeString(cleaned)
+	if err != nil {
+		return false
+	}
+
+	obj["content"] = string(decoded)
+	obj["encoding"] = "utf-8"
+	return true
 }
 
 func handleGraphQLQuery(ctx context.Context, args json.RawMessage) (*protocol.ToolCallResultV1, error) {
