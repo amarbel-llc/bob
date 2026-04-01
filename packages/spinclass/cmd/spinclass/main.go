@@ -21,6 +21,7 @@ import (
 	"github.com/amarbel-llc/spinclass/internal/mcptools"
 	"github.com/amarbel-llc/spinclass/internal/merge"
 	"github.com/amarbel-llc/spinclass/internal/perms"
+	"github.com/amarbel-llc/spinclass/internal/pr"
 	"github.com/amarbel-llc/spinclass/internal/pull"
 	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/shop"
@@ -34,6 +35,7 @@ var (
 	verbose            bool
 	startMergeOnClose bool
 	startNoAttach     bool
+	startPR           string
 	mergeGitSync       bool
 )
 
@@ -64,9 +66,44 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		resolvedPath, err := worktree.ResolvePath(repoPath, args)
-		if err != nil {
-			return err
+		var resolvedPath worktree.ResolvedPath
+
+		if startPR != "" {
+			prInfo, err := pr.Resolve(startPR, repoPath)
+			if err != nil {
+				return err
+			}
+
+			branch := prInfo.HeadRefName
+
+			if !git.BranchExists(repoPath, branch) {
+				if _, err := git.Run(repoPath, "fetch", "origin", branch); err != nil {
+					return fmt.Errorf("fetching PR branch %q: %w", branch, err)
+				}
+			}
+
+			absPath := filepath.Join(repoPath, worktree.WorktreesDir, branch)
+			repoDirname := filepath.Base(repoPath)
+
+			description := fmt.Sprintf("%s (#%d)", prInfo.Title, prInfo.Number)
+			if len(args) > 0 {
+				description = strings.Join(args, " ")
+			}
+
+			resolvedPath = worktree.ResolvedPath{
+				AbsPath:        absPath,
+				RepoPath:       repoPath,
+				SessionKey:     repoDirname + "/" + branch,
+				Branch:         branch,
+				Description:    description,
+				ExistingBranch: branch,
+			}
+		} else {
+			var err error
+			resolvedPath, err = worktree.ResolvePath(repoPath, args)
+			if err != nil {
+				return err
+			}
 		}
 
 		hierarchy, err := sweatfile.LoadWorktreeHierarchy(
@@ -458,6 +495,12 @@ func init() {
 		"no-attach",
 		false,
 		"create worktree but skip attaching (show command that would run)",
+	)
+	startCmd.Flags().StringVar(
+		&startPR,
+		"pr",
+		"",
+		"start session from a PR (number or GitHub URL)",
 	)
 	mergeCmd.Flags().BoolVar(
 		&mergeGitSync,
