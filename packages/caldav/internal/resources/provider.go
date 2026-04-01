@@ -60,7 +60,7 @@ func (p *Provider) registerResources() {
 		protocol.Resource{
 			URI:         "caldav://task_index",
 			Name:        "Task Index",
-			Description: "Word-indexed search across all task summaries, descriptions, and categories. Use caldav://task_index/{word} to search.",
+			Description: "Word-indexed search across all task summaries, descriptions, categories, and calendar names. Use caldav://task_index/{word} to search.",
 			MimeType:    "application/json",
 		},
 		p.readTaskIndex,
@@ -126,7 +126,7 @@ func (p *Provider) registerResources() {
 		protocol.Resource{
 			URI:         "caldav://event_index",
 			Name:        "Event Index",
-			Description: "Word-indexed search across all event summaries, descriptions, locations, and categories. Use caldav://event_index/{word} to search.",
+			Description: "Word-indexed search across all event summaries, descriptions, locations, categories, and calendar names. Use caldav://event_index/{word} to search.",
 			MimeType:    "application/json",
 		},
 		p.readEventIndex,
@@ -278,8 +278,8 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 	}
 
 	var infos []calendarInfo
-	var allTasks []caldav.Task
-	var allEvents []caldav.Event
+	var taskItems []IndexItem
+	var eventItems []IndexItem
 	var warnings []string
 
 	for _, cal := range calendars {
@@ -292,8 +292,12 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 			} else {
 				taskCount = len(result.Tasks)
 				for _, t := range result.Tasks {
-					allTasks = append(allTasks, t.Task)
 					p.cacheTask(t, cal.Href)
+					text := t.Task.Summary + " " + t.Task.Description + " " + cal.DisplayName
+					if len(t.Task.Categories) > 0 {
+						text += " " + strings.Join(t.Task.Categories, " ")
+					}
+					taskItems = append(taskItems, IndexItem{UID: t.Task.UID, Text: text})
 				}
 				for _, parseErr := range result.ParseErrors {
 					warnings = append(warnings,
@@ -311,8 +315,12 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 			} else {
 				eventCount = len(eventResult.Events)
 				for _, e := range eventResult.Events {
-					allEvents = append(allEvents, e.Event)
 					p.cacheEvent(e, cal.Href)
+					text := e.Event.Summary + " " + e.Event.Description + " " + e.Event.Location + " " + cal.DisplayName
+					if len(e.Event.Categories) > 0 {
+						text += " " + strings.Join(e.Event.Categories, " ")
+					}
+					eventItems = append(eventItems, IndexItem{UID: e.Event.UID, Text: text})
 				}
 				for _, parseErr := range eventResult.ParseErrors {
 					warnings = append(warnings,
@@ -332,18 +340,8 @@ func (p *Provider) readCalendars(ctx context.Context, uri string) (*protocol.Res
 		})
 	}
 
-	// Rebuild word index with all discovered tasks
-	p.index.Build(allTasks)
-
-	// Rebuild event word index
-	var eventItems []IndexItem
-	for _, e := range allEvents {
-		text := e.Summary + " " + e.Description + " " + e.Location
-		if len(e.Categories) > 0 {
-			text += " " + strings.Join(e.Categories, " ")
-		}
-		eventItems = append(eventItems, IndexItem{UID: e.UID, Text: text})
-	}
+	// Rebuild word indices with all discovered tasks/events
+	p.index.BuildFromItems(taskItems)
 	p.eventIndex.BuildFromItems(eventItems)
 
 	resp := calendarsResponse{Calendars: infos, Total: len(infos), Warnings: warnings}
