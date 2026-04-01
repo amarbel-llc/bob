@@ -13,7 +13,7 @@ import (
 
 func registerStashCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "stash_save",
+		Name:        "stash-save",
 		Title:       "Stash Changes",
 		Description: command.Description{Short: "Save uncommitted changes to a stash"},
 		Annotations: &protocol.ToolAnnotations{
@@ -34,7 +34,7 @@ func registerStashCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "stash_apply",
+		Name:        "stash-apply",
 		Title:       "Apply Stash",
 		Description: command.Description{Short: "Apply a stash to the working tree without removing it from the stash list"},
 		Annotations: &protocol.ToolAnnotations{
@@ -54,7 +54,7 @@ func registerStashCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "stash_drop",
+		Name:        "stash-drop",
 		Title:       "Drop Stash",
 		Description: command.Description{Short: "Delete a stash entry"},
 		Annotations: &protocol.ToolAnnotations{

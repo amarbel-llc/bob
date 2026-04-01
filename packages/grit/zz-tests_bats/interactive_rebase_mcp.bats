@@ -30,7 +30,7 @@ setup_multi_commit_scenario() {
 
 function plan_returns_commit_list { # @test
   setup_multi_commit_scenario
-  run run_grit_mcp "interactive_rebase_plan" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
+  run run_grit_mcp "interactive-rebase-plan" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -50,7 +50,7 @@ function plan_returns_commit_list { # @test
 function plan_up_to_date { # @test
   setup_test_repo
   git -C "$TEST_REPO" checkout -b feature
-  run run_grit_mcp "interactive_rebase_plan" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
+  run run_grit_mcp "interactive-rebase-plan" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -64,7 +64,7 @@ function plan_up_to_date { # @test
 
 function plan_blocked_on_main { # @test
   setup_test_repo
-  run run_grit_mcp "interactive_rebase_plan" "$(printf '{"repo_path":"%s","upstream":"HEAD~1"}' "$TEST_REPO")"
+  run run_grit_mcp "interactive-rebase-plan" "$(printf '{"repo_path":"%s","upstream":"HEAD~1"}' "$TEST_REPO")"
   assert_success
   assert_output --partial "blocked"
 }
@@ -79,7 +79,7 @@ function execute_squash_commits { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Squash second into first, pick third
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"squash","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"squash","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
   assert_success
 
   local status
@@ -100,7 +100,7 @@ function execute_drop_commit { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Pick first and third, implicitly drop second
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash3")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash3")"
   assert_success
 
   local status
@@ -125,7 +125,7 @@ function execute_reorder_commits { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Reverse the order: third, second, first
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash3" "$hash2" "$hash1")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash3" "$hash2" "$hash1")"
   assert_success
 
   local status
@@ -147,7 +147,7 @@ function execute_reword_commit { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Reword the first commit
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"reword","hash":"%s","message":"renamed first commit"},{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"reword","hash":"%s","message":"renamed first commit"},{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
   assert_success
 
   local status
@@ -168,7 +168,7 @@ function execute_validates_squash_not_first { # @test
   hash2=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '2p')
 
   # squash as first action should fail validation
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"squash","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"squash","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2")"
   assert_success
   assert_output --partial "cannot be the first"
 }
@@ -180,14 +180,14 @@ function execute_validates_reword_needs_message { # @test
   hash1=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '1p')
 
   # reword without message should fail validation
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"reword","hash":"%s"}]}' "$TEST_REPO" "$hash1")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"reword","hash":"%s"}]}' "$TEST_REPO" "$hash1")"
   assert_success
   assert_output --partial "message"
 }
 
 function execute_blocked_on_main { # @test
   setup_test_repo
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"HEAD~1","todo":[{"action":"pick","hash":"abc"}]}' "$TEST_REPO")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"HEAD~1","todo":[{"action":"pick","hash":"abc"}]}' "$TEST_REPO")"
   assert_success
   assert_output --partial "blocked"
 }
@@ -213,7 +213,7 @@ function execute_conflict_returns_conflict_status { # @test
   hash1=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '1p')
   hash2=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '2p')
 
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2")"
   assert_success
 
   local status
@@ -223,7 +223,7 @@ function execute_conflict_returns_conflict_status { # @test
 
 function execute_empty_todo_rejected { # @test
   setup_multi_commit_scenario
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[]}' "$TEST_REPO")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[]}' "$TEST_REPO")"
   assert_success
   assert_output --partial "must not be empty"
 }
@@ -236,7 +236,7 @@ function execute_rejects_when_rebase_in_progress { # @test
   local hash1
   hash1=$(git -C "$TEST_REPO" log --reverse --format=%H main..ORIG_HEAD | sed -n '1p')
 
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1")"
   assert_success
   assert_output --partial "already in progress"
 }
@@ -250,7 +250,7 @@ function execute_explicit_drop { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Explicitly drop the second commit
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"drop","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"drop","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
   assert_success
 
   local status
@@ -275,7 +275,7 @@ function execute_fixup_commits { # @test
   hash3=$(git -C "$TEST_REPO" log --reverse --format=%H main..HEAD | sed -n '3p')
 
   # Fixup second into first (like squash but discard second's message)
-  run run_grit_mcp "interactive_rebase_execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"fixup","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
+  run run_grit_mcp "interactive-rebase-execute" "$(printf '{"repo_path":"%s","upstream":"main","todo":[{"action":"pick","hash":"%s"},{"action":"fixup","hash":"%s"},{"action":"pick","hash":"%s"}]}' "$TEST_REPO" "$hash1" "$hash2" "$hash3")"
   assert_success
 
   local status

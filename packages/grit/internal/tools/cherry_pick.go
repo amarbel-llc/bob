@@ -13,7 +13,7 @@ import (
 
 func registerCherryPickCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "cherry_pick",
+		Name:        "cherry-pick",
 		Title:       "Cherry Pick",
 		Description: command.Description{Short: "Apply commits from other branches onto the current branch"},
 		Annotations: &protocol.ToolAnnotations{

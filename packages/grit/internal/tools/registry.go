@@ -10,7 +10,7 @@ func RegisterAll() (*command.App, *resourceProvider) {
 	registerStagingCommands(app)
 	registerRmCommands(app)
 	registerCommitCommands(app)
-	registerTryCommitCommands(app)
+
 	registerBranchCommands(app)
 	registerRemoteCommands(app)
 	registerRevParseCommands(app)

@@ -12,7 +12,7 @@ import (
 
 func registerWorktreeCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "worktree_list",
+		Name:        "worktree-list",
 		Title:       "List Worktrees",
 		Description: command.Description{Short: "List all git worktrees with path, HEAD, branch, and lock/prune state"},
 		Annotations: &protocol.ToolAnnotations{
@@ -31,7 +31,7 @@ func registerWorktreeCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "worktree_remove",
+		Name:        "worktree-remove",
 		Title:       "Remove Worktree",
 		Description: command.Description{Short: "Remove a git worktree by path"},
 		Annotations: &protocol.ToolAnnotations{

@@ -13,7 +13,7 @@ import (
 
 func registerRevParseCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "git_rev_parse",
+		Name:        "git-rev-parse",
 		Title:       "Resolve Git Revision",
 		Description: command.Description{Short: "Resolve a git revision to its full SHA, or resolve special names like HEAD, branch names, tags, and relative refs (e.g. HEAD~3, main^2)"},
 		Annotations: &protocol.ToolAnnotations{

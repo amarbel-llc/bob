@@ -13,7 +13,7 @@ import (
 
 func registerHardResetCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "hard_reset",
+		Name:        "hard-reset",
 		Title:       "Hard Reset",
 		Description: command.Description{Short: "Discard all changes and reset HEAD, index, and working tree to a ref (blocked on main/master for safety)"},
 		Annotations: &protocol.ToolAnnotations{

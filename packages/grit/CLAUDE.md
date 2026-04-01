@@ -76,23 +76,25 @@ Resources are registered via the resource provider.
   Category    Tools
   ----------- -------------------------------------------------------------------
   Diff        `diff`
-  Staging     `add`, `reset`
-  Commit      `commit`, `try_commit`
-  Branch      `branch_create`, `checkout`
+  Staging     `add`, `reset`, `rm`
+  Commit      `commit`
+  Branch      `branch-create`, `branch-delete`, `checkout`
   Remote      `fetch`, `pull`, `push`
-  Rev parse   `git_rev_parse`
-  Rebase      `rebase`, `interactive_rebase_plan`, `interactive_rebase_execute`
-  Reset       `hard_reset`
-  Tag         `tag_verify`
-  Stash       `stash_save`, `stash_apply`, `stash_drop`
+  Rev parse   `git-rev-parse`
+  Rebase      `rebase`, `interactive-rebase-plan`, `interactive-rebase-execute`
+  Reset       `hard-reset`
+  Cherry pick `cherry-pick`
+  Tag         `tag-verify`
+  Stash       `stash-save`, `stash-apply`, `stash-drop`
   Merge       `merge`
+  Worktree    `worktree-list`, `worktree-remove`
   Resources   `resource-templates`, `resource-read`
 
 ### Safety Constraints
 
 - Force push is blocked on `main`/`master` branches
 - Merge into `main`/`master` is blocked for safety
-- `git_reset` is soft-only (no working tree modifications)
+- `reset` is soft-only (no working tree modifications)
 
 ## Nix Flake
 

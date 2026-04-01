@@ -12,7 +12,7 @@ import (
 
 func registerBranchCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "branch_create",
+		Name:        "branch-create",
 		Title:       "Create Branch",
 		Description: command.Description{Short: "Create a new branch"},
 		Annotations: &protocol.ToolAnnotations{
@@ -30,7 +30,7 @@ func registerBranchCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "branch_delete",
+		Name:        "branch-delete",
 		Title:       "Delete Branch",
 		Description: command.Description{Short: "Delete a local branch (blocked on main/master for safety)"},
 		Annotations: &protocol.ToolAnnotations{

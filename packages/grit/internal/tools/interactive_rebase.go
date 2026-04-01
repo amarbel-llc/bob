@@ -14,7 +14,7 @@ import (
 
 func registerInteractiveRebaseCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "interactive_rebase_plan",
+		Name:        "interactive-rebase-plan",
 		Title:       "Plan Interactive Rebase",
 		Description: command.Description{Short: "Get the commit list for an interactive rebase (blocked on main/master for safety)"},
 		Annotations: &protocol.ToolAnnotations{
@@ -31,7 +31,7 @@ func registerInteractiveRebaseCommands(app *command.App) {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "interactive_rebase_execute",
+		Name:        "interactive-rebase-execute",
 		Title:       "Execute Interactive Rebase",
 		Description: command.Description{Short: "Execute an interactive rebase with a structured todo list (blocked on main/master for safety)"},
 		Annotations: &protocol.ToolAnnotations{

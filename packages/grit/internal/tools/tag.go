@@ -12,7 +12,7 @@ import (
 
 func registerTagCommands(app *command.App) {
 	app.AddCommand(&command.Command{
-		Name:        "tag_verify",
+		Name:        "tag-verify",
 		Title:       "Verify Tag Signature",
 		Description: command.Description{Short: "Verify the GPG signature of a tag"},
 		Annotations: &protocol.ToolAnnotations{

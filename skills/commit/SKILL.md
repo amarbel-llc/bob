@@ -7,77 +7,64 @@ description: Use when the user asks to commit, requests a commit, says "commit t
 
 ## Overview
 
-Use grit's `try_commit` MCP tool for all commits. It stages, commits, and returns status in a single call — replacing the multi-step cycle of status, diff, log, add, commit.
+Use grit's `add` and `commit` MCP tools for all commits. Stage files explicitly with `add`, then create the commit with `commit`.
 
 ## The Process
 
 ### Step 1: Determine What to Commit
 
-Before calling `try_commit`, identify:
+Identify which files to stage:
 
-1. **Which files to stage** — use grit's `status` tool or your knowledge of what you changed
-2. **The commit message** — draft a concise message following the repo's commit style
+1. **Check status** — read the `grit://status` resource or use your knowledge of what you changed
+2. **Draft the commit message** — check recent commits via `grit://log` for style conventions
 
-If unsure which files changed, call grit's `status` tool first.
+### Step 2: Stage Files
 
-### Step 2: Draft the Commit Message
-
-Check recent commits for style:
+Call `add` with the file paths to stage:
 
 ```
-grit log (repo_path, max_count: 5)
-```
-
-Draft a message that:
-- Summarizes the "why" not the "what"
-- Follows the repo's existing convention (conventional commits, imperative mood, etc.)
-- Ends with `Co-Authored-By: Claude <co-author> <noreply@anthropic.com>` when appropriate
-
-### Step 3: Commit with try_commit
-
-Call `try_commit` with all three required parameters:
-
-```
-grit try_commit (
+grit add (
   repo_path: "<path>",
-  message: "<commit message>",
   paths: ["file1.go", "file2.go"]
 )
 ```
 
-`try_commit` handles staging, committing, and returns structured results including staged diff stats and post-commit status.
+### Step 3: Create the Commit
 
-### Step 4: Verify the Result
+Call `commit` with the message:
 
-`try_commit` returns:
-- **commit**: parsed commit info (empty if commit failed)
-- **staged**: diff numstat of what was staged
-- **status**: post-commit porcelain status
+```
+grit commit (
+  repo_path: "<path>",
+  message: "<commit message>"
+)
+```
 
-If the commit field is empty, the commit failed. Check the status and staged fields for context — likely a pre-commit hook failure. Fix the issue and call `try_commit` again (do NOT fall back to the multi-step cycle).
+The message should:
+- Summarize the "why" not the "what"
+- Follow the repo's existing convention (conventional commits, imperative mood, etc.)
+- End with `Co-Authored-By: Claude <co-author> <noreply@anthropic.com>` when appropriate
+
+### Step 4: Verify
+
+Read `grit://status` to confirm the commit succeeded and the working tree is in the expected state.
 
 ## Quick Reference
 
 | Step | Tool | Purpose |
 |------|------|---------|
-| Check changes | `grit status` | See what's modified (optional if you already know) |
-| Check style | `grit log` | Match commit message convention (optional) |
-| Commit | `grit try_commit` | Stage + commit + verify in one call |
+| Check changes | `grit://status` resource | See what's modified (optional if you already know) |
+| Check style | `grit://log` resource | Match commit message convention (optional) |
+| Stage | `grit add` | Stage files for commit |
+| Commit | `grit commit` | Create the commit |
+| Verify | `grit://status` resource | Confirm success |
 
 ## Common Mistakes
 
-**Falling back to multi-step cycle**
-- **Problem:** Using separate status, diff, log, add, commit calls
-- **Fix:** Always use `try_commit` — it does all of this in one call
+**Using Bash for git commands**
+- **Problem:** Hooks will deny `git add` and `git commit` via Bash
+- **Fix:** Use grit's `add` and `commit` tools directly
 
-**Using grit's `commit` tool instead of `try_commit`**
-- **Problem:** `commit` only commits already-staged files; requires separate `add` call
-- **Fix:** `try_commit` stages and commits together
-
-**Using Bash for git commit**
-- **Problem:** Hooks will deny `git commit` via Bash in favor of grit
-- **Fix:** Use `try_commit` directly
-
-**Omitting paths parameter**
-- **Problem:** `try_commit` requires explicit file paths to stage
-- **Fix:** List all files that should be included; use `status` first if unsure
+**Forgetting to stage before committing**
+- **Problem:** `commit` only commits staged files
+- **Fix:** Always call `add` first to stage the files you want to include

@@ -16,7 +16,7 @@ function stash_save_creates_stash_from_staged_changes { # @test
   echo "modified" > "$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
 
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"test stash"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"test stash"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -32,7 +32,7 @@ function stash_save_creates_stash_from_unstaged_changes { # @test
   setup_test_repo
   echo "modified" > "$TEST_REPO/file.txt"
 
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"unstaged"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"unstaged"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -44,7 +44,7 @@ function stash_save_no_changes_returns_no_changes_status { # @test
   setup_test_repo
   # Working tree is clean — no modifications at all
 
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"nothing"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"nothing"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -56,7 +56,7 @@ function stash_save_include_untracked { # @test
   setup_test_repo
   echo "new file" > "$TEST_REPO/untracked.txt"
 
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"with untracked","include_untracked":true}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"with untracked","include_untracked":true}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -73,7 +73,7 @@ function stash_save_without_include_untracked_leaves_untracked_files { # @test
   # Also modify a tracked file so stash has something to save
   echo "modified" > "$TEST_REPO/file.txt"
 
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"no untracked"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"no untracked"}' "$TEST_REPO")"
   assert_success
 
   # Untracked file should still be present
@@ -88,7 +88,7 @@ function stash_apply_restores_stashed_changes { # @test
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "to apply"
 
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -112,7 +112,7 @@ function stash_apply_with_explicit_ref { # @test
   git -C "$TEST_REPO" stash push -m "second stash"
 
   # Apply the older stash (stash@{1})
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s","stash_ref":"stash@{1}"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s","stash_ref":"stash@{1}"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -139,7 +139,7 @@ function stash_apply_with_conflict_returns_json_not_text_error { # @test
 
   # Applying the stash should conflict
   local result
-  result=$(run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
+  result=$(run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
 
   # The result must be valid JSON with status "conflict", not a plain text error
   run jq -e -r '.status' <<< "$result"
@@ -158,7 +158,7 @@ function stash_apply_with_conflict_lists_conflicted_files { # @test
   git -C "$TEST_REPO" commit -m "conflicting change"
 
   local result
-  result=$(run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
+  result=$(run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
 
   # Should list file.txt as conflicted (depends on the bug above being fixed)
   run jq -e -r '.conflicts[]' <<< "$result"
@@ -169,7 +169,7 @@ function stash_apply_with_conflict_lists_conflicted_files { # @test
 function stash_apply_nonexistent_ref_returns_error { # @test
   setup_test_repo
 
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s","stash_ref":"stash@{99}"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s","stash_ref":"stash@{99}"}' "$TEST_REPO")"
   assert_success
 
   # Should return an error, not crash
@@ -182,7 +182,7 @@ function stash_apply_preserves_stash_in_list { # @test
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "should remain"
 
-  run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
 
   # Stash should still exist after apply (unlike pop)
   run read_grit_resource "grit://stashes?repo_path=$TEST_REPO"
@@ -201,7 +201,7 @@ function stash_drop_removes_stash { # @test
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
-  run run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{0}"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{0}"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -220,7 +220,7 @@ function stash_drop_removes_stash { # @test
 function stash_drop_nonexistent_ref_returns_error { # @test
   setup_test_repo
 
-  run run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{99}"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{99}"}' "$TEST_REPO")"
   assert_success
 
   # Should contain an error message
@@ -239,7 +239,7 @@ function stash_drop_with_index_instead_of_stash_ref { # @test
   # producing "refs/stash@{} is not a valid reference".
   # The tool should either accept an index param or fail with a clear
   # error about the missing stash_ref.
-  run run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","index":0}' "$TEST_REPO")"
+  run run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","index":0}' "$TEST_REPO")"
   assert_success
 
   # If the tool doesn't understand "index", it should return a clear error
@@ -260,7 +260,7 @@ function stash_drop_with_bare_integer_ref { # @test
   git -C "$TEST_REPO" stash push -m "drop me"
 
   # gh#73: LLM passes just "0" instead of "stash@{0}"
-  run run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":"0"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":"0"}' "$TEST_REPO")"
   assert_success
 
   # Should either work (by constructing the proper ref) or return a
@@ -282,7 +282,7 @@ function stash_drop_with_empty_stash_ref_does_not_drop_silently { # @test
   # gh#73: stash_ref is required but go-mcp doesn't enforce it at runtime.
   # When empty string arrives, git stash drop "" is called.
   local result
-  result=$(run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":""}' "$TEST_REPO")")
+  result=$(run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":""}' "$TEST_REPO")")
 
   # Empty stash_ref should not silently drop stash@{0}
   run read_grit_resource "grit://stashes?repo_path=$TEST_REPO"
@@ -303,7 +303,7 @@ function stash_drop_with_missing_stash_ref_does_not_drop_silently { # @test
   # Since Required is schema-only with no runtime enforcement, the tool
   # should validate this itself.
   local result
-  result=$(run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
+  result=$(run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
 
   # Missing stash_ref should not silently drop stash@{0}
   run read_grit_resource "grit://stashes?repo_path=$TEST_REPO"
@@ -323,7 +323,7 @@ function stash_drop_with_stash_at_empty_braces { # @test
   # This means the ref "stash@{}" (empty braces) was passed to git.
   # Reproduce by sending stash_ref with empty braces.
   local result
-  result=$(run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{}"}' "$TEST_REPO")")
+  result=$(run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{}"}' "$TEST_REPO")")
 
   # Should return an error, and stash should remain
   run read_grit_resource "grit://stashes?repo_path=$TEST_REPO"
@@ -347,7 +347,7 @@ function stash_drop_ref_with_special_chars_in_printf { # @test
 {"repo_path":"$TEST_REPO","stash_ref":"stash@{0}"}
 ARGS
 )
-  run run_grit_mcp "stash_drop" "$args"
+  run run_grit_mcp "stash-drop" "$args"
   assert_success
 
   local status
@@ -373,7 +373,7 @@ function stash_drop_ref_survives_json_encoding { # @test
   args=$(jq -cn --arg repo "$TEST_REPO" --arg ref 'stash@{0}' \
     '{repo_path: $repo, stash_ref: $ref}')
 
-  run run_grit_mcp "stash_drop" "$args"
+  run run_grit_mcp "stash-drop" "$args"
   assert_success
 
   local status
@@ -396,7 +396,7 @@ function stash_apply_with_index_instead_of_stash_ref { # @test
   # Same issue as stash_drop: LLMs pass index instead of stash_ref.
   # "git stash apply" with empty ref defaults to stash@{0} which happens
   # to work, but the intent is wrong — the tool should handle index params.
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s","index":0}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s","index":0}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -411,7 +411,7 @@ function stash_apply_with_bare_integer_ref { # @test
   git -C "$TEST_REPO" stash push -m "apply me"
 
   # gh#73: LLM passes just "0" instead of "stash@{0}"
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s","stash_ref":"0"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s","stash_ref":"0"}' "$TEST_REPO")"
   assert_success
 
   local status
@@ -481,7 +481,7 @@ function stash_round_trip_save_list_apply_drop { # @test
   git -C "$TEST_REPO" add file.txt
 
   # Save
-  run run_grit_mcp "stash_save" "$(printf '{"repo_path":"%s","message":"round trip"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"round trip"}' "$TEST_REPO")"
   assert_success
   local status
   status=$(echo "$output" | jq -r '.status')
@@ -500,7 +500,7 @@ function stash_round_trip_save_list_apply_drop { # @test
   assert_equal "$count" "1"
 
   # Apply
-  run run_grit_mcp "stash_apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")"
   assert_success
   status=$(echo "$output" | jq -r '.status')
   assert_equal "$status" "applied"
@@ -510,7 +510,7 @@ function stash_round_trip_save_list_apply_drop { # @test
   assert_equal "$content" "round trip content"
 
   # Drop
-  run run_grit_mcp "stash_drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{0}"}' "$TEST_REPO")"
+  run run_grit_mcp "stash-drop" "$(printf '{"repo_path":"%s","stash_ref":"stash@{0}"}' "$TEST_REPO")"
   assert_success
   status=$(echo "$output" | jq -r '.status')
   assert_equal "$status" "dropped"
