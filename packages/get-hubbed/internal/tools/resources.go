@@ -154,6 +154,20 @@ func NewResourceProvider() (*resourceProvider, error) {
 		MimeType:    "text/plain",
 	}, nil)
 
+	registry.RegisterTemplate(protocol.ResourceTemplate{
+		URITemplate: "get-hubbed://compare?repo={repo}&base={base}&head={head}&per_page={per_page}&page={page}",
+		Name:        "Compare Refs",
+		Description: "Compare two refs (branches, tags, or commits) showing commits and file changes. Required: base, head. Optional: repo (defaults to current), per_page, page",
+		MimeType:    "application/json",
+	}, nil)
+
+	registry.RegisterTemplate(protocol.ResourceTemplate{
+		URITemplate: "get-hubbed://gist?id={id}",
+		Name:        "Gist",
+		Description: "View a gist's metadata and file contents. Required: id",
+		MimeType:    "application/json",
+	}, nil)
+
 	return p, nil
 }
 
@@ -273,6 +287,17 @@ func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (*proto
 			return p.readRunLog(ctx, uri, runID, parsed.Query())
 		}
 		return p.readRunView(ctx, uri, path, parsed.Query())
+	case "compare":
+		return p.readCompare(ctx, uri, parsed.Query())
+	case "gist":
+		id := strings.TrimPrefix(parsed.Path, "/")
+		if id == "" {
+			id = parsed.Query().Get("id")
+		}
+		if id == "" {
+			return nil, fmt.Errorf("missing id in gist URI. Use get-hubbed://gist?id={id}")
+		}
+		return p.readGist(ctx, uri, id, parsed.Query())
 	default:
 		return nil, fmt.Errorf("unknown resource: %s", uri)
 	}
@@ -953,6 +978,66 @@ func (p *resourceProvider) readRunLog(ctx context.Context, uri, runID string, q 
 
 	if out == "" {
 		out = "No failed step logs found for this run."
+	}
+
+	return textResourceResult(uri, out), nil
+}
+
+func (p *resourceProvider) readCompare(ctx context.Context, uri string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"repo", "base", "head", "per_page", "page"}); err != nil {
+		return nil, err
+	}
+
+	repo, err := p.resolveRepo(q.Get("repo"))
+	if err != nil {
+		return nil, err
+	}
+
+	base := q.Get("base")
+	head := q.Get("head")
+	if base == "" || head == "" {
+		return nil, fmt.Errorf("base and head parameters are required. Use get-hubbed://compare?base={base}&head={head}")
+	}
+
+	endpoint := fmt.Sprintf("repos/%s/compare/%s...%s", repo, base, head)
+
+	ghArgs := []string{"api", endpoint, "--method", "GET"}
+
+	if perPage := q.Get("per_page"); perPage != "" {
+		ghArgs = append(ghArgs, "-f", fmt.Sprintf("per_page=%s", perPage))
+	}
+
+	if page := q.Get("page"); page != "" {
+		ghArgs = append(ghArgs, "-f", fmt.Sprintf("page=%s", page))
+	}
+
+	ghArgs = append(ghArgs, "--jq",
+		`{status, ahead_by, behind_by, total_commits, commits: [.commits[] | {sha: .sha[:8], message: .commit.message, author: .commit.author.name, date: .commit.author.date}], files: [.files[] | {filename, status, additions, deletions, changes}]}`,
+	)
+
+	out, err := gh.Run(ctx, ghArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("gh api compare: %w", err)
+	}
+
+	return textResourceResult(uri, out), nil
+}
+
+func (p *resourceProvider) readGist(ctx context.Context, uri, id string, q url.Values) (*protocol.ResourceReadResult, error) {
+	if err := validateQueryParams(q, []string{"id"}); err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("gists/%s", id)
+
+	ghArgs := []string{
+		"api", endpoint, "--method", "GET",
+		"--jq", `{id, description, public, created_at, updated_at, owner: .owner.login, files: [.files | to_entries[] | {filename: .key, language: .value.language, size: .value.size, content: .value.content}]}`,
+	}
+
+	out, err := gh.Run(ctx, ghArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("gh api gists: %w", err)
 	}
 
 	return textResourceResult(uri, out), nil

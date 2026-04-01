@@ -307,7 +307,8 @@ func writeCatchAllDeny(w io.Writer) error {
 	reason := "DENIED: GitHub URLs are served by get-hubbed. Do not use WebFetch for GitHub.\n" +
 		"Use get-hubbed for ALL GitHub interactions \u2014 do not use WebFetch or Bash with gh/curl for GitHub.\n\n" +
 		"Resources (read-only): get-hubbed://repo, get-hubbed://issues, get-hubbed://pulls, " +
-		"get-hubbed://contents, get-hubbed://tree, get-hubbed://blame, get-hubbed://commits, get-hubbed://runs\n" +
+		"get-hubbed://contents, get-hubbed://tree, get-hubbed://blame, get-hubbed://commits, " +
+		"get-hubbed://runs, get-hubbed://compare, get-hubbed://gist\n" +
 		"Tools (mutations): issue-create, issue-close, issue-comment, pr-create, " +
 		"content-search, content-compare, api-get, graphql-query, graphql-mutation"
 	return writeDenyJSON(w, reason)

@@ -95,18 +95,21 @@ func TestWebFetchHookCatchAllGitHub(t *testing.T) {
 }
 
 func TestWebFetchHookAllGitHubDomains(t *testing.T) {
-	domains := []string{
-		"https://github.com/owner/repo/settings",
-		"https://www.github.com/owner/repo/settings",
-		"https://api.github.com/repos/owner/repo",
-		"https://raw.githubusercontent.com/owner/repo/main/README.md",
-		"https://gist.github.com/owner/abc123",
+	tests := []struct {
+		url         string
+		resourceURI string
+	}{
+		{"https://github.com/owner/repo/settings", "GitHub URLs are served by get-hubbed"},
+		{"https://www.github.com/owner/repo/settings", "GitHub URLs are served by get-hubbed"},
+		{"https://api.github.com/repos/owner/repo", "get-hubbed://repo"},
+		{"https://raw.githubusercontent.com/owner/repo/main/README.md", "get-hubbed://contents?path=README.md&repo=owner/repo&ref=main"},
+		{"https://gist.github.com/owner/abc123", "get-hubbed://gist?id=abc123"},
 	}
 
-	for _, url := range domains {
-		t.Run(url, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
 			input := makeHookInput("WebFetch", map[string]any{
-				"url":    url,
+				"url":    tt.url,
 				"prompt": "fetch",
 			})
 			var out bytes.Buffer
@@ -115,7 +118,10 @@ func TestWebFetchHookAllGitHubDomains(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !handled {
-				t.Fatalf("expected hook to handle %s", url)
+				t.Fatalf("expected hook to handle %s", tt.url)
+			}
+			if !strings.Contains(out.String(), tt.resourceURI) {
+				t.Errorf("expected %q in output, got %q", tt.resourceURI, out.String())
 			}
 		})
 	}
