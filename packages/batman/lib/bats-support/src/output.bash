@@ -129,7 +129,7 @@ batslib_get_max_single_line_key_width() {
 batslib_print_kv_single() {
   local -ir col_width="$1"; shift
   while (( $# != 0 )); do
-    printf '%-*s : %s\n' "$col_width" "$1" "$2"
+    printf '%-*s : %s$\n' "$col_width" "$1" "$2"
     shift 2
   done
 }
@@ -153,7 +153,10 @@ batslib_print_kv_single() {
 batslib_print_kv_multi() {
   while (( $# != 0 )); do
     printf '%s (%d lines):\n' "$1" "$( batslib_count_lines "$2" )"
-    printf '%s\n' "$2"
+    local line
+    while IFS='' read -r line || [[ -n $line ]]; do
+      printf '%s$\n' "$line"
+    done < <(printf '%s' "$2")
     shift 2
   done
 }
