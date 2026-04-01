@@ -104,6 +104,11 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "log_tail": {
                         "type": "integer",
                         "description": "Only return the last N lines of build log. Takes precedence over max_log_bytes."
+                    },
+                    "override_inputs": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "Map of input names to flake references to override."
                     }
                 }
             }),
@@ -170,6 +175,11 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "tail": {
                         "type": "integer",
                         "description": "Only return the last N lines of output."
+                    },
+                    "override_inputs": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "Map of input names to flake references to override."
                     }
                 }
             }),
@@ -311,6 +321,11 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "override_inputs": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "Map of input names to flake references to override."
                     }
                 }
             }),
@@ -360,6 +375,11 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "tail": {
                         "type": "integer",
                         "description": "Only return the last N lines of output."
+                    },
+                    "override_inputs": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "Map of input names to flake references to override."
                     }
                 },
                 "required": ["commands"]
@@ -991,6 +1011,7 @@ pub struct NixBuildParams {
     pub flake_dir: Option<String>,
     pub max_log_bytes: Option<usize>,
     pub log_tail: Option<usize>,
+    pub override_inputs: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1011,6 +1032,7 @@ pub struct NixFlakeCheckParams {
     pub max_bytes: Option<usize>,
     pub head: Option<usize>,
     pub tail: Option<usize>,
+    pub override_inputs: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1054,6 +1076,7 @@ pub struct NixRunParams {
     pub installable: Option<String>,
     pub args: Option<Vec<String>>,
     pub flake_dir: Option<String>,
+    pub override_inputs: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1070,6 +1093,7 @@ pub struct NixDevelopRunParams {
     pub max_bytes: Option<usize>,
     pub head: Option<usize>,
     pub tail: Option<usize>,
+    pub override_inputs: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]

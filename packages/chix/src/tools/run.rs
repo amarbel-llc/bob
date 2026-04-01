@@ -50,7 +50,17 @@ pub async fn nix_run(params: NixRunParams) -> Result<NixRunResult, String> {
         validate_path(dir).map_err(|e| e.to_string())?;
     }
 
-    let mut args: Vec<&str> = vec!["run", &installable];
+    let override_inputs = params.override_inputs.unwrap_or_default();
+    let override_input_args: Vec<String> = override_inputs
+        .iter()
+        .flat_map(|(k, v)| vec!["--override-input".to_string(), k.clone(), v.clone()])
+        .collect();
+
+    let mut args: Vec<&str> = vec!["run"];
+    for arg in &override_input_args {
+        args.push(arg);
+    }
+    args.push(&installable);
 
     let user_args: Vec<String> = params.args.unwrap_or_default();
     if !user_args.is_empty() {
@@ -100,8 +110,18 @@ pub async fn nix_develop_run(params: NixDevelopRunParams) -> Result<NixDevelopRu
     let mut all_success = true;
     let mut any_truncated = false;
 
+    let override_inputs = params.override_inputs.unwrap_or_default();
+    let override_input_args: Vec<String> = override_inputs
+        .iter()
+        .flat_map(|(k, v)| vec!["--override-input".to_string(), k.clone(), v.clone()])
+        .collect();
+
     for entry in &params.commands {
-        let mut nix_args: Vec<&str> = vec!["develop", &flake_ref, "-c", &entry.command];
+        let mut nix_args: Vec<&str> = vec!["develop"];
+        for arg in &override_input_args {
+            nix_args.push(arg);
+        }
+        nix_args.extend_from_slice(&[&flake_ref, "-c", &entry.command]);
 
         let user_args: Vec<&str> = entry
             .args
@@ -175,6 +195,7 @@ mod tests {
             max_bytes: None,
             head: None,
             tail: None,
+            override_inputs: None,
         };
         let result = nix_develop_run(params).await;
         assert!(result.is_err());
@@ -193,6 +214,7 @@ mod tests {
             max_bytes: None,
             head: None,
             tail: None,
+            override_inputs: None,
         };
         let result = nix_develop_run(params).await;
         assert!(result.is_err());
@@ -211,6 +233,7 @@ mod tests {
             max_bytes: None,
             head: None,
             tail: None,
+            override_inputs: None,
         };
         let result = nix_develop_run(params).await;
         assert!(result.is_err());

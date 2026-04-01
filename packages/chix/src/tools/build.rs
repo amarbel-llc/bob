@@ -32,6 +32,15 @@ pub async fn nix_build(params: NixBuildParams) -> Result<NixBuildResult, String>
         args.push("-L");
     }
 
+    let override_inputs = params.override_inputs.unwrap_or_default();
+    let override_input_args: Vec<String> = override_inputs
+        .iter()
+        .flat_map(|(k, v)| vec!["--override-input".to_string(), k.clone(), v.clone()])
+        .collect();
+    for arg in &override_input_args {
+        args.push(arg);
+    }
+
     args.push(&installable);
 
     let result = run_nix_command_in_dir(&args, flake_dir)
