@@ -89,7 +89,7 @@ worktree paths. Applies `claude-allow` rules from sweatfile to
 
   Command                    Description
   -------------------------- ---------------------------------------------------
-  `sc start [desc...]`       Create and start a new worktree session
+  `sc start [desc...]`       Create and start a new worktree session (--pr N or --pr URL)
   `sc resume [id]`           Resume an existing session (auto-detects from cwd)
   `sc update-description`    Update session description (--id or auto-detect)
   `sc list`                  List all tracked sessions from state directory
