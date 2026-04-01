@@ -193,8 +193,8 @@ func TestWebFetchHookCompareURL(t *testing.T) {
 	if !handled {
 		t.Fatal("expected hook to handle compare URL")
 	}
-	if !strings.Contains(out.String(), "content-compare") {
-		t.Errorf("expected content-compare tool in output, got %q", out.String())
+	if !strings.Contains(out.String(), "get-hubbed://compare?repo=owner/repo&base=main&head=feature") {
+		t.Errorf("expected compare resource URI in output, got %q", out.String())
 	}
 }
 

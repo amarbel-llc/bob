@@ -113,7 +113,11 @@ func matchGitHubURL(rawURL string) (string, bool) {
 
 	case "compare":
 		if len(segments) >= 4 {
-			return fmt.Sprintf("content-compare tool with repo=%s, base and head from %s", repoSlug, segments[3]), true
+			spec := segments[3]
+			if parts := strings.SplitN(spec, "...", 2); len(parts) == 2 {
+				return fmt.Sprintf("get-hubbed://compare?repo=%s&base=%s&head=%s", repoSlug, parts[0], parts[1]), false
+			}
+			return fmt.Sprintf("get-hubbed://compare?repo=%s", repoSlug), false
 		}
 	}
 
