@@ -153,8 +153,21 @@ func HandleWebFetchHook(input []byte, w io.Writer) (bool, error) {
 		return false, nil
 	}
 
-	// Try specific mapping
-	resourceURI, isTool := matchGitHubURL(rawURL)
+	// Try host-specific mapping
+	var resourceURI string
+	var isTool bool
+
+	switch parsed.Host {
+	case "github.com", "www.github.com":
+		resourceURI, isTool = matchGitHubURL(rawURL)
+	case "api.github.com":
+		resourceURI, isTool = matchAPIGitHubURL(parsed)
+	case "raw.githubusercontent.com":
+		resourceURI, isTool = matchRawGitHubURL(parsed)
+	case "gist.github.com":
+		resourceURI, isTool = matchGistGitHubURL(parsed)
+	}
+
 	if resourceURI != "" {
 		if isTool {
 			return true, writeToolDeny(w, resourceURI)
@@ -164,6 +177,24 @@ func HandleWebFetchHook(input []byte, w io.Writer) (bool, error) {
 
 	// Catch-all for any GitHub domain
 	return true, writeCatchAllDeny(w)
+}
+
+// matchAPIGitHubURL matches api.github.com REST API paths to get-hubbed
+// resource URIs. Returns ("", false) if no match.
+func matchAPIGitHubURL(parsed *url.URL) (string, bool) {
+	return "", false
+}
+
+// matchRawGitHubURL matches raw.githubusercontent.com paths to get-hubbed
+// resource URIs. Returns ("", false) if no match.
+func matchRawGitHubURL(parsed *url.URL) (string, bool) {
+	return "", false
+}
+
+// matchGistGitHubURL matches gist.github.com paths to get-hubbed
+// resource URIs. Returns ("", false) if no match.
+func matchGistGitHubURL(parsed *url.URL) (string, bool) {
+	return "", false
 }
 
 func writeResourceDeny(w io.Writer, resourceURI string) error {
