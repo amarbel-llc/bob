@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
