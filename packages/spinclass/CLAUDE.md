@@ -87,16 +87,18 @@ worktree paths. Applies `claude-allow` rules from sweatfile to
 
 ## CLI Commands
 
-  Command               Description
-  --------------------- -----------------------------------------------------
-  `sc attach [name]`    Create (if needed) and attach to a worktree session
-  `sc list`             List all tracked sessions from state directory
-  `sc merge [target]`   Merge worktree into main, remove session state
-  `sc clean`            Remove merged worktrees and abandoned sessions
-  `sc fork [branch]`    Fork current worktree (supports `--from <dir>`)
-  `sc pull`             Pull repos and rebase worktrees
-  `sc validate`         Validate sweatfile hierarchy
-  `sc exec-claude`      Run claude with sweatfile settings
+  Command                    Description
+  -------------------------- ---------------------------------------------------
+  `sc start [desc...]`       Create and start a new worktree session
+  `sc resume [id]`           Resume an existing session (auto-detects from cwd)
+  `sc update-description`    Update session description (--id or auto-detect)
+  `sc list`                  List all tracked sessions from state directory
+  `sc merge [target]`        Merge worktree into main, remove session state
+  `sc clean`                 Remove merged worktrees and abandoned sessions
+  `sc fork [branch]`         Fork current worktree (supports `--from <dir>`)
+  `sc pull`                  Pull repos and rebase worktrees
+  `sc validate`              Validate sweatfile hierarchy
+  `sc exec-claude`           Run claude with sweatfile settings
 
 ## Nix Build
 

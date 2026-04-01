@@ -26,12 +26,12 @@ func Sessions(w io.Writer, repoPath string) {
 		if repoPath != "" && s.RepoPath != repoPath {
 			continue
 		}
-		// Extract branch name for completion value
+		wtID := filepath.Base(s.WorktreePath)
 		label := fmt.Sprintf("%s session (%s)", resolved, filepath.Base(s.RepoPath))
 		if s.Description != "" {
 			label += " — " + s.Description
 		}
-		fmt.Fprintf(w, "%s\t%s\n", s.Branch, label)
+		fmt.Fprintf(w, "%s\t%s\n", wtID, label)
 	}
 }
 

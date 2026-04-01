@@ -77,7 +77,7 @@ run_sc() {
   run timeout --preserve-status 5s "$bin" --format tap "$@"
 }
 
-# Extract the worktree absolute path from TAP output of an attach command.
+# Extract the worktree absolute path from TAP output of a start command.
 # Looks for "ok N - create <branch> <path>" and returns <path>.
 # Usage: extract_wt_path "$output"
 extract_wt_path() {

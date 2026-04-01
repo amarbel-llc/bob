@@ -13,7 +13,7 @@ function tool_use_log_writes_to_xdg_log_home { # @test
   # Create a worktree so hooks can detect worktree context
   cd "$TEST_REPO"
   local attach_output
-  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  attach_output=$("$bin" --format tap start --no-attach 2>&1)
   local wt
   wt=$(extract_wt_path "$attach_output")
   local branch
@@ -45,7 +45,7 @@ function tool_use_log_respects_xdg_log_home { # @test
 
   cd "$TEST_REPO"
   local attach_output
-  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  attach_output=$("$bin" --format tap start --no-attach 2>&1)
   local wt
   wt=$(extract_wt_path "$attach_output")
   local branch

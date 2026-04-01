@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 
-	charmbraceletLog "github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
@@ -32,8 +32,8 @@ import (
 var (
 	outputFormat       string
 	verbose            bool
-	attachMergeOnClose bool
-	attachNoAttach     bool
+	startMergeOnClose bool
+	startNoAttach     bool
 	mergeGitSync       bool
 )
 
@@ -43,10 +43,10 @@ var rootCmd = &cobra.Command{
 	Long:  `spinclass manages git worktree lifecycles: creating worktrees + sessions, and offering close workflows (rebase, merge, cleanup, push).`,
 }
 
-var attachCmd = &cobra.Command{
-	Use:   "attach [description...]",
-	Short: "Create and attach to a new worktree session",
-	Long:  `Create a new worktree with a random branch name and attach to a session. Words after "attach" are joined as a freeform session description. Auto-detects whether to start a new session or resume an active one based on the session state directory.`,
+var startCmd = &cobra.Command{
+	Use:   "start [description...]",
+	Short: "Create and start a new worktree session",
+	Long:  `Create a new worktree with a random branch name and start a session. Words after "start" are joined as a freeform session description.`,
 	Args:  cobra.MinimumNArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		format := outputFormat
@@ -79,19 +79,7 @@ var attachCmd = &cobra.Command{
 			}
 		}
 
-		merged := hierarchy.Merged
-		entrypoint := merged.SessionStart()
-
-		// Check for active session and use resume entrypoint if available
-		existing, _ := session.Read(resolvedPath.RepoPath, resolvedPath.Branch)
-		if existing != nil && existing.ResolveState() == session.StateActive {
-			if resume := merged.SessionResume(); resume != nil {
-				entrypoint = resume
-			} else {
-				charmbraceletLog.Warn("active session exists, starting second instance",
-					"session", resolvedPath.SessionKey)
-			}
-		}
+		entrypoint := hierarchy.Merged.SessionStart()
 
 		exec := executor.SessionExecutor{
 			Entrypoint:  entrypoint,
@@ -103,8 +91,75 @@ var attachCmd = &cobra.Command{
 			exec,
 			resolvedPath,
 			format,
-			attachMergeOnClose,
-			attachNoAttach,
+			startMergeOnClose,
+			startNoAttach,
+			verbose,
+		)
+	},
+}
+
+var resumeCmd = &cobra.Command{
+	Use:   "resume [id]",
+	Short: "Resume an existing worktree session",
+	Long:  `Resume an existing worktree session. With no arguments, auto-detects the session from the current working directory. With one argument, resumes the session identified by the worktree directory name (the name under .worktrees/).`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		format := outputFormat
+		if format == "" {
+			format = "tap"
+		}
+
+		var state *session.State
+		var err error
+
+		if len(args) == 1 {
+			state, err = session.FindByID(args[0])
+		} else {
+			cwd, cwdErr := os.Getwd()
+			if cwdErr != nil {
+				return cwdErr
+			}
+			state, err = session.FindByWorktreePath(cwd)
+		}
+		if err != nil {
+			return err
+		}
+
+		hierarchy, err := sweatfile.LoadWorktreeHierarchy(
+			os.Getenv("HOME"), state.RepoPath, state.WorktreePath,
+		)
+		if err != nil {
+			hierarchy, err = sweatfile.LoadHierarchy(os.Getenv("HOME"), state.RepoPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		merged := hierarchy.Merged
+		entrypoint := merged.SessionStart()
+		if resume := merged.SessionResume(); resume != nil {
+			entrypoint = resume
+		}
+
+		rp := worktree.ResolvedPath{
+			AbsPath:     state.WorktreePath,
+			RepoPath:    state.RepoPath,
+			SessionKey:  state.SessionKey,
+			Branch:      state.Branch,
+			Description: state.Description,
+		}
+
+		exec := executor.SessionExecutor{
+			Entrypoint: entrypoint,
+		}
+
+		return shop.Attach(
+			os.Stdout,
+			exec,
+			rp,
+			format,
+			false, // mergeOnClose
+			false, // noAttach
 			verbose,
 		)
 	},
@@ -191,6 +246,35 @@ var listCmd = &cobra.Command{
 			fmt.Printf("%s\t%s\t%s\t%s\n", s.SessionKey, resolved, s.WorktreePath, s.Description)
 		}
 		return nil
+	},
+}
+
+var updateDescriptionID string
+
+var updateDescriptionCmd = &cobra.Command{
+	Use:   "update-description [description...]",
+	Short: "Update the description of a session",
+	Long:  `Update the freeform description of an existing session. With --id, targets a specific worktree by directory name. Without --id, auto-detects from the current working directory.`,
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var state *session.State
+		var err error
+
+		if updateDescriptionID != "" {
+			state, err = session.FindByID(updateDescriptionID)
+		} else {
+			cwd, cwdErr := os.Getwd()
+			if cwdErr != nil {
+				return cwdErr
+			}
+			state, err = session.FindByWorktreePath(cwd)
+		}
+		if err != nil {
+			return err
+		}
+
+		state.Description = strings.Join(args, " ")
+		return session.Write(*state)
 	},
 }
 
@@ -363,14 +447,14 @@ func init() {
 		false,
 		"show detailed output (YAML diagnostics on passing test points)",
 	)
-	attachCmd.Flags().BoolVar(
-		&attachMergeOnClose,
+	startCmd.Flags().BoolVar(
+		&startMergeOnClose,
 		"merge-on-close",
 		false,
 		"auto-merge worktree into default branch on session close",
 	)
-	attachCmd.Flags().BoolVar(
-		&attachNoAttach,
+	startCmd.Flags().BoolVar(
+		&startNoAttach,
 		"no-attach",
 		false,
 		"create worktree but skip attaching (show command that would run)",
@@ -388,7 +472,15 @@ func init() {
 		false,
 		"interactively discard changes in dirty merged worktrees",
 	)
-	rootCmd.AddCommand(attachCmd)
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(resumeCmd)
+	updateDescriptionCmd.Flags().StringVar(
+		&updateDescriptionID,
+		"id",
+		"",
+		"worktree ID to update (auto-detects from cwd if omitted)",
+	)
+	rootCmd.AddCommand(updateDescriptionCmd)
 	rootCmd.AddCommand(mergeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)

@@ -109,6 +109,83 @@ func TestListAllEmpty(t *testing.T) {
 	}
 }
 
+func TestFindByWorktreePath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	s := State{
+		PID:          12345,
+		SessionState: StateActive,
+		RepoPath:     "/home/user/repos/bob",
+		WorktreePath: "/home/user/repos/bob/.worktrees/plain-spruce",
+		Branch:       "plain-spruce",
+		SessionKey:   "bob/plain-spruce",
+		Entrypoint:   []string{"/bin/sh"},
+		StartedAt:    time.Now().UTC(),
+	}
+	if err := Write(s); err != nil {
+		t.Fatal(err)
+	}
+
+	// Exact match
+	found, err := FindByWorktreePath(s.WorktreePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.SessionKey != s.SessionKey {
+		t.Errorf("SessionKey = %s, want %s", found.SessionKey, s.SessionKey)
+	}
+
+	// Subdirectory match
+	found, err = FindByWorktreePath(s.WorktreePath + "/src/main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.SessionKey != s.SessionKey {
+		t.Errorf("subdirectory: SessionKey = %s, want %s", found.SessionKey, s.SessionKey)
+	}
+
+	// No match
+	_, err = FindByWorktreePath("/completely/different/path")
+	if err == nil {
+		t.Error("expected error for non-matching path")
+	}
+}
+
+func TestFindByID(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	s := State{
+		PID:          12345,
+		SessionState: StateActive,
+		RepoPath:     "/home/user/repos/bob",
+		WorktreePath: "/home/user/repos/bob/.worktrees/plain-spruce",
+		Branch:       "different-branch",
+		SessionKey:   "bob/different-branch",
+		Entrypoint:   []string{"/bin/sh"},
+		StartedAt:    time.Now().UTC(),
+	}
+	if err := Write(s); err != nil {
+		t.Fatal(err)
+	}
+
+	// Match by worktree directory name, not branch
+	found, err := FindByID("plain-spruce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.WorktreePath != s.WorktreePath {
+		t.Errorf("WorktreePath = %s, want %s", found.WorktreePath, s.WorktreePath)
+	}
+
+	// No match
+	_, err = FindByID("nonexistent")
+	if err == nil {
+		t.Error("expected error for non-matching ID")
+	}
+}
+
 func TestListAllWithEntries(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", dir)

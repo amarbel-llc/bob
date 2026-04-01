@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -95,6 +96,40 @@ func (s *State) ResolveState() string {
 		return StateInactive
 	}
 	return s.SessionState
+}
+
+// FindByWorktreePath scans all session state files and returns the one
+// whose WorktreePath is a prefix of path. Returns an error if no match.
+func FindByWorktreePath(path string) (*State, error) {
+	states, err := ListAll()
+	if err != nil {
+		return nil, err
+	}
+	for i := range states {
+		s := &states[i]
+		if strings.HasPrefix(path, s.WorktreePath) {
+			return s, nil
+		}
+	}
+	return nil, fmt.Errorf("no session found for path %s", path)
+}
+
+// FindByID scans all session state files and returns the one whose
+// WorktreePath ends in /.worktrees/<id>. The id is the worktree directory
+// name, which may differ from the git branch.
+func FindByID(id string) (*State, error) {
+	suffix := "/.worktrees/" + id
+	states, err := ListAll()
+	if err != nil {
+		return nil, err
+	}
+	for i := range states {
+		s := &states[i]
+		if strings.HasSuffix(s.WorktreePath, suffix) {
+			return s, nil
+		}
+	}
+	return nil, fmt.Errorf("no session found for worktree ID %q", id)
 }
 
 func ListAll() ([]State, error) {

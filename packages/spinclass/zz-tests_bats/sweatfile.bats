@@ -17,7 +17,7 @@ allow = ["Bash(git *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_settings
+  run_sc start --no-attach test_settings
   assert_success
 
   # Extract the worktree path from TAP output (ok N - create <branch> <path>)
@@ -48,7 +48,7 @@ allow = ["Bash(nix *)"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_hierarchy
+  run_sc start --no-attach test_hierarchy
   assert_success
 
   # Extract the worktree path from TAP output
@@ -72,7 +72,7 @@ EOF
   git -C "$TEST_REPO" commit -m "add flake.nix"
 
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_envrc_flake
+  run_sc start --no-attach test_envrc_flake
   assert_success
 
   # Extract the worktree path from TAP output
@@ -87,7 +87,7 @@ EOF
 
 function apply_skips_use_flake_without_flake_nix { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach test_envrc_no_flake
+  run_sc start --no-attach test_envrc_no_flake
   assert_success
 
   # Extract the worktree path from TAP output
@@ -109,7 +109,7 @@ start = ["echo", "$SPINCLASS_SESSION_ID", "$SPINCLASS_BRANCH"]
 EOF
 
   cd "$TEST_REPO"
-  run_sc attach --no-attach env_expand_test
+  run_sc start --no-attach env_expand_test
   assert_success
 
   # The TAP output should show expanded env vars (repo/<random-branch>), not literals

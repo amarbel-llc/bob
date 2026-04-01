@@ -8,9 +8,9 @@ setup() {
   create_repo
 }
 
-function spinclass_attach_creates_worktree { # @test
+function spinclass_start_creates_worktree { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach
+  run_sc start --no-attach
   assert_success
 
   local wt_path
@@ -25,9 +25,9 @@ function spinclass_attach_creates_worktree { # @test
   assert_success
 }
 
-function spinclass_attach_auto_name { # @test
+function spinclass_start_auto_name { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach
+  run_sc start --no-attach
 
   assert_success
   # Should have created a worktree dir — at least one entry in .worktrees/
@@ -36,9 +36,9 @@ function spinclass_attach_auto_name { # @test
   assert [ -n "$output" ]
 }
 
-function spinclass_attach_no_attach_skips_session { # @test
+function spinclass_start_no_attach_skips_session { # @test
   cd "$TEST_REPO"
-  run_sc attach --no-attach
+  run_sc start --no-attach
   assert_success
 
   local wt_path
@@ -53,21 +53,21 @@ function spinclass_attach_no_attach_skips_session { # @test
   fi
 }
 
-function spinclass_attach_idempotent { # @test
+function spinclass_start_idempotent { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
 
-  # First attach — capture the worktree path
+  # First start — capture the worktree path
   local first_output
-  first_output=$("$bin" --format tap attach --no-attach 2>&1)
+  first_output=$("$bin" --format tap start --no-attach 2>&1)
   local wt_path
   wt_path=$(extract_wt_path "$first_output")
   local branch
   branch=$(basename "$wt_path")
 
-  # Second attach to same worktree (by cd'ing into it) should succeed with SKIP
+  # Second start to same worktree (by cd'ing into it) should succeed with SKIP
   cd "$wt_path"
-  run_sc attach --no-attach
+  run_sc start --no-attach
   assert_success
   assert_output --partial "SKIP"
 }
@@ -77,8 +77,8 @@ function spinclass_list_shows_sessions { # @test
   local bin="${SPINCLASS_BIN:-spinclass}"
 
   # Create some worktrees
-  "$bin" --format tap attach --no-attach
-  "$bin" --format tap attach --no-attach
+  "$bin" --format tap start --no-attach
+  "$bin" --format tap start --no-attach
 
   # list without active sessions should produce empty output (no-attach doesn't write state)
   run_sc list
@@ -89,7 +89,7 @@ function spinclass_merge_fast_forwards { # @test
   cd "$TEST_REPO"
   local bin="${SPINCLASS_BIN:-spinclass}"
   local attach_output
-  attach_output=$("$bin" --format tap attach --no-attach 2>&1)
+  attach_output=$("$bin" --format tap start --no-attach 2>&1)
 
   local wt
   wt=$(extract_wt_path "$attach_output")
@@ -121,7 +121,7 @@ function spinclass_clean_removes_merged { # @test
   local bin="${SPINCLASS_BIN:-spinclass}"
 
   local attach1_output
-  attach1_output=$("$bin" --format tap attach --no-attach 2>&1)
+  attach1_output=$("$bin" --format tap start --no-attach 2>&1)
   local wt1
   wt1=$(extract_wt_path "$attach1_output")
   local branch1
@@ -135,7 +135,7 @@ function spinclass_clean_removes_merged { # @test
 
   # Create another worktree that IS merged (no extra commits)
   local attach2_output
-  attach2_output=$("$bin" --format tap attach --no-attach 2>&1)
+  attach2_output=$("$bin" --format tap start --no-attach 2>&1)
   local wt2
   wt2=$(extract_wt_path "$attach2_output")
 
