@@ -21,6 +21,7 @@ func RegisterAll() (*command.App, *resourceProvider) {
 	registerTagCommands(app)
 	registerStashCommands(app)
 	registerMergeCommands(app)
+	registerWorktreeCommands(app)
 
 	resProvider, err := NewResourceProvider()
 	if err != nil {

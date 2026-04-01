@@ -23,6 +23,7 @@ var resourceMappings = []resourceMapping{
 	{"git show", "grit://commits/{ref}", "commit detail"},
 	{"git blame", "grit://blame/{path}", "line authorship"},
 	{"git stash list", "grit://stashes", "stash listing"},
+	{"git worktree list", "grit://worktrees", "worktree listing"},
 }
 
 type hookInput struct {
@@ -74,7 +75,7 @@ func HandleResourceHook(input []byte, w io.Writer) (bool, error) {
 }
 
 func writeDenyAllGit(w io.Writer) error {
-	reason := "DENIED: ALL git CLI commands are blocked — this applies to EVERY git command, not just this one. Do not attempt any other git commands via Bash.\n\nUse grit's MCP tools and resources instead:\n- Mutations: commit, try_commit, checkout, add, reset, push, pull, fetch, rebase, interactive_rebase_plan, interactive_rebase_execute, branch_create, hard_reset, diff, tag_verify, stash_save, stash_apply, stash_drop, merge\n- Read-only resources: grit://status, grit://branches, grit://remotes, grit://tags, grit://stashes, grit://worktrees, grit://log, grit://commits/{ref}, grit://blame/{path}\n\nSubagents: use mcp__plugin_grit_grit__<tool_name> for mutations, or mcp__plugin_grit_grit__resource-read for read-only data."
+	reason := "DENIED: ALL git CLI commands are blocked — this applies to EVERY git command, not just this one. Do not attempt any other git commands via Bash.\n\nUse grit's MCP tools and resources instead:\n- Mutations: commit, try_commit, checkout, add, reset, push, pull, fetch, rebase, interactive_rebase_plan, interactive_rebase_execute, branch_create, hard_reset, diff, tag_verify, stash_save, stash_apply, stash_drop, merge, worktree_list, worktree_remove\n- Read-only resources: grit://status, grit://branches, grit://remotes, grit://tags, grit://stashes, grit://worktrees, grit://log, grit://commits/{ref}, grit://blame/{path}\n\nSubagents: use mcp__plugin_grit_grit__<tool_name> for mutations, or mcp__plugin_grit_grit__resource-read for read-only data."
 
 	output := map[string]any{
 		"hookSpecificOutput": map[string]any{
