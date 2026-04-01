@@ -259,3 +259,219 @@ func TestWebFetchHookEmptyURL(t *testing.T) {
 		t.Fatal("expected hook to not handle empty URL")
 	}
 }
+
+func TestWebFetchHookRawGitHubURLMappings(t *testing.T) {
+	tests := []struct {
+		url         string
+		resourceURI string
+	}{
+		{
+			"https://raw.githubusercontent.com/owner/repo/main/README.md",
+			"get-hubbed://contents?path=README.md&repo=owner/repo&ref=main",
+		},
+		{
+			"https://raw.githubusercontent.com/owner/repo/v1.0.0/src/lib/foo.go",
+			"get-hubbed://contents?path=src/lib/foo.go&repo=owner/repo&ref=v1.0.0",
+		},
+		{
+			"https://raw.githubusercontent.com/owner/repo/abc1234/file.txt",
+			"get-hubbed://contents?path=file.txt&repo=owner/repo&ref=abc1234",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			input := makeHookInput("WebFetch", map[string]any{
+				"url":    tt.url,
+				"prompt": "fetch",
+			})
+			var out bytes.Buffer
+			handled, err := HandleWebFetchHook(input, &out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !handled {
+				t.Fatalf("expected hook to handle %q", tt.url)
+			}
+			if !strings.Contains(out.String(), tt.resourceURI) {
+				t.Errorf("expected %s in output, got %q", tt.resourceURI, out.String())
+			}
+		})
+	}
+}
+
+func TestWebFetchHookRawGitHubURLTooFewSegments(t *testing.T) {
+	input := makeHookInput("WebFetch", map[string]any{
+		"url":    "https://raw.githubusercontent.com/owner/repo/main",
+		"prompt": "fetch",
+	})
+	var out bytes.Buffer
+	handled, err := HandleWebFetchHook(input, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected hook to handle raw.githubusercontent.com URL")
+	}
+	if !strings.Contains(out.String(), "GitHub URLs are served by get-hubbed") {
+		t.Errorf("expected catch-all message for too-few segments, got %q", out.String())
+	}
+}
+
+func TestWebFetchHookAPIGitHubURLMappings(t *testing.T) {
+	tests := []struct {
+		url         string
+		resourceURI string
+	}{
+		{
+			"https://api.github.com/repos/owner/repo",
+			"get-hubbed://repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/issues",
+			"get-hubbed://issues?repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/issues/42",
+			"get-hubbed://issues?number=42&repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/pulls",
+			"get-hubbed://pulls?repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/pulls/7",
+			"get-hubbed://pulls?number=7&repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/contents/src/foo.go",
+			"get-hubbed://contents?path=src/foo.go&repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/git/trees/main",
+			"get-hubbed://tree?repo=owner/repo&ref=main",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/actions/runs",
+			"get-hubbed://runs?repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/actions/runs/12345",
+			"get-hubbed://runs?run_id=12345&repo=owner/repo",
+		},
+		{
+			"https://api.github.com/repos/owner/repo/compare/main...feature",
+			"get-hubbed://compare?repo=owner/repo&base=main&head=feature",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			input := makeHookInput("WebFetch", map[string]any{
+				"url":    tt.url,
+				"prompt": "fetch",
+			})
+			var out bytes.Buffer
+			handled, err := HandleWebFetchHook(input, &out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !handled {
+				t.Fatalf("expected hook to handle %q", tt.url)
+			}
+			if !strings.Contains(out.String(), tt.resourceURI) {
+				t.Errorf("expected %s in output, got %q", tt.resourceURI, out.String())
+			}
+		})
+	}
+}
+
+func TestWebFetchHookAPIGitHubURLCatchAll(t *testing.T) {
+	input := makeHookInput("WebFetch", map[string]any{
+		"url":    "https://api.github.com/repos/owner/repo/stargazers",
+		"prompt": "fetch",
+	})
+	var out bytes.Buffer
+	handled, err := HandleWebFetchHook(input, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected hook to handle api.github.com URL")
+	}
+	if !strings.Contains(out.String(), "GitHub URLs are served by get-hubbed") {
+		t.Errorf("expected catch-all message, got %q", out.String())
+	}
+}
+
+func TestWebFetchHookAPIGitHubURLNonRepos(t *testing.T) {
+	input := makeHookInput("WebFetch", map[string]any{
+		"url":    "https://api.github.com/users/owner",
+		"prompt": "fetch",
+	})
+	var out bytes.Buffer
+	handled, err := HandleWebFetchHook(input, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected hook to handle api.github.com URL")
+	}
+	if !strings.Contains(out.String(), "GitHub URLs are served by get-hubbed") {
+		t.Errorf("expected catch-all message, got %q", out.String())
+	}
+}
+
+func TestWebFetchHookGistURLMappings(t *testing.T) {
+	tests := []struct {
+		url         string
+		resourceURI string
+	}{
+		{
+			"https://gist.github.com/owner/abc123",
+			"get-hubbed://gist?id=abc123",
+		},
+		{
+			"https://gist.github.com/owner/deadbeef1234567890",
+			"get-hubbed://gist?id=deadbeef1234567890",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			input := makeHookInput("WebFetch", map[string]any{
+				"url":    tt.url,
+				"prompt": "fetch",
+			})
+			var out bytes.Buffer
+			handled, err := HandleWebFetchHook(input, &out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !handled {
+				t.Fatalf("expected hook to handle %q", tt.url)
+			}
+			if !strings.Contains(out.String(), tt.resourceURI) {
+				t.Errorf("expected %s in output, got %q", tt.resourceURI, out.String())
+			}
+		})
+	}
+}
+
+func TestWebFetchHookGistURLTooFewSegments(t *testing.T) {
+	input := makeHookInput("WebFetch", map[string]any{
+		"url":    "https://gist.github.com/owner",
+		"prompt": "fetch",
+	})
+	var out bytes.Buffer
+	handled, err := HandleWebFetchHook(input, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected hook to handle gist.github.com URL")
+	}
+	if !strings.Contains(out.String(), "GitHub URLs are served by get-hubbed") {
+		t.Errorf("expected catch-all message, got %q", out.String())
+	}
+}

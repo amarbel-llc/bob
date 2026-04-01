@@ -182,19 +182,106 @@ func HandleWebFetchHook(input []byte, w io.Writer) (bool, error) {
 // matchAPIGitHubURL matches api.github.com REST API paths to get-hubbed
 // resource URIs. Returns ("", false) if no match.
 func matchAPIGitHubURL(parsed *url.URL) (string, bool) {
+	path := strings.TrimSuffix(parsed.Path, "/")
+	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+
+	// API paths start with /repos/{owner}/{repo}/...
+	if len(segments) < 3 || segments[0] != "repos" || segments[1] == "" {
+		return "", false
+	}
+
+	owner := segments[1]
+	repo := segments[2]
+	repoSlug := owner + "/" + repo
+
+	// Exact: /repos/{owner}/{repo}
+	if len(segments) == 3 {
+		return "get-hubbed://repo", false
+	}
+
+	section := segments[3]
+	switch section {
+	case "issues":
+		if len(segments) == 4 {
+			return fmt.Sprintf("get-hubbed://issues?repo=%s", repoSlug), false
+		}
+		if len(segments) == 5 {
+			return fmt.Sprintf("get-hubbed://issues?number=%s&repo=%s", segments[4], repoSlug), false
+		}
+
+	case "pulls":
+		if len(segments) == 4 {
+			return fmt.Sprintf("get-hubbed://pulls?repo=%s", repoSlug), false
+		}
+		if len(segments) == 5 {
+			return fmt.Sprintf("get-hubbed://pulls?number=%s&repo=%s", segments[4], repoSlug), false
+		}
+
+	case "contents":
+		if len(segments) >= 5 {
+			filePath := strings.Join(segments[4:], "/")
+			return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s", filePath, repoSlug), false
+		}
+
+	case "git":
+		if len(segments) >= 6 && segments[4] == "trees" {
+			ref := segments[5]
+			return fmt.Sprintf("get-hubbed://tree?repo=%s&ref=%s", repoSlug, ref), false
+		}
+
+	case "actions":
+		if len(segments) == 5 && segments[4] == "runs" {
+			return fmt.Sprintf("get-hubbed://runs?repo=%s", repoSlug), false
+		}
+		if len(segments) == 6 && segments[4] == "runs" {
+			return fmt.Sprintf("get-hubbed://runs?run_id=%s&repo=%s", segments[5], repoSlug), false
+		}
+
+	case "compare":
+		if len(segments) >= 5 {
+			spec := segments[4]
+			if parts := strings.SplitN(spec, "...", 2); len(parts) == 2 {
+				return fmt.Sprintf("get-hubbed://compare?repo=%s&base=%s&head=%s", repoSlug, parts[0], parts[1]), false
+			}
+			return fmt.Sprintf("get-hubbed://compare?repo=%s", repoSlug), false
+		}
+	}
+
 	return "", false
 }
 
 // matchRawGitHubURL matches raw.githubusercontent.com paths to get-hubbed
 // resource URIs. Returns ("", false) if no match.
 func matchRawGitHubURL(parsed *url.URL) (string, bool) {
-	return "", false
+	path := strings.TrimSuffix(parsed.Path, "/")
+	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+
+	// Need at least /{owner}/{repo}/{ref}/{path...}
+	if len(segments) < 4 || segments[0] == "" {
+		return "", false
+	}
+
+	owner := segments[0]
+	repo := segments[1]
+	ref := segments[2]
+	filePath := strings.Join(segments[3:], "/")
+
+	return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s/%s&ref=%s", filePath, owner, repo, ref), false
 }
 
 // matchGistGitHubURL matches gist.github.com paths to get-hubbed
 // resource URIs. Returns ("", false) if no match.
 func matchGistGitHubURL(parsed *url.URL) (string, bool) {
-	return "", false
+	path := strings.TrimSuffix(parsed.Path, "/")
+	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+
+	// Need at least /{owner}/{gist_id}
+	if len(segments) < 2 || segments[0] == "" {
+		return "", false
+	}
+
+	gistID := segments[1]
+	return fmt.Sprintf("get-hubbed://gist?id=%s", gistID), false
 }
 
 func writeResourceDeny(w io.Writer, resourceURI string) error {
