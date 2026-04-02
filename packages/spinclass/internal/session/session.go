@@ -132,6 +132,23 @@ func FindByID(id string) (*State, error) {
 	return nil, fmt.Errorf("no session found for worktree ID %q", id)
 }
 
+// ListForRepo returns sessions whose RepoPath matches and whose resolved
+// state is not abandoned.
+func ListForRepo(repoPath string) ([]State, error) {
+	all, err := ListAll()
+	if err != nil {
+		return nil, err
+	}
+	var filtered []State
+	for i := range all {
+		s := &all[i]
+		if s.RepoPath == repoPath && s.ResolveState() != StateAbandoned {
+			filtered = append(filtered, *s)
+		}
+	}
+	return filtered, nil
+}
+
 func ListAll() ([]State, error) {
 	dir := stateDir()
 	entries, err := os.ReadDir(dir)

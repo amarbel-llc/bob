@@ -84,5 +84,43 @@ function spinclass_resume_no_session_fails { # @test
   cd "$wt_path"
   run_sc_session resume
   assert_failure
-  assert_output --partial "no session found"
+  assert_output --partial "no session"
+}
+
+function spinclass_resume_from_main_repo_by_id { # @test
+  cd "$TEST_REPO"
+  local bin="${SPINCLASS_BIN:-spinclass}"
+
+  # Start a session — writes state and exits
+  local start_output
+  start_output=$(timeout --preserve-status 10s "$bin" --format tap start 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$start_output")
+  local wt_id
+  wt_id=$(basename "$wt_path")
+
+  # Resume by ID from main repo (not inside worktree) should succeed
+  cd "$TEST_REPO"
+  run_sc_session resume "$wt_id"
+  assert_success
+}
+
+function spinclass_resume_from_main_repo_no_args_lists_ids { # @test
+  cd "$TEST_REPO"
+  local bin="${SPINCLASS_BIN:-spinclass}"
+
+  # Start a session — writes state and exits
+  local start_output
+  start_output=$(timeout --preserve-status 10s "$bin" --format tap start 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$start_output")
+  local wt_id
+  wt_id=$(basename "$wt_path")
+
+  # Resume with no args from main repo (non-TTY) should fail but list IDs
+  cd "$TEST_REPO"
+  run_sc_session resume
+  assert_failure
+  assert_output --partial "available sessions"
+  assert_output --partial "$wt_id"
 }

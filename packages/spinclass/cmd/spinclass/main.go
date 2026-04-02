@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/huh"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
@@ -31,12 +33,12 @@ import (
 )
 
 var (
-	outputFormat       string
-	verbose            bool
+	outputFormat      string
+	verbose           bool
 	startMergeOnClose bool
 	startNoAttach     bool
 	startPR           string
-	mergeGitSync       bool
+	mergeGitSync      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -157,6 +159,13 @@ var resumeCmd = &cobra.Command{
 				return cwdErr
 			}
 			state, err = session.FindByWorktreePath(cwd)
+			if err != nil {
+				repoPath, repoErr := worktree.DetectRepo(cwd)
+				if repoErr != nil {
+					return err
+				}
+				state, err = chooseSession(repoPath)
+			}
 		}
 		if err != nil {
 			return err
@@ -200,6 +209,46 @@ var resumeCmd = &cobra.Command{
 			verbose,
 		)
 	},
+}
+
+func chooseSession(repoPath string) (*session.State, error) {
+	sessions, err := session.ListForRepo(repoPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(sessions) == 0 {
+		return nil, fmt.Errorf("no sessions found for %s", filepath.Base(repoPath))
+	}
+
+	interactive := isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+	if !interactive {
+		var ids []string
+		for _, s := range sessions {
+			ids = append(ids, filepath.Base(s.WorktreePath))
+		}
+		return nil, fmt.Errorf("no session found for current directory; available sessions: %s\nUse: spinclass resume <id>", strings.Join(ids, ", "))
+	}
+
+	options := make([]huh.Option[int], len(sessions))
+	for i, s := range sessions {
+		label := fmt.Sprintf("%s [%s]", s.Branch, s.ResolveState())
+		if s.Description != "" {
+			label = fmt.Sprintf("%s — %s [%s]", s.Branch, s.Description, s.ResolveState())
+		}
+		options[i] = huh.NewOption(label, i)
+	}
+
+	var selected int
+	err = huh.NewSelect[int]().
+		Title("Select session to resume").
+		Options(options...).
+		Value(&selected).
+		Run()
+	if err != nil {
+		return nil, fmt.Errorf("session selection cancelled")
+	}
+
+	return &sessions[selected], nil
 }
 
 var mergeCmd = &cobra.Command{
