@@ -93,3 +93,25 @@ assert_session_state() {
   count="$(find "$state_dir" -name '*-state.json' | wc -l)"
   assert [ "$count" -gt 0 ]
 }
+
+# Write a global sweatfile with fast-exiting entrypoints for session tests.
+# Both start and resume use "true" so the session writes state and exits
+# immediately.
+create_session_sweatfile() {
+  local sweatfile_dir="$HOME/.config/spinclass"
+  mkdir -p "$sweatfile_dir"
+  cat >"$sweatfile_dir/sweatfile" <<'EOF'
+[session-entry]
+start = ["true"]
+resume = ["true"]
+EOF
+}
+
+# Run spinclass with a longer timeout for session attach tests.
+# The subprocess spawn + closeShop workflow needs more headroom than
+# the 5s used by run_sc.
+# Usage: run_sc_session <subcommand> [args...]
+run_sc_session() {
+  local bin="${SPINCLASS_BIN:-spinclass}"
+  run timeout --preserve-status 10s "$bin" --format tap "$@"
+}
