@@ -74,6 +74,7 @@ func defaultConfigFiles(configDir, filetypeDir string) map[string]string {
 		filepath.Join(filetypeDir, "lua.toml"):        defaultFiletypeLua,
 		filepath.Join(filetypeDir, "nix.toml"):        defaultFiletypeNix,
 		filepath.Join(filetypeDir, "shell.toml"):      defaultFiletypeShell,
+		filepath.Join(filetypeDir, "toml.toml"):       defaultFiletypeToml,
 	}
 }
 
@@ -141,6 +142,13 @@ flake = "nixpkgs#nixfmt-rfc-style"
 [[formatter]]
 name = "rustfmt"
 flake = "nixpkgs#rustfmt"
+mode = "stdin"
+
+[[formatter]]
+name = "tommy"
+flake = "github:amarbel-llc/tommy"
+args = ["fmt", "-"]
+mode = "stdin"
 
 [[formatter]]
 name = "stylua"
@@ -150,6 +158,7 @@ flake = "nixpkgs#stylua"
 name = "shfmt"
 flake = "nixpkgs#shfmt"
 args = ["-s", "-i=2"]
+mode = "stdin"
 `
 
 const defaultFiletypeGo = `extensions = ["go"]
@@ -203,4 +212,8 @@ const defaultFiletypeShell = `extensions = ["sh", "bash"]
 language_ids = ["shellscript"]
 lsp = "bash-language-server"
 formatters = ["shfmt"]
+`
+
+const defaultFiletypeToml = `extensions = ["toml"]
+formatters = ["tommy"]
 `
