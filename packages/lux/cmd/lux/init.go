@@ -75,6 +75,15 @@ func defaultConfigFiles(configDir, filetypeDir string) map[string]string {
 		filepath.Join(filetypeDir, "nix.toml"):        defaultFiletypeNix,
 		filepath.Join(filetypeDir, "shell.toml"):      defaultFiletypeShell,
 		filepath.Join(filetypeDir, "toml.toml"):       defaultFiletypeToml,
+		filepath.Join(filetypeDir, "yaml.toml"):       defaultFiletypeYaml,
+		filepath.Join(filetypeDir, "css.toml"):        defaultFiletypeCss,
+		filepath.Join(filetypeDir, "html.toml"):       defaultFiletypeHtml,
+		filepath.Join(filetypeDir, "json.toml"):       defaultFiletypeJson,
+		filepath.Join(filetypeDir, "zig.toml"):        defaultFiletypeZig,
+		filepath.Join(filetypeDir, "c.toml"):          defaultFiletypeC,
+		filepath.Join(filetypeDir, "java.toml"):       defaultFiletypeJava,
+		filepath.Join(filetypeDir, "swift.toml"):      defaultFiletypeSwift,
+		filepath.Join(filetypeDir, "bats.toml"):       defaultFiletypeBats,
 	}
 }
 
@@ -130,14 +139,19 @@ flake = "nixpkgs#black"
 [[formatter]]
 name = "prettierd"
 flake = "nixpkgs#prettierd"
+args = ["--stdin-filepath", "{file}"]
+mode = "stdin"
 
 [[formatter]]
 name = "prettier"
 flake = "nixpkgs#nodePackages.prettier"
+args = ["--stdin-filepath", "{file}"]
+mode = "stdin"
 
 [[formatter]]
 name = "nixfmt"
 flake = "nixpkgs#nixfmt-rfc-style"
+mode = "stdin"
 
 [[formatter]]
 name = "rustfmt"
@@ -153,6 +167,38 @@ mode = "stdin"
 [[formatter]]
 name = "stylua"
 flake = "nixpkgs#stylua"
+args = ["-"]
+mode = "stdin"
+
+[[formatter]]
+name = "zig-fmt"
+flake = "nixpkgs#zig"
+binary = "zig"
+args = ["fmt", "--stdin"]
+mode = "stdin"
+
+[[formatter]]
+name = "clang-format"
+flake = "nixpkgs#clang-tools"
+binary = "clang-format"
+mode = "stdin"
+
+[[formatter]]
+name = "google-java-format"
+flake = "nixpkgs#google-java-format"
+args = ["-"]
+mode = "stdin"
+
+[[formatter]]
+name = "swift-format"
+flake = "nixpkgs#swift-format"
+mode = "stdin"
+
+[[formatter]]
+name = "jq"
+flake = "nixpkgs#jq"
+args = ["."]
+mode = "stdin"
 
 [[formatter]]
 name = "shfmt"
@@ -216,4 +262,46 @@ formatters = ["shfmt"]
 
 const defaultFiletypeToml = `extensions = ["toml"]
 formatters = ["tommy"]
+`
+
+const defaultFiletypeYaml = `extensions = ["yaml", "yml"]
+formatters = ["prettier"]
+`
+
+const defaultFiletypeCss = `extensions = ["css", "scss"]
+language_ids = ["css", "scss"]
+formatters = ["prettier"]
+`
+
+const defaultFiletypeHtml = `extensions = ["html", "htm"]
+language_ids = ["html"]
+formatters = ["prettier"]
+`
+
+const defaultFiletypeJson = `extensions = ["json"]
+formatters = ["jq"]
+`
+
+const defaultFiletypeZig = `extensions = ["zig"]
+language_ids = ["zig"]
+formatters = ["zig-fmt"]
+`
+
+const defaultFiletypeC = `extensions = ["c", "h", "cc", "cpp", "hpp", "cxx", "hxx"]
+language_ids = ["c", "cpp"]
+formatters = ["clang-format"]
+`
+
+const defaultFiletypeJava = `extensions = ["java"]
+language_ids = ["java"]
+formatters = ["google-java-format"]
+`
+
+const defaultFiletypeSwift = `extensions = ["swift"]
+language_ids = ["swift"]
+formatters = ["swift-format"]
+`
+
+const defaultFiletypeBats = `extensions = ["bats"]
+formatters = ["shfmt"]
 `
