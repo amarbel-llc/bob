@@ -111,10 +111,12 @@ name = "goimports"
 flake = "nixpkgs#gotools"
 binary = "goimports"
 args = ["-srcdir", "{file}"]
+mode = "stdin"
 
 [[formatter]]
 name = "gofumpt"
 flake = "nixpkgs#gofumpt"
+mode = "stdin"
 
 [[formatter]]
 name = "isort"
