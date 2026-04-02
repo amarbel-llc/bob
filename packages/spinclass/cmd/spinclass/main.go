@@ -38,6 +38,7 @@ var (
 	startMergeOnClose bool
 	startNoAttach     bool
 	startPR           string
+	resumeNoAttach    bool
 	mergeGitSync      bool
 )
 
@@ -204,8 +205,8 @@ var resumeCmd = &cobra.Command{
 			exec,
 			rp,
 			format,
-			false, // mergeOnClose
-			false, // noAttach
+			false,          // mergeOnClose
+			resumeNoAttach, // noAttach
 			verbose,
 		)
 	},
@@ -550,6 +551,12 @@ func init() {
 		"pr",
 		"",
 		"start session from a PR (number or GitHub URL)",
+	)
+	resumeCmd.Flags().BoolVar(
+		&resumeNoAttach,
+		"no-attach",
+		false,
+		"find session but skip attaching (show command that would run)",
 	)
 	mergeCmd.Flags().BoolVar(
 		&mergeGitSync,

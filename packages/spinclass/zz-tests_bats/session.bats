@@ -124,3 +124,21 @@ function spinclass_resume_from_main_repo_no_args_lists_ids { # @test
   assert_output --partial "available sessions"
   assert_output --partial "$wt_id"
 }
+
+function spinclass_resume_no_attach_shows_dry_run { # @test
+  cd "$TEST_REPO"
+  local bin="${SPINCLASS_BIN:-spinclass}"
+
+  # Start a session — writes state and exits
+  local start_output
+  start_output=$(timeout --preserve-status 10s "$bin" --format tap start 2>&1)
+  local wt_path
+  wt_path=$(extract_wt_path "$start_output")
+  local wt_id
+  wt_id=$(basename "$wt_path")
+
+  # Resume with --no-attach should succeed and show SKIP
+  run_sc_session resume --no-attach "$wt_id"
+  assert_success
+  assert_output --partial "SKIP"
+}
