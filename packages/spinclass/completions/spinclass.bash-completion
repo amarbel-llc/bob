@@ -4,7 +4,7 @@ _spinclass_complete() {
   COMPREPLY=()
 
   if [[ "$COMP_CWORD" -eq 1 ]]; then
-    COMPREPLY=($(compgen -W "attach merge clean list pull perms fork validate" -- "$cur"))
+    COMPREPLY=($(compgen -W "start resume attach merge clean list pull perms fork validate" -- "$cur"))
     return
   fi
 
@@ -17,6 +17,24 @@ _spinclass_complete() {
   fi
 
   case "$subcommand" in
+    start)
+      if [[ "$prev" == "--pr" ]]; then
+        while IFS=$'\t' read -r num _desc; do
+          [[ "$num" == "$cur"* ]] && COMPREPLY+=("$num")
+        done < <(spinclass completions --prs 2>/dev/null)
+      elif [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "--merge-on-close --no-attach --pr --format" -- "$cur"))
+      fi
+      ;;
+    resume)
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "--no-attach --format" -- "$cur"))
+      else
+        while IFS=$'\t' read -r path _desc; do
+          [[ "$path" == "$cur"* ]] && COMPREPLY+=("$path")
+        done < <(spinclass completions --sessions 2>/dev/null; spinclass completions 2>/dev/null)
+      fi
+      ;;
     attach|merge)
       if [[ "$cur" == -* ]]; then
         case "$subcommand" in

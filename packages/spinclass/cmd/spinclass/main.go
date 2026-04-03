@@ -365,7 +365,10 @@ var updateDescriptionCmd = &cobra.Command{
 	},
 }
 
-var completionsSessions bool
+var (
+	completionsSessions bool
+	completionsPRs      bool
+)
 
 var completionsCmd = &cobra.Command{
 	Use:    "completions",
@@ -381,6 +384,12 @@ var completionsCmd = &cobra.Command{
 		if completionsSessions {
 			repoPath, _ := worktree.DetectRepo(cwd)
 			completions.Sessions(os.Stdout, repoPath)
+			return nil
+		}
+
+		if completionsPRs {
+			repoPath, _ := worktree.DetectRepo(cwd)
+			completions.PRs(os.Stdout, repoPath)
 			return nil
 		}
 
@@ -588,6 +597,12 @@ func init() {
 		"sessions",
 		false,
 		"list completions from session state directory",
+	)
+	completionsCmd.Flags().BoolVar(
+		&completionsPRs,
+		"prs",
+		false,
+		"list open pull requests for completion",
 	)
 	rootCmd.AddCommand(completionsCmd)
 	pullCmd.Flags().BoolVarP(

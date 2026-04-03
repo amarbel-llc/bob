@@ -3,6 +3,20 @@ complete \
   --command spinclass \
   --no-files \
   --condition __fish_use_subcommand \
+  --arguments "start" \
+  --description "create and start a new worktree session"
+
+complete \
+  --command spinclass \
+  --no-files \
+  --condition __fish_use_subcommand \
+  --arguments "resume" \
+  --description "resume an existing worktree session"
+
+complete \
+  --command spinclass \
+  --no-files \
+  --condition __fish_use_subcommand \
   --arguments "attach" \
   --description "create a worktree and attach"
 
@@ -64,13 +78,45 @@ complete \
   --arguments "tap table" \
   --description "output format"
 
-# Dynamic target completions for attach/merge (sessions + local worktrees)
+# Dynamic target completions for start/resume/attach/merge (sessions + local worktrees)
 complete \
   --command spinclass \
   --no-files \
   --keep-order \
-  --condition "__fish_seen_subcommand_from attach merge" \
+  --condition "__fish_seen_subcommand_from start resume attach merge" \
   --arguments "(spinclass completions --sessions; spinclass completions)"
+
+# start flags
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from start" \
+  --long-option merge-on-close \
+  --description "merge worktree on session close"
+
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from start" \
+  --long-option no-attach \
+  --description "create worktree without attaching"
+
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from start" \
+  --long-option pr \
+  --require-parameter \
+  --arguments "(spinclass completions --prs)" \
+  --description "start session from a PR"
+
+# resume flags
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from resume" \
+  --long-option no-attach \
+  --description "find session without attaching"
 
 # attach flags
 complete \

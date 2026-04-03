@@ -1,14 +1,54 @@
 package completions
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 
+	"github.com/amarbel-llc/spinclass/internal/pr"
 	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
 )
+
+// PRs outputs completion entries for open pull requests using the gh CLI.
+// Each line is tab-separated: <number>\t#<number>: <title>\n
+// When repoPath is empty, no output is produced.
+func PRs(w io.Writer, repoPath string) {
+	if repoPath == "" {
+		return
+	}
+	slug := pr.RemoteRepo(repoPath)
+	if slug == "" {
+		return
+	}
+
+	out, err := exec.Command(
+		"gh", "pr", "list",
+		"--json", "number,title",
+		"--limit", "30",
+		"--repo", slug,
+	).Output()
+	if err != nil {
+		return
+	}
+
+	var prs []struct {
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+	}
+	if err := json.Unmarshal(out, &prs); err != nil {
+		return
+	}
+
+	for _, p := range prs {
+		num := strconv.Itoa(p.Number)
+		fmt.Fprintf(w, "%s\t#%s: %s\n", num, num, p.Title)
+	}
+}
 
 // Sessions outputs completion entries from the session state directory.
 // Each line is tab-separated: <session-key>\t<state>\n

@@ -77,7 +77,7 @@ func resolveWithRunner(identifier, repoPath string, runner commandRunner) (PRInf
 	if owner != "" && repo != "" {
 		args = append(args, "--repo", owner+"/"+repo)
 	} else {
-		args = append(args, "--repo", remoteRepo(repoPath))
+		args = append(args, "--repo", RemoteRepo(repoPath))
 	}
 
 	out, err := runner("gh", args...)
@@ -108,7 +108,8 @@ func Resolve(identifier, repoPath string) (PRInfo, error) {
 	return resolveWithRunner(identifier, repoPath, defaultRunner)
 }
 
-func remoteRepo(repoPath string) string {
+// RemoteRepo derives the GitHub owner/repo slug from the origin remote URL.
+func RemoteRepo(repoPath string) string {
 	cmd := exec.Command("git", "-C", repoPath, "remote", "get-url", "origin")
 	out, err := cmd.Output()
 	if err != nil {
