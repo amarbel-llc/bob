@@ -133,8 +133,17 @@ func WorktreeRemove(repoPath, worktreePath string) error {
 	return err
 }
 
+func WorktreeForceRemove(repoPath, worktreePath string) error {
+	_, err := Run(repoPath, "worktree", "remove", "--force", worktreePath)
+	return err
+}
+
 func BranchDelete(repoPath, branch string) (string, error) {
 	return Run(repoPath, "branch", "-d", branch)
+}
+
+func BranchForceDelete(repoPath, branch string) (string, error) {
+	return Run(repoPath, "branch", "-D", branch)
 }
 
 func BranchExists(repoPath, branch string) bool {

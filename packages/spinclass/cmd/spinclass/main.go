@@ -16,6 +16,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 	"github.com/amarbel-llc/spinclass/internal/clean"
+	spinclose "github.com/amarbel-llc/spinclass/internal/close"
 	"github.com/amarbel-llc/spinclass/internal/completions"
 	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
@@ -40,6 +41,7 @@ var (
 	startPR           string
 	resumeNoAttach    bool
 	mergeGitSync      bool
+	closeForce        bool
 )
 
 var rootCmd = &cobra.Command{
@@ -275,6 +277,26 @@ var mergeCmd = &cobra.Command{
 			mergeGitSync,
 			verbose,
 		)
+	},
+}
+
+var closeCmd = &cobra.Command{
+	Use:   "close [target]",
+	Short: "Close a session without merging",
+	Long:  `Remove a worktree and its branch without merging into main. Prompts for confirmation if the branch has not been pushed upstream. Use --force to skip.`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		format := outputFormat
+		if format == "" {
+			format = "tap"
+		}
+
+		var target string
+		if len(args) == 1 {
+			target = args[0]
+		}
+
+		return spinclose.Run(os.Stdout, target, closeForce, format)
 	},
 }
 
@@ -590,6 +612,14 @@ func init() {
 	)
 	rootCmd.AddCommand(updateDescriptionCmd)
 	rootCmd.AddCommand(mergeCmd)
+	closeCmd.Flags().BoolVarP(
+		&closeForce,
+		"force",
+		"f",
+		false,
+		"skip confirmation for unpushed branches",
+	)
+	rootCmd.AddCommand(closeCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(listCmd)
 	completionsCmd.Flags().BoolVar(

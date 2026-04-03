@@ -31,6 +31,13 @@ complete \
   --command spinclass \
   --no-files \
   --condition __fish_use_subcommand \
+  --arguments "close" \
+  --description "close a session without merging"
+
+complete \
+  --command spinclass \
+  --no-files \
+  --condition __fish_use_subcommand \
   --arguments "clean" \
   --description "remove merged worktrees"
 
@@ -83,7 +90,7 @@ complete \
   --command spinclass \
   --no-files \
   --keep-order \
-  --condition "__fish_seen_subcommand_from start resume attach merge" \
+  --condition "__fish_seen_subcommand_from start resume attach merge close" \
   --arguments "(spinclass completions --sessions; spinclass completions)"
 
 # start flags
@@ -117,6 +124,15 @@ complete \
   --condition "__fish_seen_subcommand_from resume" \
   --long-option no-attach \
   --description "find session without attaching"
+
+# close flags
+complete \
+  --command spinclass \
+  --no-files \
+  --condition "__fish_seen_subcommand_from close" \
+  --short-option f \
+  --long-option force \
+  --description "skip confirmation for unpushed branches"
 
 # attach flags
 complete \
