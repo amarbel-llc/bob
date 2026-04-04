@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -258,60 +259,143 @@ func TestIsWorktreeNoGit(t *testing.T) {
 	}
 }
 
-func TestExcludeWorktreesDir(t *testing.T) {
+func TestApplyGitExcludesFirstWrite(t *testing.T) {
 	root := t.TempDir()
 	repoDir := filepath.Join(root, "myrepo")
-	if err := os.MkdirAll(filepath.Join(repoDir, ".git", "info"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
 
-	// First call should add the entry
-	if err := excludeWorktreesDir(repoDir); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err := applyGitExcludes(repoDir, []string{".worktrees/", ".mcp.json"}); err != nil {
+		t.Fatal(err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(repoDir, ".git", "info", "exclude"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := WorktreesDir + "\n"
-	if string(data) != want {
-		t.Errorf("expected %q, got %q", want, string(data))
-	}
 
-	// Second call should be idempotent
-	if err := excludeWorktreesDir(repoDir); err != nil {
-		t.Fatalf("unexpected error on second call: %v", err)
-	}
-
-	data, err = os.ReadFile(filepath.Join(repoDir, ".git", "info", "exclude"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	want := "# --- spinclass-managed ---\n.worktrees/\n.mcp.json\n# --- spinclass-managed-end ---\n"
 	if string(data) != want {
-		t.Errorf("expected idempotent result %q, got %q", want, string(data))
+		t.Errorf("expected:\n%s\ngot:\n%s", want, string(data))
 	}
 }
 
-func TestExcludeWorktreesDirCreatesInfoDir(t *testing.T) {
+func TestApplyGitExcludesPreservesExistingContent(t *testing.T) {
 	root := t.TempDir()
 	repoDir := filepath.Join(root, "myrepo")
-	// Only create .git, not .git/info
-	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
+	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+	os.WriteFile(excludePath, []byte("# user exclude\n*.swp\n"), 0o644)
+
+	if err := applyGitExcludes(repoDir, []string{".spinclass/"}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := excludeWorktreesDir(repoDir); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if !strings.Contains(got, "# user exclude\n*.swp\n") {
+		t.Errorf("user content not preserved:\n%s", got)
+	}
+	if !strings.Contains(got, "# --- spinclass-managed ---\n.spinclass/\n# --- spinclass-managed-end ---\n") {
+		t.Errorf("fenced block not written:\n%s", got)
+	}
+}
+
+func TestApplyGitExcludesIdempotentReplace(t *testing.T) {
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "myrepo")
+	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
+
+	excludes := []string{".worktrees/", ".mcp.json"}
+
+	// Write twice with the same content
+	if err := applyGitExcludes(repoDir, excludes); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyGitExcludes(repoDir, excludes); err != nil {
+		t.Fatal(err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(repoDir, ".git", "info", "exclude"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := WorktreesDir + "\n"
-	if string(data) != want {
-		t.Errorf("expected %q, got %q", want, string(data))
+
+	// Should have exactly one fenced block
+	got := string(data)
+	if strings.Count(got, "# --- spinclass-managed ---") != 1 {
+		t.Errorf("expected exactly one fenced block:\n%s", got)
+	}
+
+	want := "# --- spinclass-managed ---\n.worktrees/\n.mcp.json\n# --- spinclass-managed-end ---\n"
+	if got != want {
+		t.Errorf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestApplyGitExcludesContentChanges(t *testing.T) {
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "myrepo")
+	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
+	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+	os.WriteFile(excludePath, []byte("*.swp\n"), 0o644)
+
+	// First write
+	if err := applyGitExcludes(repoDir, []string{".old/"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second write with different excludes
+	if err := applyGitExcludes(repoDir, []string{".new/", ".also-new/"}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if strings.Contains(got, ".old/") {
+		t.Errorf("old exclude should be replaced:\n%s", got)
+	}
+	if !strings.Contains(got, ".new/") || !strings.Contains(got, ".also-new/") {
+		t.Errorf("new excludes not present:\n%s", got)
+	}
+	if !strings.Contains(got, "*.swp") {
+		t.Errorf("user content not preserved:\n%s", got)
+	}
+}
+
+func TestApplyGitExcludesWorktreesMigration(t *testing.T) {
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "myrepo")
+	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
+	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+
+	// Simulate old-style bare .worktrees line from excludeWorktreesDir
+	os.WriteFile(excludePath, []byte(".worktrees\n"), 0o644)
+
+	if err := applyGitExcludes(repoDir, []string{".worktrees/", ".mcp.json"}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	// Old bare line is preserved (harmless, redundant)
+	if !strings.Contains(got, ".worktrees\n") {
+		t.Errorf("old bare .worktrees line should be preserved:\n%s", got)
+	}
+	// New fenced block also present
+	if !strings.Contains(got, "# --- spinclass-managed ---") {
+		t.Errorf("fenced block not written:\n%s", got)
 	}
 }
 

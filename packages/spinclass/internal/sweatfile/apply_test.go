@@ -91,20 +91,24 @@ func TestHardcodedDefaultsGitExcludes(t *testing.T) {
 		t.Fatal("expected non-nil git excludes slice")
 	}
 
-	if len(defaults.Git.Excludes) != 2 {
+	if len(defaults.Git.Excludes) != 3 {
 		t.Fatalf(
-			"expected 2 git excludes, got %d: %v",
+			"expected 3 git excludes, got %d: %v",
 			len(defaults.Git.Excludes),
 			defaults.Git.Excludes,
 		)
 	}
 
-	if defaults.Git.Excludes[0] != ".spinclass/" {
-		t.Errorf("expected .spinclass/, got %q", defaults.Git.Excludes[0])
+	if defaults.Git.Excludes[0] != ".worktrees/" {
+		t.Errorf("expected .worktrees/, got %q", defaults.Git.Excludes[0])
 	}
 
-	if defaults.Git.Excludes[1] != ".mcp.json" {
-		t.Errorf("expected .mcp.json, got %q", defaults.Git.Excludes[1])
+	if defaults.Git.Excludes[1] != ".spinclass/" {
+		t.Errorf("expected .spinclass/, got %q", defaults.Git.Excludes[1])
+	}
+
+	if defaults.Git.Excludes[2] != ".mcp.json" {
+		t.Errorf("expected .mcp.json, got %q", defaults.Git.Excludes[2])
 	}
 }
 

@@ -74,6 +74,14 @@ func (sf Sweatfile) DisallowMainWorktreeEnabled() bool {
 		*sf.Hooks.DisallowMainWorktree
 }
 
+// GitExcludes returns the merged git exclude patterns, or nil if none.
+func (sf Sweatfile) GitExcludes() []string {
+	if sf.Git == nil {
+		return nil
+	}
+	return sf.Git.Excludes
+}
+
 func (sf Sweatfile) ToolUseLogEnabled() bool {
 	return sf.Hooks != nil &&
 		sf.Hooks.ToolUseLog != nil &&
@@ -102,7 +110,7 @@ func (sf Sweatfile) SessionResume() []string {
 // sweatfile config.
 func GetDefault() Sweatfile {
 	sf := Sweatfile{
-		Git: &Git{Excludes: []string{".spinclass/", ".mcp.json"}},
+		Git: &Git{Excludes: []string{".worktrees/", ".spinclass/", ".mcp.json"}},
 	}
 
 	if home, err := os.UserHomeDir(); err == nil && home != "" {

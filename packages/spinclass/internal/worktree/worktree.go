@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -202,8 +201,8 @@ func applyWorktreeConfig(
 	issue *prompt.IssueData,
 	pr *prompt.PRData,
 ) error {
-	if err := excludeWorktreesDir(repoPath); err != nil {
-		return fmt.Errorf("excluding %s from git: %w", WorktreesDir, err)
+	if err := applyGitExcludes(repoPath, sweetfile.Merged.GitExcludes()); err != nil {
+		return fmt.Errorf("applying git excludes: %w", err)
 	}
 
 	tmpDir := filepath.Join(worktreePath, ".tmp")
@@ -264,36 +263,57 @@ func applyWorktreeConfig(
 	return nil
 }
 
-// excludeWorktreesDir appends WorktreesDir to .git/info/exclude if not already
-// present.
-func excludeWorktreesDir(repoPath string) error {
-	excludePath := filepath.Join(repoPath, ".git", "info", "exclude")
+const (
+	excludeMarkerStart = "# --- spinclass-managed ---"
+	excludeMarkerEnd   = "# --- spinclass-managed-end ---"
+)
 
-	if data, err := os.ReadFile(excludePath); err == nil {
-		scanner := bufio.NewScanner(strings.NewReader(string(data)))
-		for scanner.Scan() {
-			if strings.TrimSpace(scanner.Text()) == WorktreesDir {
-				return nil
-			}
-		}
-	}
+// applyGitExcludes writes all excludes into a fenced block in
+// .git/info/exclude. The block is replaced on each call, making it
+// idempotent. Lines outside the fenced block are preserved.
+func applyGitExcludes(repoPath string, excludes []string) error {
+	excludePath := filepath.Join(repoPath, ".git", "info", "exclude")
 
 	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(
-		excludePath,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		0o644,
-	)
-	if err != nil {
-		return err
+	var preserved []string
+	if data, err := os.ReadFile(excludePath); err == nil {
+		lines := strings.Split(string(data), "\n")
+		inBlock := false
+		for _, line := range lines {
+			switch {
+			case line == excludeMarkerStart:
+				inBlock = true
+			case line == excludeMarkerEnd:
+				inBlock = false
+			case !inBlock:
+				preserved = append(preserved, line)
+			}
+		}
+		// strings.Split produces an empty final element from a trailing
+		// newline — drop it so we don't accumulate blank lines.
+		if len(preserved) > 0 && preserved[len(preserved)-1] == "" {
+			preserved = preserved[:len(preserved)-1]
+		}
 	}
-	defer f.Close()
 
-	_, err = fmt.Fprintln(f, WorktreesDir)
-	return err
+	var buf strings.Builder
+	for _, line := range preserved {
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+	buf.WriteString(excludeMarkerStart)
+	buf.WriteByte('\n')
+	for _, exc := range excludes {
+		buf.WriteString(exc)
+		buf.WriteByte('\n')
+	}
+	buf.WriteString(excludeMarkerEnd)
+	buf.WriteByte('\n')
+
+	return os.WriteFile(excludePath, []byte(buf.String()), 0o644)
 }
 
 // IsWorktree returns true if path contains a .git file (not directory),
