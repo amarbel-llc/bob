@@ -25,6 +25,7 @@ import (
 	"github.com/amarbel-llc/spinclass/internal/merge"
 	"github.com/amarbel-llc/spinclass/internal/perms"
 	"github.com/amarbel-llc/spinclass/internal/pr"
+	"github.com/amarbel-llc/spinclass/internal/prompt"
 	"github.com/amarbel-llc/spinclass/internal/pull"
 	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/shop"
@@ -104,12 +105,25 @@ var startCmd = &cobra.Command{
 				Description:    description,
 				ExistingBranch: branch,
 			}
+
+			prData, prErr := prompt.FetchPR(startPR, repoPath)
+			if prErr == nil {
+				resolvedPath.PR = &prData
+			}
 		} else {
 			var err error
 			resolvedPath, err = worktree.ResolvePath(repoPath, args)
 			if err != nil {
 				return err
 			}
+		}
+
+		if startIssue != "" {
+			issueData, err := prompt.FetchIssue(startIssue, repoPath)
+			if err != nil {
+				return fmt.Errorf("fetching issue: %w", err)
+			}
+			resolvedPath.Issue = &issueData
 		}
 
 		hierarchy, err := sweatfile.LoadWorktreeHierarchy(
