@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 )
 
@@ -112,29 +113,76 @@ func GetDefault() Sweatfile {
 	return sf
 }
 
+func collectSystemPromptAppend(cwd string) (string, error) {
+	pattern := filepath.Join(cwd, ".spinclass", "system_prompt_append.d", "*.md")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", fmt.Errorf("globbing system_prompt_append.d: %w", err)
+	}
+
+	sort.Strings(matches)
+
+	var parts []string
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("reading %s: %w", filepath.Base(path), err)
+		}
+		if content := strings.TrimSpace(string(data)); content != "" {
+			parts = append(parts, content)
+		}
+	}
+
+	return strings.Join(parts, "\n\n"), nil
+}
+
 func (sweatfile Sweatfile) ExecClaude(
 	args ...string,
 ) error {
-	if sweatfile.Claude != nil {
-		if sweatfile.Claude.SystemPromptAppend != nil {
-			args = append(
-				[]string{
-					"--append-system-prompt",
-					resolvePathOrString(*sweatfile.Claude.SystemPromptAppend),
-				},
-				args...,
-			)
-		}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 
-		if sweatfile.Claude.SystemPrompt != nil {
-			args = append(
-				[]string{
-					"--system-prompt",
-					resolvePathOrString(*sweatfile.Claude.SystemPrompt),
-				},
-				args...,
-			)
+	scDir := filepath.Join(cwd, ".spinclass")
+	if _, err := os.Stat(scDir); os.IsNotExist(err) {
+		return fmt.Errorf(".spinclass directory not found in %s; exec-claude requires a spinclass session", cwd)
+	}
+
+	// Write user sweatfile system-prompt-append into the .d/ directory
+	if sweatfile.Claude != nil && sweatfile.Claude.SystemPromptAppend != nil {
+		userContent := resolvePathOrString(*sweatfile.Claude.SystemPromptAppend)
+		userPath := filepath.Join(scDir, "system_prompt_append.d", "2-user.md")
+		if err := os.MkdirAll(filepath.Dir(userPath), 0o755); err != nil {
+			return fmt.Errorf("creating system_prompt_append.d: %w", err)
 		}
+		if err := os.WriteFile(userPath, []byte(userContent), 0o644); err != nil {
+			return fmt.Errorf("writing user system prompt append: %w", err)
+		}
+	}
+
+	// Collect all system prompt append fragments
+	appendContent, err := collectSystemPromptAppend(cwd)
+	if err != nil {
+		return err
+	}
+
+	if appendContent != "" {
+		args = append(
+			[]string{"--append-system-prompt", appendContent},
+			args...,
+		)
+	}
+
+	// system-prompt (non-append) still works as before
+	if sweatfile.Claude != nil && sweatfile.Claude.SystemPrompt != nil {
+		args = append(
+			[]string{
+				"--system-prompt",
+				resolvePathOrString(*sweatfile.Claude.SystemPrompt),
+			},
+			args...,
+		)
 	}
 
 	pathGitDirCommon, err := getGitDirCommon()
