@@ -39,6 +39,7 @@ var (
 	startMergeOnClose bool
 	startNoAttach     bool
 	startPR           string
+	startIssue        string
 	resumeNoAttach    bool
 	mergeGitSync      bool
 	closeForce        bool
@@ -583,6 +584,13 @@ func init() {
 		"",
 		"start session from a PR (number or GitHub URL)",
 	)
+	startCmd.Flags().StringVar(
+		&startIssue,
+		"issue",
+		"",
+		"start session with GitHub issue context (number)",
+	)
+	startCmd.MarkFlagsMutuallyExclusive("issue", "pr")
 	resumeCmd.Flags().BoolVar(
 		&resumeNoAttach,
 		"no-attach",
