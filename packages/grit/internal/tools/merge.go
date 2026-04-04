@@ -24,7 +24,7 @@ func registerMergeCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "branch", Type: command.String, Description: "Branch to merge"},
+			{Name: "branch", Type: command.String, Description: "Branch to merge", Completer: branchCompleter(true)},
 			{Name: "no_ff", Type: command.Bool, Description: "Create a merge commit even if fast-forward is possible (--no-ff)"},
 			{Name: "squash", Type: command.Bool, Description: "Squash commits before merging (--squash)"},
 			{Name: "abort", Type: command.Bool, Description: "Abort an in-progress merge"},

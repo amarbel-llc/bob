@@ -57,7 +57,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-VH8hmk/O/yQETaaYS04KhUGkmjVIEp41pp9rW/nvKW8=";
+      goVendorHash = "sha256-bHJJwQCFnYX0shpXFl6xBDYCkpQjAILgC1q6xvcwl1c=";
 
       buildDevShellPackages =
         system:

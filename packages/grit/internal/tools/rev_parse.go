@@ -24,7 +24,7 @@ func registerRevParseCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "ref", Type: command.String, Description: "Ref to resolve (e.g. HEAD, main, v1.0, HEAD~3, abc1234)", Required: true},
+			{Name: "ref", Type: command.String, Description: "Ref to resolve (e.g. HEAD, main, v1.0, HEAD~3, abc1234)", Required: true, Completer: refCompleter()},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git rev-parse"}, UseWhen: "resolving a git revision to its full SHA"},

@@ -45,7 +45,7 @@ func registerStashCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "stash_ref", Type: command.String, Description: "Stash reference (e.g. stash@{0}). Defaults to stash@{0}"},
+			{Name: "stash_ref", Type: command.String, Description: "Stash reference (e.g. stash@{0}). Defaults to stash@{0}", Completer: stashCompleter()},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git stash apply", "git stash pop"}, UseWhen: "applying a stash"},
@@ -65,7 +65,7 @@ func registerStashCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "stash_ref", Type: command.String, Description: "Stash reference to drop (e.g. stash@{0})", Required: true},
+			{Name: "stash_ref", Type: command.String, Description: "Stash reference to drop (e.g. stash@{0})", Required: true, Completer: stashCompleter()},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git stash drop", "git stash clear"}, UseWhen: "dropping a stash"},

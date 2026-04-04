@@ -66,9 +66,13 @@ func main() {
 	}
 
 	if flag.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "grit: unexpected arguments: %v\n", flag.Args())
-		flag.Usage()
-		os.Exit(1)
+		// Route CLI subcommands (e.g. __complete) through the command.App
+		ctx := context.Background()
+		if err := app.RunCLI(ctx, flag.Args(), nil); err != nil {
+			fmt.Fprintf(os.Stderr, "grit: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

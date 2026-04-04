@@ -6,7 +6,7 @@ replace github.com/amarbel-llc/bob/packages/tap-dancer/go => ../tap-dancer/go
 
 require (
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.0.0-20260222022802-be680fd2b4ac
-	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.4
+	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.5
 	github.com/amarbel-llc/tommy v0.0.0-20260326195616-1e3aa70b25d0
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0

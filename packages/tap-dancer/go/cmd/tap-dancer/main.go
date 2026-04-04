@@ -13,10 +13,10 @@ import (
 	"os/signal"
 	"strings"
 
+	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 )
 
 func main() {
@@ -96,23 +96,17 @@ func registerCommands() *command.App {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "go-test",
-		Description: command.Description{Short: "Run go test and convert output to TAP-14"},
-		Params: []command.Param{
-			{Name: "verbose", Type: command.Bool, Description: "Pass -v to go test and include output for passing tests", Required: false},
-			{Name: "skip-empty", Type: command.Bool, Description: "Emit SKIP directive instead of not ok for packages with no tests", Required: false},
-		},
-		RunCLI: handleGoTest,
+		Name:            "go-test",
+		Description:     command.Description{Short: "Run go test and convert output to TAP-14"},
+		PassthroughArgs: true,
+		RunCLI:          handleGoTest,
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "cargo-test",
-		Description: command.Description{Short: "Run cargo test and convert output to TAP-14"},
-		Params: []command.Param{
-			{Name: "verbose", Type: command.Bool, Description: "Include output for passing tests", Required: false},
-			{Name: "skip-empty", Type: command.Bool, Description: "Emit SKIP directive instead of not ok for suites with no tests", Required: false},
-		},
-		RunCLI: handleCargoTest,
+		Name:            "cargo-test",
+		Description:     command.Description{Short: "Run cargo test and convert output to TAP-14"},
+		PassthroughArgs: true,
+		RunCLI:          handleCargoTest,
 	})
 
 	app.AddCommand(&command.Command{
@@ -122,59 +116,43 @@ func registerCommands() *command.App {
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "exec",
-		Description: command.Description{Short: "Run a command for each argument sequentially and emit TAP-14"},
-		Params: []command.Param{
-			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
-			{Name: "no-spinner", Type: command.Bool, Description: "Hide the spinner prefix on status lines", Required: false},
-		},
-		RunCLI: handleExec,
+		Name:            "exec",
+		Description:     command.Description{Short: "Run a command for each argument sequentially and emit TAP-14"},
+		PassthroughArgs: true,
+		RunCLI:          handleExec,
 	})
 
 	app.AddCommand(&command.Command{
-		Name:        "exec-parallel",
-		Description: command.Description{Short: "Run commands in parallel and emit TAP-14 test points"},
-		Params: []command.Param{
-			{Name: "verbose", Type: command.Bool, Description: "Include stdout/stderr diagnostics on successful test points", Required: false},
-			{Name: "jobs", Short: 'j', Type: command.Int, Description: "Max parallel jobs (0 = unlimited)", Required: false},
-			{Name: "no-spinner", Type: command.Bool, Description: "Hide the spinner prefix on status lines", Required: false},
-		},
-		RunCLI: handleExecParallel,
+		Name:            "exec-parallel",
+		Description:     command.Description{Short: "Run commands in parallel and emit TAP-14 test points"},
+		PassthroughArgs: true,
+		RunCLI:          handleExecParallel,
 	})
 
 	return app
 }
 
 func handleGoTest(ctx context.Context, args json.RawMessage) error {
-	var params struct {
-		Verbose   bool `json:"verbose"`
-		SkipEmpty bool `json:"skip-empty"`
+	var pt struct {
+		Args []string `json:"args"`
 	}
-	if err := json.Unmarshal(args, &params); err != nil {
+	if err := json.Unmarshal(args, &pt); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	// Build go test command args: everything after "go-test" in os.Args
-	goTestArgs := []string{"test", "-json"}
-	if params.Verbose {
-		goTestArgs = append(goTestArgs, "-v")
+	fs := flag.NewFlagSet("go-test", flag.ContinueOnError)
+	verbose := fs.Bool("v", false, "")
+	fs.BoolVar(verbose, "verbose", false, "")
+	skipEmpty := fs.Bool("skip-empty", false, "")
+	if err := fs.Parse(pt.Args); err != nil {
+		return err
 	}
 
-	// Find remaining args from os.Args after "go-test"
-	for i, arg := range os.Args {
-		if arg == "go-test" {
-			// Skip flags we handle and collect the rest
-			rest := os.Args[i+1:]
-			for _, a := range rest {
-				if a == "-v" || a == "--verbose" ||
-					a == "-skip-empty" || a == "--skip-empty" {
-					continue
-				}
-				goTestArgs = append(goTestArgs, a)
-			}
-			break
-		}
+	goTestArgs := []string{"test", "-json"}
+	if *verbose {
+		goTestArgs = append(goTestArgs, "-v")
 	}
+	goTestArgs = append(goTestArgs, fs.Args()...)
 
 	cmd := exec.CommandContext(ctx, "go", goTestArgs...)
 	cmd.Stderr = os.Stderr
@@ -192,7 +170,7 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 		return err
 	}
 
-	exitCode := tap.ConvertGoTest(stdout, os.Stdout, params.Verbose, params.SkipEmpty, color)
+	exitCode := tap.ConvertGoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
 
 	// Wait for command to finish (ignore error — we use our own exit code)
 	cmd.Wait()
@@ -205,33 +183,26 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 }
 
 func handleCargoTest(ctx context.Context, args json.RawMessage) error {
-	var params struct {
-		Verbose   bool `json:"verbose"`
-		SkipEmpty bool `json:"skip-empty"`
+	var pt struct {
+		Args []string `json:"args"`
 	}
-	if err := json.Unmarshal(args, &params); err != nil {
+	if err := json.Unmarshal(args, &pt); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	cargoArgs := []string{"test"}
-	if params.Verbose {
-		cargoArgs = append(cargoArgs, "-v")
+	fs := flag.NewFlagSet("cargo-test", flag.ContinueOnError)
+	verbose := fs.Bool("v", false, "")
+	fs.BoolVar(verbose, "verbose", false, "")
+	skipEmpty := fs.Bool("skip-empty", false, "")
+	if err := fs.Parse(pt.Args); err != nil {
+		return err
 	}
 
-	// Collect extra args from CLI (after "cargo-test", excluding our flags)
-	for i, arg := range os.Args {
-		if arg == "cargo-test" {
-			rest := os.Args[i+1:]
-			for _, a := range rest {
-				if a == "-v" || a == "--verbose" ||
-					a == "-skip-empty" || a == "--skip-empty" {
-					continue
-				}
-				cargoArgs = append(cargoArgs, a)
-			}
-			break
-		}
+	cargoArgs := []string{"test"}
+	if *verbose {
+		cargoArgs = append(cargoArgs, "-v")
 	}
+	cargoArgs = append(cargoArgs, fs.Args()...)
 
 	cmd := exec.CommandContext(ctx, "cargo", cargoArgs...)
 
@@ -253,7 +224,7 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 		return err
 	}
 
-	exitCode := tap.ConvertCargoTest(stdout, os.Stdout, params.Verbose, params.SkipEmpty, color)
+	exitCode := tap.ConvertCargoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
 
 	cmdErr := cmd.Wait()
 
@@ -404,30 +375,22 @@ func handleReformat(_ context.Context, _ json.RawMessage) error {
 }
 
 func handleExec(ctx context.Context, args json.RawMessage) error {
-	var params struct {
-		Verbose   bool `json:"verbose"`
-		NoSpinner bool `json:"no-spinner"`
+	var pt struct {
+		Args []string `json:"args"`
 	}
-	if err := json.Unmarshal(args, &params); err != nil {
+	if err := json.Unmarshal(args, &pt); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	// Parse CLI args: everything after "exec", excluding our flags.
-	var cliArgs []string
-	for i, arg := range os.Args {
-		if arg == "exec" {
-			rest := os.Args[i+1:]
-			for _, a := range rest {
-				if a == "-v" || a == "--verbose" ||
-					a == "--no-spinner" {
-					continue
-				}
-				cliArgs = append(cliArgs, a)
-			}
-			break
-		}
+	fs := flag.NewFlagSet("exec", flag.ContinueOnError)
+	verbose := fs.Bool("v", false, "")
+	fs.BoolVar(verbose, "verbose", false, "")
+	noSpinner := fs.Bool("no-spinner", false, "")
+	if err := fs.Parse(pt.Args); err != nil {
+		return err
 	}
 
+	cliArgs := fs.Args()
 	if len(cliArgs) == 0 {
 		return fmt.Errorf("missing command\nusage: tap-dancer exec [--verbose] [--no-spinner] <cmd> [<arg1> <arg2> ...]")
 	}
@@ -436,7 +399,7 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, params.Verbose, color, tap.WithSpinner(!params.NoSpinner))
+	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, tap.WithSpinner(!*noSpinner))
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -446,45 +409,24 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 }
 
 func handleExecParallel(ctx context.Context, args json.RawMessage) error {
-	// Use any for Jobs to tolerate the command framework assigning
-	// positional args (strings) to non-Bool params when -j is omitted.
-	var params struct {
-		Verbose   bool `json:"verbose"`
-		Jobs      any  `json:"jobs"`
-		NoSpinner bool `json:"no-spinner"`
+	var pt struct {
+		Args []string `json:"args"`
 	}
-	if err := json.Unmarshal(args, &params); err != nil {
+	if err := json.Unmarshal(args, &pt); err != nil {
 		return fmt.Errorf("invalid arguments: %w", err)
 	}
-	var maxJobs int
-	switch v := params.Jobs.(type) {
-	case float64:
-		maxJobs = int(v)
-	default:
-		maxJobs = 0
+
+	fs := flag.NewFlagSet("exec-parallel", flag.ContinueOnError)
+	verbose := fs.Bool("v", false, "")
+	fs.BoolVar(verbose, "verbose", false, "")
+	maxJobs := fs.Int("j", 0, "")
+	fs.IntVar(maxJobs, "jobs", 0, "")
+	noSpinner := fs.Bool("no-spinner", false, "")
+	if err := fs.Parse(pt.Args); err != nil {
+		return err
 	}
 
-	// Parse CLI args: everything after "exec-parallel", excluding our flags,
-	// split on ":::" into template and args.
-	var cliArgs []string
-	for i, arg := range os.Args {
-		if arg == "exec-parallel" {
-			rest := os.Args[i+1:]
-			for j := 0; j < len(rest); j++ {
-				a := rest[j]
-				if a == "-v" || a == "--verbose" ||
-					a == "--no-spinner" {
-					continue
-				}
-				if (a == "-j" || a == "--jobs") && j+1 < len(rest) {
-					j++ // skip the value; already parsed by command framework
-					continue
-				}
-				cliArgs = append(cliArgs, a)
-			}
-			break
-		}
-	}
+	cliArgs := fs.Args()
 
 	// Find ::: separator
 	sepIdx := -1
@@ -511,14 +453,14 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	executor := &tap.GoroutineExecutor{MaxJobs: maxJobs}
+	executor := &tap.GoroutineExecutor{MaxJobs: *maxJobs}
 
 	var exitCode int
 	if color {
-		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, params.Verbose, color, tap.WithSpinner(!params.NoSpinner))
+		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, tap.WithSpinner(!*noSpinner))
 	} else {
 		results := executor.Run(ctx, template, execArgs)
-		exitCode = tap.ConvertExecParallel(results, os.Stdout, params.Verbose, color)
+		exitCode = tap.ConvertExecParallel(results, os.Stdout, *verbose, color)
 	}
 
 	if exitCode != 0 {

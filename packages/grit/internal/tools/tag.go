@@ -23,7 +23,7 @@ func registerTagCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "name", Type: command.String, Description: "Tag name to verify", Required: true},
+			{Name: "name", Type: command.String, Description: "Tag name to verify", Required: true, Completer: tagCompleter()},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git tag -v", "git verify-tag"}, UseWhen: "verifying tag signatures"},

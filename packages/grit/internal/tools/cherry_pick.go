@@ -24,7 +24,7 @@ func registerCherryPickCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "commits", Type: command.Array, Description: "Commit hashes to cherry-pick (applied in order)", Required: true},
+			{Name: "commits", Type: command.Array, Description: "Commit hashes to cherry-pick (applied in order)", Required: true, Completer: commitCompleter(20)},
 			{Name: "no_commit", Type: command.Bool, Description: "Apply changes without creating commits (--no-commit)"},
 		},
 		MapsTools: []command.ToolMapping{

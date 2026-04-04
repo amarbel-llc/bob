@@ -47,7 +47,7 @@ func registerRemoteCommands(app *command.App) {
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "remote", Type: command.String, Description: "Remote name (default origin)"},
-			{Name: "branch", Type: command.String, Description: "Remote branch to pull"},
+			{Name: "branch", Type: command.String, Description: "Remote branch to pull", Completer: branchCompleter(true)},
 			{Name: "rebase", Type: command.Bool, Description: "Rebase instead of merge"},
 		},
 		MapsTools: []command.ToolMapping{
@@ -69,7 +69,7 @@ func registerRemoteCommands(app *command.App) {
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "remote", Type: command.String, Description: "Remote name (default origin)"},
-			{Name: "branch", Type: command.String, Description: "Branch to push"},
+			{Name: "branch", Type: command.String, Description: "Branch to push", Completer: branchCompleter(false)},
 			{Name: "set_upstream", Type: command.Bool, Description: "Set upstream tracking reference (-u)"},
 			{Name: "force", Type: command.Bool, Description: "Force push (blocked on main/master branches)"},
 		},
@@ -78,7 +78,6 @@ func registerRemoteCommands(app *command.App) {
 		},
 		Run: handleGitPush,
 	})
-
 }
 
 func handleGitFetch(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
@@ -234,4 +233,3 @@ func handleGitPush(ctx context.Context, args json.RawMessage, _ command.Prompter
 		Force:       params.Force,
 	}), nil
 }
-

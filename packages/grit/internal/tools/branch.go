@@ -24,7 +24,7 @@ func registerBranchCommands(app *command.App) {
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
 			{Name: "name", Type: command.String, Description: "Name for the new branch", Required: true},
-			{Name: "start_point", Type: command.String, Description: "Starting point for the new branch (commit, branch, tag)"},
+			{Name: "start_point", Type: command.String, Description: "Starting point for the new branch (commit, branch, tag)", Completer: branchCompleter(true)},
 		},
 		Run: handleGitBranchCreate,
 	})
@@ -41,7 +41,7 @@ func registerBranchCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "name", Type: command.String, Description: "Name of the branch to delete", Required: true},
+			{Name: "name", Type: command.String, Description: "Name of the branch to delete", Required: true, Completer: branchCompleter(false)},
 			{Name: "force", Type: command.Bool, Description: "Force delete even if not fully merged (-D instead of -d)"},
 		},
 		MapsTools: []command.ToolMapping{
@@ -62,7 +62,7 @@ func registerBranchCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "ref", Type: command.String, Description: "Branch name or ref to check out or restore files from (defaults to HEAD when used with paths)"},
+			{Name: "ref", Type: command.String, Description: "Branch name or ref to check out or restore files from (defaults to HEAD when used with paths)", Completer: branchCompleter(true)},
 			{Name: "create", Type: command.Bool, Description: "Create a new branch and check it out (-b)"},
 			{Name: "paths", Type: command.Array, Description: "File paths to restore from ref (e.g. [\"src/main.go\", \"README.md\"]). When provided, restores these files instead of switching branches."},
 			{Name: "ours", Type: command.Bool, Description: "During merge conflict, check out our version of the file(s) (--ours)"},

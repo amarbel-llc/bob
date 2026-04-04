@@ -24,7 +24,7 @@ func registerHardResetCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "ref", Type: command.String, Description: "Target ref (e.g. HEAD, origin/main, HEAD~3, a commit SHA)", Required: true},
+			{Name: "ref", Type: command.String, Description: "Target ref (e.g. HEAD, origin/main, HEAD~3, a commit SHA)", Required: true, Completer: refCompleter()},
 		},
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"git reset --hard"}, UseWhen: "discarding all changes and resetting to a ref"},

@@ -24,7 +24,7 @@ func registerRebaseCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "upstream", Type: command.String, Description: "Ref to rebase onto (branch, tag, commit)"},
+			{Name: "upstream", Type: command.String, Description: "Ref to rebase onto (branch, tag, commit)", Completer: branchCompleter(true)},
 			{Name: "branch", Type: command.String, Description: "Branch to rebase (defaults to current branch)"},
 			{Name: "autostash", Type: command.Bool, Description: "Automatically stash/unstash uncommitted changes"},
 			{Name: "continue", Type: command.Bool, Description: "Continue rebase after resolving conflicts"},
