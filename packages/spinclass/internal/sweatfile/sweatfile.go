@@ -101,7 +101,7 @@ func (sf Sweatfile) SessionResume() []string {
 // sweatfile config.
 func GetDefault() Sweatfile {
 	sf := Sweatfile{
-		Git: &Git{Excludes: []string{".spinclass/"}},
+		Git: &Git{Excludes: []string{".spinclass/", ".mcp.json"}},
 	}
 
 	if home, err := os.UserHomeDir(); err == nil && home != "" {

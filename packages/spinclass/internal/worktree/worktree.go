@@ -212,6 +212,10 @@ func applyWorktreeConfig(
 		return fmt.Errorf("trusting workspace in claude: %w", err)
 	}
 
+	if err := claude.WriteMCPConfig(worktreePath); err != nil {
+		return fmt.Errorf("writing .mcp.json: %w", err)
+	}
+
 	if err := sweetfile.Merged.RunCreateHook(worktreePath); err != nil {
 		git.RunPassthrough(
 			repoPath,
