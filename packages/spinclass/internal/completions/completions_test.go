@@ -226,3 +226,58 @@ func TestLocalFromInsideRepo(t *testing.T) {
 		t.Errorf("expected worktree listing from inside repo, got %q", output)
 	}
 }
+
+func TestLocalShowsSessionInfo(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	repoDir := filepath.Join(dir, "myrepo")
+	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
+	wtDir := filepath.Join(repoDir, worktree.WorktreesDir, "feat-a")
+	os.MkdirAll(wtDir, 0o755)
+	os.WriteFile(filepath.Join(wtDir, ".git"), []byte("gitdir: ../../.git/worktrees/feat-a\n"), 0o644)
+
+	s := session.State{
+		PID:          0,
+		SessionState: session.StateInactive,
+		RepoPath:     repoDir,
+		WorktreePath: wtDir,
+		Branch:       "feat-a",
+		SessionKey:   "myrepo/feat-a",
+		Description:  "fix login bug",
+		Entrypoint:   []string{"/bin/sh"},
+	}
+	if err := session.Write(s); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	Local(dir, &buf)
+
+	output := buf.String()
+	if !strings.Contains(output, "inactive session (myrepo)") {
+		t.Errorf("expected session state and repo in output, got %q", output)
+	}
+	if !strings.Contains(output, "fix login bug") {
+		t.Errorf("expected description in output, got %q", output)
+	}
+}
+
+func TestLocalWithoutSessionShowsExistingWorktree(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+
+	repoDir := filepath.Join(dir, "myrepo")
+	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
+	wtDir := filepath.Join(repoDir, worktree.WorktreesDir, "feat-b")
+	os.MkdirAll(wtDir, 0o755)
+	os.WriteFile(filepath.Join(wtDir, ".git"), []byte("gitdir: ../../.git/worktrees/feat-b\n"), 0o644)
+
+	var buf bytes.Buffer
+	Local(dir, &buf)
+
+	output := buf.String()
+	if !strings.Contains(output, "feat-b\texisting worktree") {
+		t.Errorf("expected 'existing worktree' for worktree without session, got %q", output)
+	}
+}

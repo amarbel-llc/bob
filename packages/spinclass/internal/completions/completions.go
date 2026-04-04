@@ -77,7 +77,11 @@ func Sessions(w io.Writer, repoPath string) {
 
 // Local outputs completion entries by scanning worktree directories.
 // Falls back to directory scanning when no session state is available.
+// When a session exists for a worktree, its state, repo, and description
+// are shown instead of the generic "existing worktree" label.
 func Local(startDir string, w io.Writer) {
+	sessions := sessionIndex()
+
 	// If startDir is a repo, list its worktrees
 	gitDir := filepath.Join(startDir, ".git")
 	if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
@@ -86,7 +90,7 @@ func Local(startDir string, w io.Writer) {
 
 		for _, wtPath := range worktree.ListWorktrees(startDir) {
 			branch := filepath.Base(wtPath)
-			fmt.Fprintf(w, "%s\texisting worktree\n", branch)
+			fmt.Fprintf(w, "%s\t%s\n", branch, worktreeLabel(wtPath, sessions))
 		}
 		return
 	}
@@ -112,7 +116,38 @@ func Local(startDir string, w io.Writer) {
 
 		for _, wtPath := range worktree.ListWorktrees(child) {
 			branch := filepath.Base(wtPath)
-			fmt.Fprintf(w, "%s\texisting worktree\n", branch)
+			fmt.Fprintf(w, "%s\t%s\n", branch, worktreeLabel(wtPath, sessions))
 		}
 	}
+}
+
+// sessionIndex loads all sessions and indexes them by worktree path.
+func sessionIndex() map[string]session.State {
+	states, err := session.ListAll()
+	if err != nil {
+		return nil
+	}
+	idx := make(map[string]session.State, len(states))
+	for _, s := range states {
+		idx[s.WorktreePath] = s
+	}
+	return idx
+}
+
+// worktreeLabel returns a completion description for a worktree path.
+// When a session exists, it includes the state, repo name, and description.
+func worktreeLabel(wtPath string, sessions map[string]session.State) string {
+	s, ok := sessions[wtPath]
+	if !ok {
+		return "existing worktree"
+	}
+	resolved := s.ResolveState()
+	if resolved == session.StateAbandoned {
+		return "existing worktree"
+	}
+	label := fmt.Sprintf("%s session (%s)", resolved, filepath.Base(s.RepoPath))
+	if s.Description != "" {
+		label += " — " + s.Description
+	}
+	return label
 }
