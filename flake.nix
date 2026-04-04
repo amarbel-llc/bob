@@ -52,7 +52,8 @@
           || baseName == "go.sum"
           || baseName == "go.work"
           || baseName == "go.work.sum"
-          || nixpkgs.lib.hasSuffix ".scd" baseName;
+          || nixpkgs.lib.hasSuffix ".scd" baseName
+          || nixpkgs.lib.hasSuffix ".tmpl" baseName;
       };
 
       # Computed after first `go work vendor` — placeholder until then.
