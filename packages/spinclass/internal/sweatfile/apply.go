@@ -252,6 +252,10 @@ func ApplyClaudeSettings(worktreePath string, sweatfile Sweatfile) error {
 
 	doc["permissions"] = permsMap
 
+	// Auto-approve the spinclass MCP server written to .mcp.json so Claude
+	// Code doesn't prompt the user to enable it on first launch.
+	doc["enabledMcpjsonServers"] = []string{"spinclass"}
+
 	if git.IsWorktree(worktreePath) {
 		hooksMap := map[string]any{
 			"PreToolUse": []any{
