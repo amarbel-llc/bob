@@ -12,13 +12,13 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/mattn/go-isatty"
 
+	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/spinclass/internal/executor"
 	"github.com/amarbel-llc/spinclass/internal/git"
-	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/merge"
+	"github.com/amarbel-llc/spinclass/internal/session"
 	"github.com/amarbel-llc/spinclass/internal/sweatfile"
 	"github.com/amarbel-llc/spinclass/internal/worktree"
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 )
 
 func Create(
@@ -55,7 +55,7 @@ func createWorktree(worktreePath worktree.ResolvedPath, verbose bool) (bool, err
 
 	if _, err := os.Stat(worktreePath.AbsPath); os.IsNotExist(err) {
 		existed = false
-		result, err := worktree.Create(worktreePath.RepoPath, worktreePath.AbsPath, worktreePath.ExistingBranch)
+		result, err := worktree.Create(worktreePath.RepoPath, worktreePath.AbsPath, worktreePath.ExistingBranch, worktreePath.Issue, worktreePath.PR)
 		if err != nil {
 			return false, err
 		}
