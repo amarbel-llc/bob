@@ -201,7 +201,7 @@ func applyWorktreeConfig(
 	issue *prompt.IssueData,
 	pr *prompt.PRData,
 ) error {
-	if err := applyGitExcludes(repoPath, sweetfile.Merged.GitExcludes()); err != nil {
+	if err := applyGitExcludes(worktreePath, sweetfile.Merged.GitExcludes()); err != nil {
 		return fmt.Errorf("applying git excludes: %w", err)
 	}
 
@@ -268,11 +268,20 @@ const (
 	excludeMarkerEnd   = "# --- spinclass-managed-end ---"
 )
 
-// applyGitExcludes writes all excludes into a fenced block in
-// .git/info/exclude. The block is replaced on each call, making it
-// idempotent. Lines outside the fenced block are preserved.
-func applyGitExcludes(repoPath string, excludes []string) error {
-	excludePath := filepath.Join(repoPath, ".git", "info", "exclude")
+// applyGitExcludes writes all excludes into a fenced block in the
+// git dir's info/exclude. Uses git rev-parse --git-dir to resolve
+// the correct path, which is per-worktree in linked worktrees.
+// The block is replaced on each call, making it idempotent. Lines
+// outside the fenced block are preserved.
+func applyGitExcludes(worktreePath string, excludes []string) error {
+	gitDir, err := git.Run(worktreePath, "rev-parse", "--git-dir")
+	if err != nil {
+		return fmt.Errorf("resolving git dir: %w", err)
+	}
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(worktreePath, gitDir)
+	}
+	excludePath := filepath.Join(gitDir, "info", "exclude")
 
 	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
 		return err

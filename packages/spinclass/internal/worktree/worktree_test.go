@@ -259,16 +259,33 @@ func TestIsWorktreeNoGit(t *testing.T) {
 	}
 }
 
-func TestApplyGitExcludesFirstWrite(t *testing.T) {
+// initGitRepo creates a real git repo in a temp directory so that
+// git rev-parse --git-dir works. Returns the repo path and the
+// resolved git dir (from --git-dir).
+func initGitRepo(t *testing.T) (repoDir, gitDir string) {
+	t.Helper()
 	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
+	repoDir = filepath.Join(root, "myrepo")
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "-C", repoDir, "init")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	return repoDir, filepath.Join(repoDir, ".git")
+}
+
+func TestApplyGitExcludesFirstWrite(t *testing.T) {
+	repoDir, gitDir := initGitRepo(t)
+	// Remove git's default exclude so we test a clean first write.
+	os.Remove(filepath.Join(gitDir, "info", "exclude"))
 
 	if err := applyGitExcludes(repoDir, []string{".worktrees/", ".mcp.json"}); err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(repoDir, ".git", "info", "exclude"))
+	data, err := os.ReadFile(filepath.Join(gitDir, "info", "exclude"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,10 +297,8 @@ func TestApplyGitExcludesFirstWrite(t *testing.T) {
 }
 
 func TestApplyGitExcludesPreservesExistingContent(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
-	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+	repoDir, gitDir := initGitRepo(t)
+	excludePath := filepath.Join(gitDir, "info", "exclude")
 	os.WriteFile(excludePath, []byte("# user exclude\n*.swp\n"), 0o644)
 
 	if err := applyGitExcludes(repoDir, []string{".spinclass/"}); err != nil {
@@ -305,9 +320,9 @@ func TestApplyGitExcludesPreservesExistingContent(t *testing.T) {
 }
 
 func TestApplyGitExcludesIdempotentReplace(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
+	repoDir, gitDir := initGitRepo(t)
+	// Remove git's default exclude so we test exact output.
+	os.Remove(filepath.Join(gitDir, "info", "exclude"))
 
 	excludes := []string{".worktrees/", ".mcp.json"}
 
@@ -319,7 +334,7 @@ func TestApplyGitExcludesIdempotentReplace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(repoDir, ".git", "info", "exclude"))
+	data, err := os.ReadFile(filepath.Join(gitDir, "info", "exclude"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,10 +352,8 @@ func TestApplyGitExcludesIdempotentReplace(t *testing.T) {
 }
 
 func TestApplyGitExcludesContentChanges(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
-	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+	repoDir, gitDir := initGitRepo(t)
+	excludePath := filepath.Join(gitDir, "info", "exclude")
 	os.WriteFile(excludePath, []byte("*.swp\n"), 0o644)
 
 	// First write
@@ -371,10 +384,8 @@ func TestApplyGitExcludesContentChanges(t *testing.T) {
 }
 
 func TestApplyGitExcludesWorktreesMigration(t *testing.T) {
-	root := t.TempDir()
-	repoDir := filepath.Join(root, "myrepo")
-	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
-	os.MkdirAll(filepath.Dir(excludePath), 0o755)
+	repoDir, gitDir := initGitRepo(t)
+	excludePath := filepath.Join(gitDir, "info", "exclude")
 
 	// Simulate old-style bare .worktrees line from excludeWorktreesDir
 	os.WriteFile(excludePath, []byte(".worktrees\n"), 0o644)
