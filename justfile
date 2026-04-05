@@ -28,9 +28,6 @@ build-robin:
 build-caldav:
     nix build .#caldav
 
-build-spinclass:
-    nix build .#spinclass
-
 build-batman:
     nix build .#batman -o result-batman
 
@@ -47,9 +44,6 @@ test-get-hubbed:
 
 test-lux:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/lux/...
-
-test-spinclass:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/spinclass/...
 
 test-caldav:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
@@ -133,10 +127,6 @@ validate-mcp-caldav: build-caldav
 
 validate-mcp: validate-mcp-grit validate-mcp-get-hubbed validate-mcp-lux validate-mcp-chix validate-mcp-caldav
 
-test-spinclass-bats: build-batman
-    nix build .#spinclass
-    SPINCLASS_BIN={{justfile_directory()}}/result/bin/spinclass PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/spinclass/zz-tests_bats/test
-
 test-grit-bats: build-batman
     nix build .#grit
     GRIT_BIN={{justfile_directory()}}/result/bin/grit PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/grit/zz-tests_bats/test
@@ -177,8 +167,6 @@ test: \
     test-integration \
     test-lux \
     test-lux-bats \
-    test-spinclass \
-    test-spinclass-bats \
     test-tap-dancer-bats \
     test-tap-dancer-go \
     test-tap-dancer-rust \

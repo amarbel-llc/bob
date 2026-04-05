@@ -57,7 +57,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-bHJJwQCFnYX0shpXFl6xBDYCkpQjAILgC1q6xvcwl1c=";
+      goVendorHash = "sha256-ukzUWobHBiOS+5kV66SC01NegxeVG3Zb9b+tDSzVcmU=";
 
       buildDevShellPackages =
         system:
@@ -169,16 +169,6 @@
               ;
           };
 
-          spinclassPkg = import ./lib/packages/spinclass.nix {
-            inherit
-              pkgs
-              goWorkspaceSrc
-              goVendorHash
-              go
-              ;
-            src = ./packages/spinclass;
-          };
-
           caldavPkg = import ./lib/packages/caldav.nix {
             inherit
               pkgs
@@ -273,7 +263,6 @@
             sandcastlePkg
             andSoCanYouRepoPkg
             potatoPkg
-            spinclassPkg
             ;
         };
 
@@ -336,7 +325,6 @@
                 localPkgs.sandcastlePkg
                 localPkgs.andSoCanYouRepoPkg
                 localPkgs.potatoPkg
-                localPkgs.spinclassPkg
               ];
             in
             marketplacePkgs
@@ -357,7 +345,6 @@
               sandcastle = localPkgs.sandcastlePkg;
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
-              spinclass = localPkgs.spinclassPkg;
               mcp-all = pkgs.symlinkJoin {
                 name = "mcp-all";
                 paths = [

@@ -71,8 +71,7 @@ nix build .#tap-dancer
 ### Go Workspace
 
 All Go packages share a single `go.work` workspace. Modules:
-`packages/{grit,get-hubbed,lux,potato,spinclass}`, `packages/tap-dancer/go`,
-`dummies/go`.
+`packages/{grit,get-hubbed,lux,potato}`, `packages/tap-dancer/go`, `dummies/go`.
 
 The `vendor/` directory is **intentionally gitignored**. It exists only for
 local IDE/tooling use and for computing the Nix vendor hash via
@@ -129,7 +128,7 @@ Skills live in `skills/<name>/SKILL.md` with YAML frontmatter. Skills MAY have
   ------------------------------------------ ----------------------------------
   `packages/`                                All packages (grit, get-hubbed,
                                              lux, chix, batman, tap-dancer,
-                                             spinclass, potato, sandcastle,
+                                             potato, sandcastle,
                                              and-so-can-you-repo)
 
   `skills/`                                  22 general-purpose skills
@@ -183,5 +182,5 @@ toolchain builds (go, cargo) must output to the `build/` directory.
   (published module, not workspace local)
 - Rust packages depend on `mcp-server` crate from the purse-first repo via git
   dependency
-- `packages/spinclass` has a workspace `replace` directive for
-  `packages/tap-dancer/go` (unpublished module)
+- `tap-dancer/go` is published as
+  `github.com/amarbel-llc/bob/packages/tap-dancer/go` (tagged v0.1.0)
