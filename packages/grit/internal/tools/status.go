@@ -23,7 +23,7 @@ func registerStatusCommands(app *command.App) {
 		},
 		Params: []command.Param{
 			{Name: "repo_path", Type: command.String, Description: "Path to the git repository (defaults to current working directory — almost never needed)"},
-			{Name: "staged", Type: command.Bool, Description: "Show staged changes (--cached)"},
+			{Name: "staged", Type: command.Bool, Description: "Show only staged (true) or only unstaged (false) changes. Omit to show both."},
 			{Name: "ref", Type: command.String, Description: "Diff against a specific ref (commit, branch, tag)"},
 			{Name: "paths", Type: command.Array, Description: "Limit diff to specific paths"},
 			{Name: "stat_only", Type: command.Bool, Description: "Show only diffstat summary"},
@@ -40,7 +40,7 @@ func registerStatusCommands(app *command.App) {
 func handleGitDiff(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 	var params struct {
 		RepoPath      string   `json:"repo_path"`
-		Staged        bool     `json:"staged"`
+		Staged        *bool    `json:"staged"`
 		Ref           string   `json:"ref"`
 		Paths         []string `json:"paths"`
 		StatOnly      bool     `json:"stat_only"`
@@ -52,62 +52,97 @@ func handleGitDiff(ctx context.Context, args json.RawMessage, _ command.Prompter
 		return command.TextErrorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
 	}
 
-	numstatArgs := []string{"diff", "--numstat"}
-	if params.Staged {
-		numstatArgs = append(numstatArgs, "--cached")
-	}
-	if params.Ref != "" {
-		numstatArgs = append(numstatArgs, params.Ref)
-	}
-	if len(params.Paths) > 0 {
-		numstatArgs = append(numstatArgs, "--")
-		numstatArgs = append(numstatArgs, params.Paths...)
-	}
-
-	numstatOut, err := git.Run(ctx, params.RepoPath, numstatArgs...)
-	if err != nil {
-		return command.TextErrorResult(fmt.Sprintf("git diff: %v", err)), nil
-	}
-
-	stats := git.ParseDiffNumstat(numstatOut)
-
-	var summary git.DiffSummary
-	summary.TotalFiles = len(stats)
-	for _, s := range stats {
-		summary.TotalAdditions += s.Additions
-		summary.TotalDeletions += s.Deletions
-	}
-
-	result := git.DiffResult{
-		Stats:   stats,
-		Summary: summary,
-	}
-
-	if !params.StatOnly {
-		patchArgs := []string{"diff"}
-		if params.ContextLines != nil {
-			patchArgs = append(patchArgs, fmt.Sprintf("--unified=%d", *params.ContextLines))
-		}
-		if params.Staged {
-			patchArgs = append(patchArgs, "--cached")
+	buildSection := func(cached bool) (*git.DiffSection, error) {
+		numstatArgs := []string{"diff", "--numstat"}
+		if cached {
+			numstatArgs = append(numstatArgs, "--cached")
 		}
 		if params.Ref != "" {
-			patchArgs = append(patchArgs, params.Ref)
+			numstatArgs = append(numstatArgs, params.Ref)
 		}
 		if len(params.Paths) > 0 {
-			patchArgs = append(patchArgs, "--")
-			patchArgs = append(patchArgs, params.Paths...)
+			numstatArgs = append(numstatArgs, "--")
+			numstatArgs = append(numstatArgs, params.Paths...)
 		}
 
-		patchOut, err := git.Run(ctx, params.RepoPath, patchArgs...)
+		numstatOut, err := git.Run(ctx, params.RepoPath, numstatArgs...)
 		if err != nil {
-			return command.TextErrorResult(fmt.Sprintf("git diff: %v", err)), nil
+			return nil, fmt.Errorf("git diff: %v", err)
 		}
 
-		patch, truncated, truncatedAt := git.TruncatePatch(patchOut, params.MaxPatchLines)
-		result.Patch = patch
-		result.Truncated = truncated
-		result.TruncatedAtLine = truncatedAt
+		stats := git.ParseDiffNumstat(numstatOut)
+
+		var summary git.DiffSummary
+		summary.TotalFiles = len(stats)
+		for _, s := range stats {
+			summary.TotalAdditions += s.Additions
+			summary.TotalDeletions += s.Deletions
+		}
+
+		section := &git.DiffSection{
+			Stats:   stats,
+			Summary: summary,
+		}
+
+		if !params.StatOnly {
+			patchArgs := []string{"diff"}
+			if params.ContextLines != nil {
+				patchArgs = append(patchArgs, fmt.Sprintf("--unified=%d", *params.ContextLines))
+			}
+			if cached {
+				patchArgs = append(patchArgs, "--cached")
+			}
+			if params.Ref != "" {
+				patchArgs = append(patchArgs, params.Ref)
+			}
+			if len(params.Paths) > 0 {
+				patchArgs = append(patchArgs, "--")
+				patchArgs = append(patchArgs, params.Paths...)
+			}
+
+			patchOut, err := git.Run(ctx, params.RepoPath, patchArgs...)
+			if err != nil {
+				return nil, fmt.Errorf("git diff: %v", err)
+			}
+
+			patch, truncated, truncatedAt := git.TruncatePatch(patchOut, params.MaxPatchLines)
+			section.Patch = patch
+			section.Truncated = truncated
+			section.TruncatedAtLine = truncatedAt
+		}
+
+		return section, nil
+	}
+
+	var result git.DiffResult
+
+	switch {
+	case params.Staged != nil && *params.Staged:
+		section, err := buildSection(true)
+		if err != nil {
+			return command.TextErrorResult(err.Error()), nil
+		}
+		result.Staged = section
+
+	case params.Staged != nil && !*params.Staged:
+		section, err := buildSection(false)
+		if err != nil {
+			return command.TextErrorResult(err.Error()), nil
+		}
+		result.Unstaged = section
+
+	default:
+		staged, err := buildSection(true)
+		if err != nil {
+			return command.TextErrorResult(err.Error()), nil
+		}
+		result.Staged = staged
+
+		unstaged, err := buildSection(false)
+		if err != nil {
+			return command.TextErrorResult(err.Error()), nil
+		}
+		result.Unstaged = unstaged
 	}
 
 	return command.JSONResult(result), nil

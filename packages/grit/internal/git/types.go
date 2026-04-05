@@ -33,12 +33,17 @@ type DiffSummary struct {
 	TotalDeletions int `json:"total_deletions"`
 }
 
-type DiffResult struct {
+type DiffSection struct {
 	Stats           []DiffStat  `json:"stats"`
 	Summary         DiffSummary `json:"summary"`
 	Patch           string      `json:"patch,omitempty"`
 	Truncated       bool        `json:"truncated,omitempty"`
 	TruncatedAtLine int         `json:"truncated_at_line,omitempty"`
+}
+
+type DiffResult struct {
+	Staged   *DiffSection `json:"staged,omitempty"`
+	Unstaged *DiffSection `json:"unstaged,omitempty"`
 }
 
 type LogEntry struct {
