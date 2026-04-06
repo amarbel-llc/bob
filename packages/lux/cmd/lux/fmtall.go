@@ -89,10 +89,24 @@ func runFmtAll(ctx context.Context, paths []string) error {
 		}
 	}
 
+	var formatted []string
 	for _, f := range files {
-		if err := formatFile(ctx, f, router, executor); err != nil {
+		changed, err := formatFile(ctx, f, router, executor)
+		if err != nil {
 			fmt.Fprintf(logfile.Writer(), "fmt %s: %v\n", f, err)
+			continue
 		}
+		if changed {
+			formatted = append(formatted, f)
+		}
+	}
+
+	if len(formatted) > 0 {
+		fmt.Printf("lux fmt-all: formatted %d file(s)\n", len(formatted))
+		for _, f := range formatted {
+			fmt.Printf("  %s\n", f)
+		}
+		fmt.Println("\nPlease commit the formatted files in a separate commit with a message like: \"style: format code via lux fmt-all\"")
 	}
 
 	return nil
@@ -221,15 +235,15 @@ func applyExcludeGlobs(files []string, patterns []string, root string) []string 
 	return result
 }
 
-func formatFile(ctx context.Context, filePath string, router *formatter.Router, executor subprocess.Executor) error {
+func formatFile(ctx context.Context, filePath string, router *formatter.Router, executor subprocess.Executor) (bool, error) {
 	match := router.Match(filePath)
 	if match == nil {
-		return nil
+		return false, nil
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("reading: %w", err)
+		return false, fmt.Errorf("reading: %w", err)
 	}
 
 	var result *formatter.Result
@@ -239,15 +253,19 @@ func formatFile(ctx context.Context, filePath string, router *formatter.Router, 
 	case "fallback":
 		result, err = formatter.FormatFallback(ctx, match.Formatters, filePath, content, executor)
 	default:
-		return fmt.Errorf("unknown formatter mode: %s", match.Mode)
+		return false, fmt.Errorf("unknown formatter mode: %s", match.Mode)
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if !result.Changed {
-		return nil
+		return false, nil
 	}
 
-	return os.WriteFile(filePath, []byte(result.Formatted), 0o644)
+	if err := os.WriteFile(filePath, []byte(result.Formatted), 0o644); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
