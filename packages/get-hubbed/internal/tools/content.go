@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
@@ -142,6 +143,12 @@ func handleContentSearch(ctx context.Context, args json.RawMessage, _ command.Pr
 	out, err := gh.Run(ctx, ghArgs...)
 	if err != nil {
 		return command.TextErrorResult(fmt.Sprintf("gh api search/code: %v", err)), nil
+	}
+
+	if strings.Contains(out, `"total_count":0`) || strings.Contains(out, `"total_count": 0`) {
+		out += fmt.Sprintf("\n\nNote: zero results may mean this repository is not indexed by GitHub Code Search. "+
+			"Not all repositories are indexed. Use get-hubbed://contents?repo=%s or get-hubbed://tree?repo=%s to read files directly instead.",
+			params.Repo, params.Repo)
 	}
 
 	return command.TextResult(out), nil

@@ -102,7 +102,7 @@ func TestWebFetchHookAllGitHubDomains(t *testing.T) {
 		{"https://github.com/owner/repo/settings", "GitHub URLs are served by get-hubbed"},
 		{"https://www.github.com/owner/repo/settings", "GitHub URLs are served by get-hubbed"},
 		{"https://api.github.com/repos/owner/repo", "get-hubbed://repo"},
-		{"https://raw.githubusercontent.com/owner/repo/main/README.md", "get-hubbed://contents?path=README.md&repo=owner/repo&ref=main"},
+		{"https://raw.githubusercontent.com/owner/repo/main/README.md", "get-hubbed://contents?path=README.md&repo=owner/repo"},
 		{"https://gist.github.com/owner/abc123", "get-hubbed://gist?id=abc123"},
 	}
 
@@ -157,10 +157,10 @@ func TestWebFetchHookAllMappings(t *testing.T) {
 		{"https://github.com/owner/repo/issues/42", "get-hubbed://issues?number=42&repo=owner/repo"},
 		{"https://github.com/owner/repo/pulls", "get-hubbed://pulls?repo=owner/repo"},
 		{"https://github.com/owner/repo/pull/7", "get-hubbed://pulls?number=7&repo=owner/repo"},
-		{"https://github.com/owner/repo/blob/main/src/foo.go", "get-hubbed://contents?path=src/foo.go&repo=owner/repo&ref=main"},
-		{"https://github.com/owner/repo/tree/main/src", "get-hubbed://tree?path=src&repo=owner/repo&ref=main"},
-		{"https://github.com/owner/repo/blame/main/src/foo.go", "get-hubbed://blame?path=src/foo.go&repo=owner/repo&ref=main"},
-		{"https://github.com/owner/repo/commits/main", "get-hubbed://commits?repo=owner/repo&ref=main"},
+		{"https://github.com/owner/repo/blob/main/src/foo.go", "get-hubbed://contents?path=src/foo.go&repo=owner/repo"},
+		{"https://github.com/owner/repo/tree/main/src", "get-hubbed://tree?path=src&repo=owner/repo"},
+		{"https://github.com/owner/repo/blame/main/src/foo.go", "get-hubbed://blame?path=src/foo.go&repo=owner/repo"},
+		{"https://github.com/owner/repo/commits/main", "get-hubbed://commits?repo=owner/repo"},
 		{"https://github.com/owner/repo/actions", "get-hubbed://runs?repo=owner/repo"},
 		{"https://github.com/owner/repo/actions/runs/12345", "get-hubbed://runs?run_id=12345&repo=owner/repo"},
 	}
@@ -273,15 +273,15 @@ func TestWebFetchHookRawGitHubURLMappings(t *testing.T) {
 	}{
 		{
 			"https://raw.githubusercontent.com/owner/repo/main/README.md",
-			"get-hubbed://contents?path=README.md&repo=owner/repo&ref=main",
+			"get-hubbed://contents?path=README.md&repo=owner/repo",
 		},
 		{
 			"https://raw.githubusercontent.com/owner/repo/v1.0.0/src/lib/foo.go",
-			"get-hubbed://contents?path=src/lib/foo.go&repo=owner/repo&ref=v1.0.0",
+			"get-hubbed://contents?path=src/lib/foo.go&repo=owner/repo",
 		},
 		{
 			"https://raw.githubusercontent.com/owner/repo/abc1234/file.txt",
-			"get-hubbed://contents?path=file.txt&repo=owner/repo&ref=abc1234",
+			"get-hubbed://contents?path=file.txt&repo=owner/repo",
 		},
 	}
 

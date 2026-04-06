@@ -74,33 +74,28 @@ func matchGitHubURL(rawURL string) (string, bool) {
 
 	case "blob":
 		if len(segments) >= 5 {
-			ref := segments[3]
 			filePath := strings.Join(segments[4:], "/")
-			return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s&ref=%s", filePath, repoSlug, ref), false
+			return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s", filePath, repoSlug), false
 		}
 
 	case "tree":
 		if len(segments) >= 5 {
-			ref := segments[3]
 			dirPath := strings.Join(segments[4:], "/")
-			return fmt.Sprintf("get-hubbed://tree?path=%s&repo=%s&ref=%s", dirPath, repoSlug, ref), false
+			return fmt.Sprintf("get-hubbed://tree?path=%s&repo=%s", dirPath, repoSlug), false
 		}
 		if len(segments) == 4 {
-			ref := segments[3]
-			return fmt.Sprintf("get-hubbed://tree?repo=%s&ref=%s", repoSlug, ref), false
+			return fmt.Sprintf("get-hubbed://tree?repo=%s", repoSlug), false
 		}
 
 	case "blame":
 		if len(segments) >= 5 {
-			ref := segments[3]
 			filePath := strings.Join(segments[4:], "/")
-			return fmt.Sprintf("get-hubbed://blame?path=%s&repo=%s&ref=%s", filePath, repoSlug, ref), false
+			return fmt.Sprintf("get-hubbed://blame?path=%s&repo=%s", filePath, repoSlug), false
 		}
 
 	case "commits":
 		if len(segments) >= 4 {
-			ref := segments[3]
-			return fmt.Sprintf("get-hubbed://commits?repo=%s&ref=%s", repoSlug, ref), false
+			return fmt.Sprintf("get-hubbed://commits?repo=%s", repoSlug), false
 		}
 
 	case "actions":
@@ -263,10 +258,9 @@ func matchRawGitHubURL(parsed *url.URL) (string, bool) {
 
 	owner := segments[0]
 	repo := segments[1]
-	ref := segments[2]
 	filePath := strings.Join(segments[3:], "/")
 
-	return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s/%s&ref=%s", filePath, owner, repo, ref), false
+	return fmt.Sprintf("get-hubbed://contents?path=%s&repo=%s/%s", filePath, owner, repo), false
 }
 
 // matchGistGitHubURL matches gist.github.com paths to get-hubbed
