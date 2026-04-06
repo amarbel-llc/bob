@@ -333,6 +333,24 @@ Supported config names:
 	})
 
 	app.AddCommand(&command.Command{
+		Name:            "fmt-all",
+		PassthroughArgs: true,
+		Description: command.Description{
+			Short: "Format all files in the project",
+			Long:  "Walk the project tree and format every recognized file using configured formatters.",
+		},
+		RunCLI: func(ctx context.Context, args json.RawMessage) error {
+			var p struct {
+				Args []string `json:"args"`
+			}
+			if err := json.Unmarshal(args, &p); err != nil {
+				return fmt.Errorf("invalid arguments: %w", err)
+			}
+			return runFmtAll(ctx, p.Args)
+		},
+	})
+
+	app.AddCommand(&command.Command{
 		Name: "lsp",
 		Description: command.Description{
 			Short: "Run as an LSP server over stdio",

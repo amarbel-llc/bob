@@ -36,8 +36,8 @@ func main() {
 		outDir := generatePluginOutputDir(os.Args[2:])
 		if outDir != "" {
 			pluginDir := filepath.Join(outDir, "share", "purse-first", "lux")
-			if err := hooks.GeneratePostToolUseHooks(pluginDir); err != nil {
-				fmt.Fprintf(logfile.Writer(), "Error generating PostToolUse hooks: %v\n", err)
+			if err := hooks.GenerateStopHook(pluginDir); err != nil {
+				fmt.Fprintf(logfile.Writer(), "Error generating Stop hook: %v\n", err)
 				os.Exit(1)
 			}
 		}

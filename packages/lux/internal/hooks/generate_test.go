@@ -4,20 +4,18 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestGeneratePostToolUseHooks_CreatesHooksJSON(t *testing.T) {
+func TestGenerateStopHook_CreatesHooksJSON(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 
-	if err := GeneratePostToolUseHooks(pluginDir); err != nil {
-		t.Fatalf("GeneratePostToolUseHooks: %v", err)
+	if err := GenerateStopHook(pluginDir); err != nil {
+		t.Fatalf("GenerateStopHook: %v", err)
 	}
 
-	hooksDir := filepath.Join(pluginDir, "hooks")
-	data, err := os.ReadFile(filepath.Join(hooksDir, "hooks.json"))
+	data, err := os.ReadFile(filepath.Join(pluginDir, "hooks", "hooks.json"))
 	if err != nil {
 		t.Fatalf("reading hooks.json: %v", err)
 	}
@@ -32,22 +30,30 @@ func TestGeneratePostToolUseHooks_CreatesHooksJSON(t *testing.T) {
 		t.Fatal("hooks.json missing 'hooks' key")
 	}
 
-	postToolUse, ok := hooks["PostToolUse"].([]any)
+	stop, ok := hooks["Stop"].([]any)
 	if !ok {
-		t.Fatal("hooks.json missing 'PostToolUse' key")
+		t.Fatal("hooks.json missing 'Stop' key")
 	}
 
-	if len(postToolUse) != 1 {
-		t.Fatalf("expected 1 PostToolUse entry, got %d", len(postToolUse))
+	if len(stop) != 1 {
+		t.Fatalf("expected 1 Stop entry, got %d", len(stop))
 	}
 
-	entry := postToolUse[0].(map[string]any)
-	if entry["matcher"] != "Edit|Write" {
-		t.Errorf("matcher = %q, want %q", entry["matcher"], "Edit|Write")
+	entry := stop[0].(map[string]any)
+	innerHooks := entry["hooks"].([]any)
+	hook := innerHooks[0].(map[string]any)
+
+	if hook["command"] != "lux fmt-all" {
+		t.Errorf("command = %q, want %q", hook["command"], "lux fmt-all")
+	}
+
+	timeout, ok := hook["timeout"].(float64)
+	if !ok || timeout != 60 {
+		t.Errorf("timeout = %v, want 60", hook["timeout"])
 	}
 }
 
-func TestGeneratePostToolUseHooks_MergesWithExisting(t *testing.T) {
+func TestGenerateStopHook_MergesWithExistingPreToolUse(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 	hooksDir := filepath.Join(pluginDir, "hooks")
@@ -78,8 +84,8 @@ func TestGeneratePostToolUseHooks_MergesWithExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := GeneratePostToolUseHooks(pluginDir); err != nil {
-		t.Fatalf("GeneratePostToolUseHooks: %v", err)
+	if err := GenerateStopHook(pluginDir); err != nil {
+		t.Fatalf("GenerateStopHook: %v", err)
 	}
 
 	result, err := os.ReadFile(filepath.Join(hooksDir, "hooks.json"))
@@ -92,52 +98,80 @@ func TestGeneratePostToolUseHooks_MergesWithExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hooks, ok := manifest["hooks"].(map[string]any)
-	if !ok {
-		t.Fatal("hooks.json missing 'hooks' key after merge")
-	}
+	hooks := manifest["hooks"].(map[string]any)
 
 	if _, ok := hooks["PreToolUse"]; !ok {
 		t.Error("PreToolUse was lost during merge")
 	}
-
-	if _, ok := hooks["PostToolUse"]; !ok {
-		t.Error("PostToolUse was not added")
+	if _, ok := hooks["Stop"]; !ok {
+		t.Error("Stop was not added")
+	}
+	if _, ok := hooks["PostToolUse"]; ok {
+		t.Error("PostToolUse should not be present")
 	}
 }
 
-func TestGeneratePostToolUseHooks_WritesFormatScript(t *testing.T) {
+func TestGenerateStopHook_NoFormatFileScript(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 
-	if err := GeneratePostToolUseHooks(pluginDir); err != nil {
-		t.Fatalf("GeneratePostToolUseHooks: %v", err)
+	if err := GenerateStopHook(pluginDir); err != nil {
+		t.Fatalf("GenerateStopHook: %v", err)
 	}
 
 	scriptPath := filepath.Join(pluginDir, "hooks", "format-file")
-
-	info, err := os.Stat(scriptPath)
-	if err != nil {
-		t.Fatalf("stat format-file: %v", err)
+	if _, err := os.Stat(scriptPath); !os.IsNotExist(err) {
+		t.Error("format-file script should not exist")
 	}
+}
 
-	if info.Mode()&0o111 == 0 {
-		t.Error("format-file is not executable")
-	}
+func TestGenerateStopHook_RemovesExistingPostToolUse(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "lux")
+	hooksDir := filepath.Join(pluginDir, "hooks")
 
-	content, err := os.ReadFile(scriptPath)
-	if err != nil {
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	script := string(content)
-	if !strings.Contains(script, "#!/usr/bin/env bash") {
-		t.Error("missing shebang")
+	existing := map[string]any{
+		"hooks": map[string]any{
+			"PostToolUse": []any{
+				map[string]any{
+					"matcher": "Edit|Write",
+					"hooks": []any{
+						map[string]any{
+							"type":    "command",
+							"command": "${CLAUDE_PLUGIN_ROOT}/hooks/format-file",
+							"timeout": 30,
+						},
+					},
+				},
+			},
+		},
 	}
-	if !strings.Contains(script, "lux fmt") {
-		t.Error("missing lux fmt invocation")
+
+	data, _ := json.MarshalIndent(existing, "", "  ")
+	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), data, 0o644)
+	os.WriteFile(filepath.Join(hooksDir, "format-file"), []byte("#!/bin/bash\n"), 0o755)
+
+	if err := GenerateStopHook(pluginDir); err != nil {
+		t.Fatalf("GenerateStopHook: %v", err)
 	}
-	if !strings.Contains(script, "file_path") {
-		t.Error("missing file_path extraction")
+
+	result, _ := os.ReadFile(filepath.Join(hooksDir, "hooks.json"))
+	var manifest map[string]any
+	json.Unmarshal(result, &manifest)
+	hooks := manifest["hooks"].(map[string]any)
+
+	if _, ok := hooks["PostToolUse"]; ok {
+		t.Error("PostToolUse should have been removed")
+	}
+	if _, ok := hooks["Stop"]; !ok {
+		t.Error("Stop should have been added")
+	}
+
+	if _, err := os.Stat(filepath.Join(hooksDir, "format-file")); !os.IsNotExist(err) {
+		t.Error("format-file script should have been deleted")
 	}
 }

@@ -7,20 +7,12 @@ import (
 	"path/filepath"
 )
 
-const formatScript = `#!/usr/bin/env bash
-set -euo pipefail
-input=$(cat)
-file_path=$(jq -r '.tool_input.file_path // empty' <<< "$input")
-if [[ -n "$file_path" ]]; then
-  lux fmt "$file_path" 2>/dev/null || true
-fi
-`
-
-// GeneratePostToolUseHooks adds PostToolUse hook entries to the hooks directory
-// under pluginDir. If hooks/hooks.json already exists (e.g. from go-mcp's
-// PreToolUse generation), the PostToolUse entry is merged in. If it doesn't
-// exist, a new hooks.json is created.
-func GeneratePostToolUseHooks(pluginDir string) error {
+// GenerateStopHook adds a Stop hook entry to the hooks directory under
+// pluginDir. If hooks/hooks.json already exists (e.g. from go-mcp's
+// PreToolUse generation), the Stop entry is merged in and any existing
+// PostToolUse entry is removed. The old format-file script is deleted
+// if present.
+func GenerateStopHook(pluginDir string) error {
 	hooksDir := filepath.Join(pluginDir, "hooks")
 	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		return fmt.Errorf("creating hooks directory: %w", err)
@@ -46,14 +38,17 @@ func GeneratePostToolUseHooks(pluginDir string) error {
 		manifest["hooks"] = hooks
 	}
 
-	hooks["PostToolUse"] = []any{
+	// Remove old PostToolUse formatter hook
+	delete(hooks, "PostToolUse")
+
+	// Add Stop hook
+	hooks["Stop"] = []any{
 		map[string]any{
-			"matcher": "Edit|Write",
 			"hooks": []any{
 				map[string]any{
 					"type":    "command",
-					"command": "${CLAUDE_PLUGIN_ROOT}/hooks/format-file",
-					"timeout": float64(30),
+					"command": "lux fmt-all",
+					"timeout": float64(60),
 				},
 			},
 		},
@@ -69,9 +64,10 @@ func GeneratePostToolUseHooks(pluginDir string) error {
 		return fmt.Errorf("writing hooks.json: %w", err)
 	}
 
+	// Clean up old format-file script
 	scriptPath := filepath.Join(hooksDir, "format-file")
-	if err := os.WriteFile(scriptPath, []byte(formatScript), 0o755); err != nil {
-		return fmt.Errorf("writing format-file: %w", err)
+	if err := os.Remove(scriptPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing old format-file script: %w", err)
 	}
 
 	return nil
