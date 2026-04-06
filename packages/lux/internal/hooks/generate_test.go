@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestGenerateStopHook_CreatesHooksJSON(t *testing.T) {
+func TestGenerateHooks_CreatesHooksJSON(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 
-	if err := GenerateStopHook(pluginDir); err != nil {
-		t.Fatalf("GenerateStopHook: %v", err)
+	if err := GenerateHooks(pluginDir); err != nil {
+		t.Fatalf("GenerateHooks: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(pluginDir, "hooks", "hooks.json"))
@@ -30,30 +31,45 @@ func TestGenerateStopHook_CreatesHooksJSON(t *testing.T) {
 		t.Fatal("hooks.json missing 'hooks' key")
 	}
 
+	// PostToolUse
+	postToolUse, ok := hooks["PostToolUse"].([]any)
+	if !ok {
+		t.Fatal("hooks.json missing 'PostToolUse' key")
+	}
+	if len(postToolUse) != 1 {
+		t.Fatalf("expected 1 PostToolUse entry, got %d", len(postToolUse))
+	}
+	ptuEntry := postToolUse[0].(map[string]any)
+	if ptuEntry["matcher"] != "Edit|Write" {
+		t.Errorf("PostToolUse matcher = %q, want %q", ptuEntry["matcher"], "Edit|Write")
+	}
+	ptuHooks := ptuEntry["hooks"].([]any)
+	ptuHook := ptuHooks[0].(map[string]any)
+	if ptuHook["command"] != "${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use" {
+		t.Errorf("PostToolUse command = %q", ptuHook["command"])
+	}
+
+	// Stop
 	stop, ok := hooks["Stop"].([]any)
 	if !ok {
 		t.Fatal("hooks.json missing 'Stop' key")
 	}
-
 	if len(stop) != 1 {
 		t.Fatalf("expected 1 Stop entry, got %d", len(stop))
 	}
-
-	entry := stop[0].(map[string]any)
-	innerHooks := entry["hooks"].([]any)
-	hook := innerHooks[0].(map[string]any)
-
-	if hook["command"] != "lux fmt-all" {
-		t.Errorf("command = %q, want %q", hook["command"], "lux fmt-all")
+	stopEntry := stop[0].(map[string]any)
+	stopHooks := stopEntry["hooks"].([]any)
+	stopHook := stopHooks[0].(map[string]any)
+	if stopHook["command"] != "${CLAUDE_PLUGIN_ROOT}/hooks/stop-fmt" {
+		t.Errorf("Stop command = %q", stopHook["command"])
 	}
-
-	timeout, ok := hook["timeout"].(float64)
+	timeout, ok := stopHook["timeout"].(float64)
 	if !ok || timeout != 60 {
-		t.Errorf("timeout = %v, want 60", hook["timeout"])
+		t.Errorf("Stop timeout = %v, want 60", stopHook["timeout"])
 	}
 }
 
-func TestGenerateStopHook_MergesWithExistingPreToolUse(t *testing.T) {
+func TestGenerateHooks_MergesWithExistingPreToolUse(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 	hooksDir := filepath.Join(pluginDir, "hooks")
@@ -84,8 +100,8 @@ func TestGenerateStopHook_MergesWithExistingPreToolUse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := GenerateStopHook(pluginDir); err != nil {
-		t.Fatalf("GenerateStopHook: %v", err)
+	if err := GenerateHooks(pluginDir); err != nil {
+		t.Fatalf("GenerateHooks: %v", err)
 	}
 
 	result, err := os.ReadFile(filepath.Join(hooksDir, "hooks.json"))
@@ -103,29 +119,60 @@ func TestGenerateStopHook_MergesWithExistingPreToolUse(t *testing.T) {
 	if _, ok := hooks["PreToolUse"]; !ok {
 		t.Error("PreToolUse was lost during merge")
 	}
+	if _, ok := hooks["PostToolUse"]; !ok {
+		t.Error("PostToolUse was not added")
+	}
 	if _, ok := hooks["Stop"]; !ok {
 		t.Error("Stop was not added")
 	}
-	if _, ok := hooks["PostToolUse"]; ok {
-		t.Error("PostToolUse should not be present")
-	}
 }
 
-func TestGenerateStopHook_NoFormatFileScript(t *testing.T) {
+func TestGenerateHooks_WritesScripts(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 
-	if err := GenerateStopHook(pluginDir); err != nil {
-		t.Fatalf("GenerateStopHook: %v", err)
+	if err := GenerateHooks(pluginDir); err != nil {
+		t.Fatalf("GenerateHooks: %v", err)
 	}
 
-	scriptPath := filepath.Join(pluginDir, "hooks", "format-file")
-	if _, err := os.Stat(scriptPath); !os.IsNotExist(err) {
-		t.Error("format-file script should not exist")
+	hooksDir := filepath.Join(pluginDir, "hooks")
+
+	for _, script := range []struct {
+		name     string
+		contains []string
+	}{
+		{
+			name:     "post-tool-use",
+			contains: []string{"#!/usr/bin/env bash", "file_path", "session_id", "edited-files-${session_id}", "XDG_STATE_HOME"},
+		},
+		{
+			name:     "stop-fmt",
+			contains: []string{"#!/usr/bin/env bash", "lux fmt-all", "session_id", "edited-files-${session_id}", "sort -u", "XDG_STATE_HOME"},
+		},
+	} {
+		path := filepath.Join(hooksDir, script.name)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("stat %s: %v", script.name, err)
+		}
+		if info.Mode()&0o111 == 0 {
+			t.Errorf("%s is not executable", script.name)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading %s: %v", script.name, err)
+		}
+
+		for _, s := range script.contains {
+			if !strings.Contains(string(content), s) {
+				t.Errorf("%s missing %q", script.name, s)
+			}
+		}
 	}
 }
 
-func TestGenerateStopHook_RemovesExistingPostToolUse(t *testing.T) {
+func TestGenerateHooks_CleansUpOldFormatFile(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, "lux")
 	hooksDir := filepath.Join(pluginDir, "hooks")
@@ -134,41 +181,11 @@ func TestGenerateStopHook_RemovesExistingPostToolUse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	existing := map[string]any{
-		"hooks": map[string]any{
-			"PostToolUse": []any{
-				map[string]any{
-					"matcher": "Edit|Write",
-					"hooks": []any{
-						map[string]any{
-							"type":    "command",
-							"command": "${CLAUDE_PLUGIN_ROOT}/hooks/format-file",
-							"timeout": 30,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	data, _ := json.MarshalIndent(existing, "", "  ")
-	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), data, 0o644)
+	// Create old format-file script
 	os.WriteFile(filepath.Join(hooksDir, "format-file"), []byte("#!/bin/bash\n"), 0o755)
 
-	if err := GenerateStopHook(pluginDir); err != nil {
-		t.Fatalf("GenerateStopHook: %v", err)
-	}
-
-	result, _ := os.ReadFile(filepath.Join(hooksDir, "hooks.json"))
-	var manifest map[string]any
-	json.Unmarshal(result, &manifest)
-	hooks := manifest["hooks"].(map[string]any)
-
-	if _, ok := hooks["PostToolUse"]; ok {
-		t.Error("PostToolUse should have been removed")
-	}
-	if _, ok := hooks["Stop"]; !ok {
-		t.Error("Stop should have been added")
+	if err := GenerateHooks(pluginDir); err != nil {
+		t.Fatalf("GenerateHooks: %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Join(hooksDir, "format-file")); !os.IsNotExist(err) {

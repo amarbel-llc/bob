@@ -34,6 +34,14 @@ _.lux/filetype/\*.toml_
 	Project-level filetype configuration. Overrides global filetypes
 	with matching names.
 
+_~/.config/lux/fmt-all.toml_
+	Global fmt-all configuration. Controls file discovery and exclusion
+	for *lux fmt-all*.
+
+_.lux/fmt-all.toml_
+	Project-level fmt-all configuration. Merged with global
+	configuration.
+
 # LSP CONFIGURATION
 
 The LSP configuration file (_lsps.toml_) defines language servers that lux
@@ -228,6 +236,30 @@ formatters = ["isort", "black"]
 formatter_mode = "chain"
 ```
 
+# FMT-ALL CONFIGURATION
+
+The fmt-all configuration file (_fmt-all.toml_) controls how *lux fmt-all*
+discovers and filters files.
+
+## Fields
+
+*walk* = _"git"_ | _"all"_
+	File discovery strategy. In *git* mode (the default), lux uses
+	*git ls-files* to find tracked and untracked (non-ignored) files. In
+	*all* mode, lux walks the entire directory tree, skipping _.git/_
+	directories and symlinks.
+
+*exclude\_globs* = [_string_, ...]
+	Glob patterns for files to skip. Patterns are matched against paths
+	relative to the project root using _/_ as the separator.
+
+## Example
+
+```
+walk = "git"
+exclude_globs = ["vendor/**", "generated/**"]
+```
+
 # MERGING BEHAVIOR
 
 Project-level configurations are merged with global configurations.
@@ -250,6 +282,13 @@ For _filetype/\*.toml_:
 - Filetypes with matching names (derived from filename) are overridden
   entirely by the project-level definition.
 - Filetypes defined only in the project config are added.
+
+For _fmt-all.toml_:
+- A project-level *walk* value overrides the global value. If the
+  project config uses the default value (*git*), the global value is
+  kept.
+- A project-level *exclude\_globs* list replaces the global list
+  entirely (no per-element merging).
 
 # PROJECT ROOT DETECTION
 
