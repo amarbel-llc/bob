@@ -10,7 +10,6 @@ defaults:
     working-directory: ./
 
 jobs:
-
   flakehub-publish:
     runs-on: "ubuntu-latest"
     permissions:

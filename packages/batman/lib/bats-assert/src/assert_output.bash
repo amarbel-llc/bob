@@ -129,69 +129,81 @@ assert_output() {
   : "${output?}"
 
   # Handle options.
-  if (( $# == 0 )); then
+  if (($# == 0)); then
     is_mode_nonempty=1
   fi
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-    -p|--partial) is_mode_partial=1; shift ;;
-    -e|--regexp) is_mode_regexp=1; shift ;;
-    -|--stdin) use_stdin=1; shift ;;
-    --) shift; break ;;
+    -p | --partial)
+      is_mode_partial=1
+      shift
+      ;;
+    -e | --regexp)
+      is_mode_regexp=1
+      shift
+      ;;
+    - | --stdin)
+      use_stdin=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
     *) break ;;
     esac
   done
 
-  if (( is_mode_partial )) && (( is_mode_regexp )); then
-    echo "\`--partial' and \`--regexp' are mutually exclusive" \
-    | batslib_decorate 'ERROR: assert_output' \
-    | fail
+  if ((is_mode_partial)) && ((is_mode_regexp)); then
+    echo "\`--partial' and \`--regexp' are mutually exclusive" |
+      batslib_decorate 'ERROR: assert_output' |
+      fail
     return $?
   fi
 
   # Arguments.
   local expected
-  if (( use_stdin )); then
+  if ((use_stdin)); then
     expected="$(cat -)"
   else
     expected="${1-}"
   fi
 
   # Matching.
-  if (( is_mode_nonempty )); then
+  if ((is_mode_nonempty)); then
     if [ -z "$output" ]; then
-      echo 'expected non-empty output, but output was empty' \
-      | batslib_decorate 'no output' \
-      | fail
+      echo 'expected non-empty output, but output was empty' |
+        batslib_decorate 'no output' |
+        fail
     fi
-  elif (( is_mode_regexp )); then
-    if [[ '' =~ $expected ]] || (( $? == 2 )); then
-      echo "Invalid extended regular expression: \`$expected'" \
-      | batslib_decorate 'ERROR: assert_output' \
-      | fail
+  elif ((is_mode_regexp)); then
+    if [[ '' =~ $expected ]] || (($? == 2)); then
+      echo "Invalid extended regular expression: \`$expected'" |
+        batslib_decorate 'ERROR: assert_output' |
+        fail
     elif ! [[ $output =~ $expected ]]; then
       batslib_print_kv_single_or_multi 6 \
-      'regexp'  "$expected" \
-      'output' "$output" \
-      | batslib_decorate 'regular expression does not match output' \
-      | fail
+        'regexp' "$expected" \
+        'output' "$output" |
+        batslib_decorate 'regular expression does not match output' |
+        fail
     fi
-  elif (( is_mode_partial )); then
+  elif ((is_mode_partial)); then
     if [[ $output != *"$expected"* ]]; then
       batslib_print_kv_single_or_multi 9 \
-      'substring' "$expected" \
-      'output'    "$output" \
-      | batslib_decorate 'output does not contain substring' \
-      | fail
+        'substring' "$expected" \
+        'output' "$output" |
+        batslib_decorate 'output does not contain substring' |
+        fail
     fi
   else
     if [[ $output != "$expected" ]]; then
       batslib_print_kv_single_or_multi 8 \
-      'expected' "$expected" \
-      'actual'   "$output" \
-      | batslib_decorate 'output differs' \
-      | fail
+        'expected' "$expected" \
+        'actual' "$output" |
+        batslib_decorate 'output differs' |
+        fail
     fi
   fi
 }

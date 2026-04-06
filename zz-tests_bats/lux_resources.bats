@@ -12,7 +12,7 @@ setup() {
   export output
 
   lux="$(result_dir)/bin/lux"
-  [[ -x "$lux" ]] || skip "lux binary not found at $lux — run: nix build .#lux"
+  [[ -x $lux ]] || skip "lux binary not found at $lux — run: nix build .#lux"
 
   # Resolve gopls store path from the devShell PATH so lux does not need
   # network access (sandcastle blocks it) to nix-build gopls at runtime.
@@ -25,7 +25,7 @@ setup() {
   local lux_config_dir="$XDG_CONFIG_HOME/lux"
   mkdir -p "$lux_config_dir/filetype"
 
-  cat > "$lux_config_dir/lsps.toml" <<TOML
+  cat >"$lux_config_dir/lsps.toml" <<TOML
 [[lsp]]
 name = "gopls"
 flake = "${gopls_store_path}"
@@ -35,7 +35,7 @@ flake = "${gopls_store_path}"
     staticcheck = false
 TOML
 
-  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+  cat >"$lux_config_dir/filetype/go.toml" <<'TOML'
 extensions = [".go"]
 language_ids = ["go"]
 lsp = "gopls"
@@ -75,8 +75,8 @@ read_lux_resource() {
     sleep 1
     printf '%s\n' "$read_request"
     sleep "$timeout_secs"
-  ) | timeout --preserve-status "$((timeout_secs + 10))s" "$lux" mcp-stdio 2>/dev/null \
-    | grep -m1 -F '"id":2')
+  ) | timeout --preserve-status "$((timeout_secs + 10))s" "$lux" mcp-stdio 2>/dev/null |
+    grep -m1 -F '"id":2')
 
   if [ -z "$response" ]; then
     echo "no response from lux"
@@ -103,7 +103,7 @@ function hover_returns_json_by_default { # @test
   assert_success
 
   # Output should be valid JSON with a content field (hover result)
-  run jq -e '.content' <<< "$output"
+  run jq -e '.content' <<<"$output"
   assert_success
 }
 
@@ -127,11 +127,11 @@ function references_returns_enriched_json { # @test
   local refs_output="$output"
 
   # Should be valid JSON with references array
-  run jq -e '.references' <<< "$refs_output"
+  run jq -e '.references' <<<"$refs_output"
   assert_success
 
   # Each ref should have context with line when context > 0
-  run jq -e '.references[0].context.line' <<< "$refs_output"
+  run jq -e '.references[0].context.line' <<<"$refs_output"
   assert_success
 }
 
@@ -146,9 +146,9 @@ function incoming_calls_returns_json { # @test
   local calls_output="$output"
 
   # Should be valid JSON with symbol and calls fields
-  run jq -e '.symbol' <<< "$calls_output"
+  run jq -e '.symbol' <<<"$calls_output"
   assert_success
-  run jq -e '.calls' <<< "$calls_output"
+  run jq -e '.calls' <<<"$calls_output"
   assert_success
 }
 
@@ -162,11 +162,11 @@ function diagnostics_batch_returns_results_for_go_files { # @test
   local diag_output="$output"
 
   # Should be valid JSON with lsps array
-  run jq -e '.lsps' <<< "$diag_output"
+  run jq -e '.lsps' <<<"$diag_output"
   assert_success
 
   # First LSP should be gopls
-  run jq -r '.lsps[0].name' <<< "$diag_output"
+  run jq -r '.lsps[0].name' <<<"$diag_output"
   assert_success
   assert_output "gopls"
 }

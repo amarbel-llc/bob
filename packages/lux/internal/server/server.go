@@ -6,14 +6,14 @@ import (
 	"os"
 	"sync"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
-	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/config/filetype"
 	"github.com/amarbel-llc/lux/internal/formatter"
+	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/subprocess"
 	"github.com/amarbel-llc/lux/internal/warmup"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 )
 
 type Server struct {

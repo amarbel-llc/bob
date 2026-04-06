@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
-	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/config/filetype"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/subprocess"
 	"github.com/amarbel-llc/lux/internal/tools"
 	"github.com/amarbel-llc/lux/pkg/filematch"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
+	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 )
 
 // resourceProvider wraps a ResourceRegistry to handle template-based resources
@@ -787,7 +787,6 @@ func readFiles(cwd string, matcher *filematch.MatcherSet) (*protocol.ResourceRea
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

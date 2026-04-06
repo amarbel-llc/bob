@@ -11,7 +11,7 @@
  * This is maximally permissive by default - only explicitly denied paths are blocked.
  */
 export interface FsReadRestrictionConfig {
-  denyOnly: string[]
+  denyOnly: string[];
 }
 
 /**
@@ -27,8 +27,8 @@ export interface FsReadRestrictionConfig {
  * Note: Empty `allowOnly` means NO paths are writable (unlike read's empty denyOnly).
  */
 export interface FsWriteRestrictionConfig {
-  allowOnly: string[]
-  denyWithinAllow: string[]
+  allowOnly: string[];
+  denyWithinAllow: string[];
 }
 
 /**
@@ -46,15 +46,15 @@ export interface FsWriteRestrictionConfig {
  * Note: Empty `allowedHosts` means NO hosts are allowed (unlike read's empty denyOnly).
  */
 export interface NetworkRestrictionConfig {
-  allowedHosts?: string[]
-  deniedHosts?: string[]
+  allowedHosts?: string[];
+  deniedHosts?: string[];
 }
 
 export type NetworkHostPattern = {
-  host: string
-  port: number | undefined
-}
+  host: string;
+  port: number | undefined;
+};
 
 export type SandboxAskCallback = (
   params: NetworkHostPattern,
-) => Promise<boolean>
+) => Promise<boolean>;

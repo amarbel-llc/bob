@@ -53,12 +53,11 @@ pub use copy_tool::CopyTool;
 pub use derivation_tool::DerivationShowTool;
 pub use eval_tool::EvalTool;
 pub use flake_tools::{
-    FlakeCheckTool, FlakeInitTool, FlakeLockTool, FlakeMetadataTool, FlakeShowTool,
-    FlakeUpdateTool,
+    FlakeCheckTool, FlakeInitTool, FlakeLockTool, FlakeMetadataTool, FlakeShowTool, FlakeUpdateTool,
 };
 pub use flakehub_tools::{
-    FhAddTool, FhFetchTool, FhListFlakesTool, FhListReleasesTool, FhListVersionsTool,
-    FhLoginTool, FhResolveTool, FhSearchTool, FhStatusTool,
+    FhAddTool, FhFetchTool, FhListFlakesTool, FhListReleasesTool, FhListVersionsTool, FhLoginTool,
+    FhResolveTool, FhSearchTool, FhStatusTool,
 };
 pub use hash_tools::{HashFileTool, HashPathTool};
 pub use log_tool::LogTool;

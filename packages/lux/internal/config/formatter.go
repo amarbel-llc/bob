@@ -20,14 +20,14 @@ type FormatterConfig struct {
 }
 
 type Formatter struct {
-	Name       string            `toml:"name"`
-	Flake      string            `toml:"flake"`
-	Binary     string            `toml:"binary,omitempty"`
-	Path       string            `toml:"path"`
-	Args       []string          `toml:"args"`
-	Env        map[string]string `toml:"env"`
-	Mode       FormatterMode     `toml:"mode"`
-	Disabled   bool              `toml:"disabled"`
+	Name     string            `toml:"name"`
+	Flake    string            `toml:"flake"`
+	Binary   string            `toml:"binary,omitempty"`
+	Path     string            `toml:"path"`
+	Args     []string          `toml:"args"`
+	Env      map[string]string `toml:"env"`
+	Mode     FormatterMode     `toml:"mode"`
+	Disabled bool              `toml:"disabled"`
 }
 
 func FormatterConfigPath() string {

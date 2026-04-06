@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/lsp"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 )
 
 type LSPState int
@@ -44,14 +44,14 @@ func (s LSPState) String() string {
 }
 
 type LSPInstance struct {
-	Name         string
-	Flake        string
-	Binary       string
-	Args         []string
-	Env          map[string]string
-	InitOptions  map[string]any
-	Settings     map[string]any
-	SettingsKey  string
+	Name            string
+	Flake           string
+	Binary          string
+	Args            []string
+	Env             map[string]string
+	InitOptions     map[string]any
+	Settings        map[string]any
+	SettingsKey     string
 	CapOverrides    *CapabilityOverride
 	State           LSPState
 	Process         *Process

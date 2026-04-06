@@ -18,7 +18,7 @@
  * expansion, no history expansion, no command substitution.
  */
 export function singleQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'"
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 /**
@@ -28,5 +28,5 @@ export function singleQuote(s: string): string {
  * double-quoting `!` escaping bug.
  */
 export function quoteArgs(args: string[]): string {
-  return args.map(singleQuote).join(' ')
+  return args.map(singleQuote).join(" ");
 }

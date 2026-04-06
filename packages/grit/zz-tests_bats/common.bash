@@ -14,13 +14,13 @@ setup_conflict_scenario() {
   setup_test_repo
 
   # Create divergent change on main
-  echo "main change" > "$TEST_REPO/file.txt"
+  echo "main change" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "main: modify file"
 
   # Create feature branch from initial commit with conflicting change
   git -C "$TEST_REPO" checkout -b feature HEAD~1
-  echo "feature change" > "$TEST_REPO/file.txt"
+  echo "feature change" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "feature: modify file"
 }
@@ -33,13 +33,13 @@ setup_clean_rebase_scenario() {
   setup_test_repo
 
   # Create change on main to a different file
-  echo "main addition" > "$TEST_REPO/file_a.txt"
+  echo "main addition" >"$TEST_REPO/file_a.txt"
   git -C "$TEST_REPO" add file_a.txt
   git -C "$TEST_REPO" commit -m "main: add file_a"
 
   # Create feature branch from initial commit with non-conflicting change
   git -C "$TEST_REPO" checkout -b feature HEAD~1
-  echo "feature addition" > "$TEST_REPO/file_b.txt"
+  echo "feature addition" >"$TEST_REPO/file_b.txt"
   git -C "$TEST_REPO" add file_b.txt
   git -C "$TEST_REPO" commit -m "feature: add file_b"
 }
@@ -58,10 +58,10 @@ run_grit_mcp() {
   call_request=$(printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"%s","arguments":%s}}' "$tool_name" "$tool_args")
 
   local response
-  response=$(printf '%s\n%s\n%s\n' "$init_request" "$initialized_notification" "$call_request" \
-    | timeout --preserve-status 5s "$grit_bin" 2>/dev/null \
-    | grep -F '"id":2' \
-    | head -1)
+  response=$(printf '%s\n%s\n%s\n' "$init_request" "$initialized_notification" "$call_request" |
+    timeout --preserve-status 5s "$grit_bin" 2>/dev/null |
+    grep -F '"id":2' |
+    head -1)
 
   if [ -z "$response" ]; then
     echo "no response from grit"
@@ -85,10 +85,10 @@ read_grit_resource() {
   read_request=$(printf '{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"%s"}}' "$uri")
 
   local response
-  response=$(printf '%s\n%s\n%s\n' "$init_request" "$initialized_notification" "$read_request" \
-    | timeout --preserve-status 5s "$grit_bin" 2>/dev/null \
-    | grep -F '"id":2' \
-    | head -1)
+  response=$(printf '%s\n%s\n%s\n' "$init_request" "$initialized_notification" "$read_request" |
+    timeout --preserve-status 5s "$grit_bin" 2>/dev/null |
+    grep -F '"id":2' |
+    head -1)
 
   if [ -z "$response" ]; then
     echo "no response from grit"

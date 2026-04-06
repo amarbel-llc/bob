@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/lux/internal/lsp"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 )
 
 // RegisterAll adds all MCP tool commands to the given app. When bridge is nil,

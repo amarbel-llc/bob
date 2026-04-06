@@ -5,8 +5,10 @@ import (
 	"strings"
 )
 
-const logRecordSep = "\x1e"
-const logFieldSep = "\x1f"
+const (
+	logRecordSep = "\x1e"
+	logFieldSep  = "\x1f"
+)
 
 const LogFormat = "%H" + logFieldSep + "%an" + logFieldSep + "%ae" + logFieldSep + "%aI" + logFieldSep + "%s" + logFieldSep + "%b" + logRecordSep
 

@@ -12,7 +12,7 @@ setup() {
   export output
 
   lux="$(result_dir)/bin/lux"
-  [[ -x "$lux" ]] || skip "lux binary not found at $lux — run: nix build .#lux"
+  [[ -x $lux ]] || skip "lux binary not found at $lux — run: nix build .#lux"
 
   # Resolve gopls store path from devShell to avoid network access.
   local gopls_bin
@@ -23,16 +23,16 @@ setup() {
   local lux_config_dir="$XDG_CONFIG_HOME/lux"
   mkdir -p "$lux_config_dir/filetype"
 
-  cat > "$lux_config_dir/lsps.toml" <<TOML
+  cat >"$lux_config_dir/lsps.toml" <<TOML
 [[lsp]]
 name = "gopls"
 flake = "${gopls_store_path}"
 TOML
 
-  cat > "$lux_config_dir/formatters.toml" <<'TOML'
+  cat >"$lux_config_dir/formatters.toml" <<'TOML'
 TOML
 
-  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+  cat >"$lux_config_dir/filetype/go.toml" <<'TOML'
 extensions = ["go"]
 language_ids = ["go"]
 lsp = "gopls"
@@ -42,7 +42,7 @@ TOML
 
   # Create a minimal Go project for gopls.
   mkdir -p "${BATS_TEST_TMPDIR}/project"
-  echo 'module test' > "${BATS_TEST_TMPDIR}/project/go.mod"
+  echo 'module test' >"${BATS_TEST_TMPDIR}/project/go.mod"
 }
 
 teardown() {
@@ -78,7 +78,7 @@ lux_lsp_session() {
     eval "$(declare -f lsp_frame)"
     eval "$LSP_SEND_MESSAGES_BODY"
     send_messages
-  ' | "$lux" "$@" > "$output_file" 2>/dev/null || true
+  ' | "$lux" "$@" >"$output_file" 2>/dev/null || true
 }
 
 # Extract a JSON-RPC response from a Content-Length framed output file.
@@ -122,18 +122,18 @@ function lux_lsp_responds_to_initialize { # @test
     lsp_frame "$shutdown_msg"
     sleep 1
     lsp_frame "$exit_msg"
-  ) | timeout --signal=KILL 10s "$lux" lsp > "$output_file" 2>/dev/null || true
+  ) | timeout --signal=KILL 10s "$lux" lsp >"$output_file" 2>/dev/null || true
 
   local response
   response="$(extract_lsp_response "$output_file" 1)"
 
   # Should have a result with capabilities
-  run jq -e '.result.capabilities.documentFormattingProvider' <<< "$response"
+  run jq -e '.result.capabilities.documentFormattingProvider' <<<"$response"
   assert_success
   assert_output "true"
 
   # Should report serverInfo
-  run jq -r '.result.serverInfo.name' <<< "$response"
+  run jq -r '.result.serverInfo.name' <<<"$response"
   assert_success
   assert_output "lux"
 }
@@ -151,25 +151,25 @@ function lux_lsp_advertises_formatting_only_in_phase_1 { # @test
     lsp_frame "$shutdown_msg"
     sleep 1
     lsp_frame "$exit_msg"
-  ) | timeout --signal=KILL 10s "$lux" lsp > "$output_file" 2>/dev/null || true
+  ) | timeout --signal=KILL 10s "$lux" lsp >"$output_file" 2>/dev/null || true
 
   local response
   response="$(extract_lsp_response "$output_file" 1)"
 
   # Phase 1: formatting providers should be true
-  run jq -e '.result.capabilities.documentFormattingProvider' <<< "$response"
+  run jq -e '.result.capabilities.documentFormattingProvider' <<<"$response"
   assert_success
   assert_output "true"
 
-  run jq -e '.result.capabilities.documentRangeFormattingProvider' <<< "$response"
+  run jq -e '.result.capabilities.documentRangeFormattingProvider' <<<"$response"
   assert_success
   assert_output "true"
 
   # Phase 1: other providers should NOT be present
-  run jq -e '.result.capabilities.hoverProvider // null' <<< "$response"
+  run jq -e '.result.capabilities.hoverProvider // null' <<<"$response"
   assert_output "null"
 
-  run jq -e '.result.capabilities.definitionProvider // null' <<< "$response"
+  run jq -e '.result.capabilities.definitionProvider // null' <<<"$response"
   assert_output "null"
 }
 
@@ -183,7 +183,7 @@ function lux_lsp_formats_go_file_via_gopls { # @test
 
   # Escape the content for JSON (newlines become \n, tabs become \t)
   local escaped_content
-  escaped_content="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" < "$go_file")"
+  escaped_content="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <"$go_file")"
 
   local init_msg='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file://'"${BATS_TEST_TMPDIR}/project"'","capabilities":{"textDocument":{"formatting":{"dynamicRegistration":false}}}}}'
   local initialized_msg='{"jsonrpc":"2.0","method":"initialized","params":{}}'
@@ -206,17 +206,17 @@ function lux_lsp_formats_go_file_via_gopls { # @test
     lsp_frame "$shutdown_msg"
     sleep 1
     lsp_frame "$exit_msg"
-  ) | timeout --signal=KILL 30s "$lux" lsp > "$output_file" 2>/dev/null || true
+  ) | timeout --signal=KILL 30s "$lux" lsp >"$output_file" 2>/dev/null || true
 
   local response
   response="$(extract_lsp_response "$output_file" 2)"
 
   # Should have a result (array of text edits)
-  run jq -e '.result' <<< "$response"
+  run jq -e '.result' <<<"$response"
   assert_success
 
   # Save response to file and apply edits
-  echo "$response" > "${BATS_TEST_TMPDIR}/response.json"
+  echo "$response" >"${BATS_TEST_TMPDIR}/response.json"
 
   python3 -c "
 import json, sys
@@ -239,7 +239,7 @@ for edit in edits:
     lines[s['line']:e['line'] + 1] = replacement_lines
 
 sys.stdout.write('\n'.join(lines))
-" "$go_file" "${BATS_TEST_TMPDIR}/response.json" > "${BATS_TEST_TMPDIR}/formatted.go"
+" "$go_file" "${BATS_TEST_TMPDIR}/response.json" >"${BATS_TEST_TMPDIR}/formatted.go"
 
   run diff -u "${fixtures_dir}/expected.go" "${BATS_TEST_TMPDIR}/formatted.go"
   assert_success
@@ -256,13 +256,13 @@ function lux_lsp_neovim_formats_go_file { # @test
   local output_go="${BATS_TEST_TMPDIR}/project/formatted.go"
 
   LUX_CMD="$lux lsp" \
-  LUX_INPUT="$go_file" \
-  LUX_OUTPUT="$output_go" \
+    LUX_INPUT="$go_file" \
+    LUX_OUTPUT="$output_go" \
     timeout --signal=KILL 120s \
     nvim --headless --clean -c "luafile ${fixtures_dir}/format.lua" 2>"${BATS_TEST_TMPDIR}/nvim_stderr.log" || true
 
   # Check nvim produced output
-  [[ -f "$output_go" ]] || {
+  [[ -f $output_go ]] || {
     echo "nvim stderr:"
     cat "${BATS_TEST_TMPDIR}/nvim_stderr.log" >&2
     fail "output file not created"
@@ -290,7 +290,7 @@ function lux_lsp_neovim_does_not_attach_to_non_matching_filetype { # @test
   command -v nvim >/dev/null 2>&1 || skip "nvim not on PATH"
 
   local txt_file="${BATS_TEST_TMPDIR}/project/readme.txt"
-  echo "hello" > "$txt_file"
+  echo "hello" >"$txt_file"
 
   run timeout --signal=KILL 15s env \
     LUX_CMD="$lux lsp" \
@@ -330,13 +330,13 @@ function lux_lsp_returns_method_not_found_for_hover { # @test
     lsp_frame "$shutdown_msg"
     sleep 1
     lsp_frame "$exit_msg"
-  ) | timeout --signal=KILL 10s "$lux" lsp > "$output_file" 2>/dev/null || true
+  ) | timeout --signal=KILL 10s "$lux" lsp >"$output_file" 2>/dev/null || true
 
   local response
   response="$(extract_lsp_response "$output_file" 2)"
 
   # Should return MethodNotFound error
-  run jq -e '.error.code' <<< "$response"
+  run jq -e '.error.code' <<<"$response"
   assert_success
   assert_output -- "-32601"
 }

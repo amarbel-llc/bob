@@ -23,9 +23,9 @@ const (
 )
 
 var (
-	planRegexp      = regexp.MustCompile(`^1\.\.([\d,.\x{00a0}\x{202f} ]+)(\s+#\s+(.*))?$`)
-	testPointRegexp = regexp.MustCompile(`^(not )?ok\b`)
-	pragmaRegexp    = regexp.MustCompile(`^pragma\s+[+-]\w`)
+	planRegexp         = regexp.MustCompile(`^1\.\.([\d,.\x{00a0}\x{202f} ]+)(\s+#\s+(.*))?$`)
+	testPointRegexp    = regexp.MustCompile(`^(not )?ok\b`)
+	pragmaRegexp       = regexp.MustCompile(`^pragma\s+[+-]\w`)
 	outputHeaderRegexp = regexp.MustCompile(`^# Output:\s+(\d+)\s*-\s*(.+?)(?:\s+#.*)?$`)
 	// csiRegexp matches all CSI escape sequences (ESC [ ... <final byte>),
 	// not just SGR, per the ANSI Display Hints amendment security guidance.

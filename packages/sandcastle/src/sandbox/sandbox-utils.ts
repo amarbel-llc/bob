@@ -1,30 +1,30 @@
-import { homedir } from 'os'
-import * as path from 'path'
-import * as fs from 'fs'
-import { getPlatform } from '../utils/platform.js'
-import { logForDebugging } from '../utils/debug.js'
+import { homedir } from "os";
+import * as path from "path";
+import * as fs from "fs";
+import { getPlatform } from "../utils/platform.js";
+import { logForDebugging } from "../utils/debug.js";
 
 /**
  * Dangerous files that should be protected from writes.
  * These files can be used for code execution or data exfiltration.
  */
 export const DANGEROUS_FILES = [
-  '.gitconfig',
-  '.gitmodules',
-  '.bashrc',
-  '.bash_profile',
-  '.zshrc',
-  '.zprofile',
-  '.profile',
-  '.ripgreprc',
-  '.mcp.json',
-] as const
+  ".gitconfig",
+  ".gitmodules",
+  ".bashrc",
+  ".bash_profile",
+  ".zshrc",
+  ".zprofile",
+  ".profile",
+  ".ripgreprc",
+  ".mcp.json",
+] as const;
 
 /**
  * Dangerous directories that should be protected from writes.
  * These directories contain sensitive configuration or executable files.
  */
-export const DANGEROUS_DIRECTORIES = ['.git', '.vscode', '.idea'] as const
+export const DANGEROUS_DIRECTORIES = [".git", ".vscode", ".idea"] as const;
 
 /**
  * Get the list of dangerous directories to deny writes to.
@@ -33,10 +33,10 @@ export const DANGEROUS_DIRECTORIES = ['.git', '.vscode', '.idea'] as const
  */
 export function getDangerousDirectories(): string[] {
   return [
-    ...DANGEROUS_DIRECTORIES.filter(d => d !== '.git'),
-    '.claude/commands',
-    '.claude/agents',
-  ]
+    ...DANGEROUS_DIRECTORIES.filter((d) => d !== ".git"),
+    ".claude/commands",
+    ".claude/agents",
+  ];
 }
 
 /**
@@ -49,7 +49,7 @@ export function getDangerousDirectories(): string[] {
  * @returns The lowercase path for safe comparison
  */
 export function normalizeCaseForComparison(pathStr: string): string {
-  return pathStr.toLowerCase()
+  return pathStr.toLowerCase();
 }
 
 /**
@@ -57,11 +57,11 @@ export function normalizeCaseForComparison(pathStr: string): string {
  */
 export function containsGlobChars(pathPattern: string): boolean {
   return (
-    pathPattern.includes('*') ||
-    pathPattern.includes('?') ||
-    pathPattern.includes('[') ||
-    pathPattern.includes(']')
-  )
+    pathPattern.includes("*") ||
+    pathPattern.includes("?") ||
+    pathPattern.includes("[") ||
+    pathPattern.includes("]")
+  );
 }
 
 /**
@@ -69,7 +69,7 @@ export function containsGlobChars(pathPattern: string): boolean {
  * Used to normalize path patterns since /** just means "directory and everything under it"
  */
 export function removeTrailingGlobSuffix(pathPattern: string): string {
-  return pathPattern.replace(/\/\*\*$/, '')
+  return pathPattern.replace(/\/\*\*$/, "");
 }
 
 /**
@@ -89,12 +89,12 @@ export function isSymlinkOutsideBoundary(
   originalPath: string,
   resolvedPath: string,
 ): boolean {
-  const normalizedOriginal = path.normalize(originalPath)
-  const normalizedResolved = path.normalize(resolvedPath)
+  const normalizedOriginal = path.normalize(originalPath);
+  const normalizedResolved = path.normalize(resolvedPath);
 
   // Same path after normalization - OK
   if (normalizedResolved === normalizedOriginal) {
-    return false
+    return false;
   }
 
   // Handle macOS /tmp -> /private/tmp canonical resolution
@@ -102,63 +102,63 @@ export function isSymlinkOutsideBoundary(
   // /tmp/claude -> /private/tmp/claude is OK
   // /var/folders/... -> /private/var/folders/... is OK
   if (
-    normalizedOriginal.startsWith('/tmp/') &&
-    normalizedResolved === '/private' + normalizedOriginal
+    normalizedOriginal.startsWith("/tmp/") &&
+    normalizedResolved === "/private" + normalizedOriginal
   ) {
-    return false
+    return false;
   }
   if (
-    normalizedOriginal.startsWith('/var/') &&
-    normalizedResolved === '/private' + normalizedOriginal
+    normalizedOriginal.startsWith("/var/") &&
+    normalizedResolved === "/private" + normalizedOriginal
   ) {
-    return false
+    return false;
   }
   // Also handle the reverse: /private/tmp/... resolving to itself
   if (
-    normalizedOriginal.startsWith('/private/tmp/') &&
+    normalizedOriginal.startsWith("/private/tmp/") &&
     normalizedResolved === normalizedOriginal
   ) {
-    return false
+    return false;
   }
   if (
-    normalizedOriginal.startsWith('/private/var/') &&
+    normalizedOriginal.startsWith("/private/var/") &&
     normalizedResolved === normalizedOriginal
   ) {
-    return false
+    return false;
   }
 
   // If resolved path is "/" it's outside expected boundaries
-  if (normalizedResolved === '/') {
-    return true
+  if (normalizedResolved === "/") {
+    return true;
   }
 
   // If resolved path is very short (single component like /tmp, /usr, /var),
   // it's likely outside expected boundaries
-  const resolvedParts = normalizedResolved.split('/').filter(Boolean)
+  const resolvedParts = normalizedResolved.split("/").filter(Boolean);
   if (resolvedParts.length <= 1) {
-    return true
+    return true;
   }
 
   // If original path starts with resolved path, the resolved path is an ancestor
   // e.g., /tmp/claude -> /tmp means the symlink points to a broader scope
-  if (normalizedOriginal.startsWith(normalizedResolved + '/')) {
-    return true
+  if (normalizedOriginal.startsWith(normalizedResolved + "/")) {
+    return true;
   }
 
   // Also check the canonical form of the original path for macOS
   // e.g., /tmp/claude should also be checked as /private/tmp/claude
-  let canonicalOriginal = normalizedOriginal
-  if (normalizedOriginal.startsWith('/tmp/')) {
-    canonicalOriginal = '/private' + normalizedOriginal
-  } else if (normalizedOriginal.startsWith('/var/')) {
-    canonicalOriginal = '/private' + normalizedOriginal
+  let canonicalOriginal = normalizedOriginal;
+  if (normalizedOriginal.startsWith("/tmp/")) {
+    canonicalOriginal = "/private" + normalizedOriginal;
+  } else if (normalizedOriginal.startsWith("/var/")) {
+    canonicalOriginal = "/private" + normalizedOriginal;
   }
 
   if (
     canonicalOriginal !== normalizedOriginal &&
-    canonicalOriginal.startsWith(normalizedResolved + '/')
+    canonicalOriginal.startsWith(normalizedResolved + "/")
   ) {
-    return true
+    return true;
   }
 
   // STRICT CHECK: Only allow resolutions that stay within the expected path tree
@@ -169,15 +169,15 @@ export function isSymlinkOutsideBoundary(
   // Any other resolution (e.g., /tmp/claude -> /Users/dworken) is outside expected bounds
 
   const resolvedStartsWithOriginal = normalizedResolved.startsWith(
-    normalizedOriginal + '/',
-  )
+    normalizedOriginal + "/",
+  );
   const resolvedStartsWithCanonical =
     canonicalOriginal !== normalizedOriginal &&
-    normalizedResolved.startsWith(canonicalOriginal + '/')
+    normalizedResolved.startsWith(canonicalOriginal + "/");
   const resolvedIsCanonical =
     canonicalOriginal !== normalizedOriginal &&
-    normalizedResolved === canonicalOriginal
-  const resolvedIsSame = normalizedResolved === normalizedOriginal
+    normalizedResolved === canonicalOriginal;
+  const resolvedIsSame = normalizedResolved === normalizedOriginal;
 
   // If resolved path is not within expected tree, it's outside boundary
   if (
@@ -186,11 +186,11 @@ export function isSymlinkOutsideBoundary(
     !resolvedStartsWithOriginal &&
     !resolvedStartsWithCanonical
   ) {
-    return true
+    return true;
   }
 
   // Allow resolution to same directory level or deeper within expected tree
-  return false
+  return false;
 }
 
 /**
@@ -205,66 +205,66 @@ export function isSymlinkOutsideBoundary(
  * Returns the absolute path with symlinks resolved (or normalized glob pattern)
  */
 export function normalizePathForSandbox(pathPattern: string): string {
-  const cwd = process.cwd()
-  let normalizedPath = pathPattern
+  const cwd = process.cwd();
+  let normalizedPath = pathPattern;
 
   // Expand ~ to home directory
-  if (pathPattern === '~') {
-    normalizedPath = homedir()
-  } else if (pathPattern.startsWith('~/')) {
-    normalizedPath = homedir() + pathPattern.slice(1)
-  } else if (pathPattern.startsWith('./') || pathPattern.startsWith('../')) {
+  if (pathPattern === "~") {
+    normalizedPath = homedir();
+  } else if (pathPattern.startsWith("~/")) {
+    normalizedPath = homedir() + pathPattern.slice(1);
+  } else if (pathPattern.startsWith("./") || pathPattern.startsWith("../")) {
     // Convert relative to absolute based on current working directory
-    normalizedPath = path.resolve(cwd, pathPattern)
+    normalizedPath = path.resolve(cwd, pathPattern);
   } else if (!path.isAbsolute(pathPattern)) {
     // Handle other relative paths (e.g., ".", "..", "foo/bar")
-    normalizedPath = path.resolve(cwd, pathPattern)
+    normalizedPath = path.resolve(cwd, pathPattern);
   }
 
   // For glob patterns, resolve symlinks for the directory portion only
   if (containsGlobChars(normalizedPath)) {
     // Extract the static directory prefix before glob characters
-    const staticPrefix = normalizedPath.split(/[*?[\]]/)[0]
-    if (staticPrefix && staticPrefix !== '/') {
+    const staticPrefix = normalizedPath.split(/[*?[\]]/)[0];
+    if (staticPrefix && staticPrefix !== "/") {
       // Get the directory containing the glob pattern
       // If staticPrefix ends with /, remove it to get the directory
-      const baseDir = staticPrefix.endsWith('/')
+      const baseDir = staticPrefix.endsWith("/")
         ? staticPrefix.slice(0, -1)
-        : path.dirname(staticPrefix)
+        : path.dirname(staticPrefix);
 
       // Try to resolve symlinks for the base directory
       try {
-        const resolvedBaseDir = fs.realpathSync(baseDir)
+        const resolvedBaseDir = fs.realpathSync(baseDir);
         // Validate that resolution stays within expected boundaries
         if (!isSymlinkOutsideBoundary(baseDir, resolvedBaseDir)) {
           // Reconstruct the pattern with the resolved directory
-          const patternSuffix = normalizedPath.slice(baseDir.length)
-          return resolvedBaseDir + patternSuffix
+          const patternSuffix = normalizedPath.slice(baseDir.length);
+          return resolvedBaseDir + patternSuffix;
         }
         // If resolution would broaden scope, keep original pattern
       } catch {
         // If directory doesn't exist or can't be resolved, keep the original pattern
       }
     }
-    return normalizedPath
+    return normalizedPath;
   }
 
   // Resolve symlinks to real paths to avoid bwrap issues
   // Validate that the resolution stays within expected boundaries
   try {
-    const resolvedPath = fs.realpathSync(normalizedPath)
+    const resolvedPath = fs.realpathSync(normalizedPath);
 
     // Only use resolved path if it doesn't cross boundary (e.g., symlink to parent dir)
     if (isSymlinkOutsideBoundary(normalizedPath, resolvedPath)) {
       // Symlink points outside expected boundaries - keep original path
     } else {
-      normalizedPath = resolvedPath
+      normalizedPath = resolvedPath;
     }
   } catch {
     // If path doesn't exist or can't be resolved, keep the normalized path
   }
 
-  return normalizedPath
+  return normalizedPath;
 }
 
 /**
@@ -275,29 +275,29 @@ export function normalizePathForSandbox(pathPattern: string): string {
  * environments, you should configure more restrictive write paths.
  */
 export function getDefaultWritePaths(tmpdir?: string): string[] {
-  const homeDir = homedir()
+  const homeDir = homedir();
   const writePaths = [
-    '/dev/stdout',
-    '/dev/stderr',
-    '/dev/null',
-    '/dev/tty',
-    '/dev/dtracehelper',
-    '/dev/autofs_nowait',
-    path.join(homeDir, '.npm/_logs'),
-    path.join(homeDir, '.claude/debug'),
-  ]
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/null",
+    "/dev/tty",
+    "/dev/dtracehelper",
+    "/dev/autofs_nowait",
+    path.join(homeDir, ".npm/_logs"),
+    path.join(homeDir, ".claude/debug"),
+  ];
 
   if (tmpdir) {
-    writePaths.push(tmpdir)
+    writePaths.push(tmpdir);
     // On macOS, /tmp is a symlink to /private/tmp
-    if (tmpdir.startsWith('/tmp/')) {
-      writePaths.push('/private' + tmpdir)
-    } else if (tmpdir.startsWith('/private/tmp/')) {
-      writePaths.push(tmpdir.replace('/private', ''))
+    if (tmpdir.startsWith("/tmp/")) {
+      writePaths.push("/private" + tmpdir);
+    } else if (tmpdir.startsWith("/private/tmp/")) {
+      writePaths.push(tmpdir.replace("/private", ""));
     }
   }
 
-  return writePaths
+  return writePaths;
 }
 
 /**
@@ -308,60 +308,60 @@ export function generateProxyEnvVars(
   socksProxyPort?: number,
   tmpdir?: string,
 ): string[] {
-  const envVars: string[] = [`SANDBOX_RUNTIME=1`]
+  const envVars: string[] = [`SANDBOX_RUNTIME=1`];
 
   if (tmpdir) {
-    envVars.push(`TMPDIR=${tmpdir}`)
+    envVars.push(`TMPDIR=${tmpdir}`);
   }
 
   // If no proxy ports provided, return minimal env vars
   if (!httpProxyPort && !socksProxyPort) {
-    return envVars
+    return envVars;
   }
 
   // Always set NO_PROXY to exclude localhost and private networks from proxying
   const noProxyAddresses = [
-    'localhost',
-    '127.0.0.1',
-    '::1',
-    '*.local',
-    '.local',
-    '169.254.0.0/16', // Link-local
-    '10.0.0.0/8', // Private network
-    '172.16.0.0/12', // Private network
-    '192.168.0.0/16', // Private network
-  ].join(',')
-  envVars.push(`NO_PROXY=${noProxyAddresses}`)
-  envVars.push(`no_proxy=${noProxyAddresses}`)
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "*.local",
+    ".local",
+    "169.254.0.0/16", // Link-local
+    "10.0.0.0/8", // Private network
+    "172.16.0.0/12", // Private network
+    "192.168.0.0/16", // Private network
+  ].join(",");
+  envVars.push(`NO_PROXY=${noProxyAddresses}`);
+  envVars.push(`no_proxy=${noProxyAddresses}`);
 
   if (httpProxyPort) {
-    envVars.push(`HTTP_PROXY=http://localhost:${httpProxyPort}`)
-    envVars.push(`HTTPS_PROXY=http://localhost:${httpProxyPort}`)
+    envVars.push(`HTTP_PROXY=http://localhost:${httpProxyPort}`);
+    envVars.push(`HTTPS_PROXY=http://localhost:${httpProxyPort}`);
     // Lowercase versions for compatibility with some tools
-    envVars.push(`http_proxy=http://localhost:${httpProxyPort}`)
-    envVars.push(`https_proxy=http://localhost:${httpProxyPort}`)
+    envVars.push(`http_proxy=http://localhost:${httpProxyPort}`);
+    envVars.push(`https_proxy=http://localhost:${httpProxyPort}`);
   }
 
   if (socksProxyPort) {
     // Use socks5h:// for proper DNS resolution through proxy
-    envVars.push(`ALL_PROXY=socks5h://localhost:${socksProxyPort}`)
-    envVars.push(`all_proxy=socks5h://localhost:${socksProxyPort}`)
+    envVars.push(`ALL_PROXY=socks5h://localhost:${socksProxyPort}`);
+    envVars.push(`all_proxy=socks5h://localhost:${socksProxyPort}`);
 
     // Configure Git to use SSH through SOCKS proxy (platform-aware)
-    if (getPlatform() === 'macos') {
+    if (getPlatform() === "macos") {
       // macOS has nc available
       // Note: No outer quotes - bwrap --setenv sets the value directly without shell interpretation
       envVars.push(
         `GIT_SSH_COMMAND=ssh -o ProxyCommand='nc -X 5 -x localhost:${socksProxyPort} %h %p'`,
-      )
+      );
     }
 
     // FTP proxy support (use socks5h for DNS resolution through proxy)
-    envVars.push(`FTP_PROXY=socks5h://localhost:${socksProxyPort}`)
-    envVars.push(`ftp_proxy=socks5h://localhost:${socksProxyPort}`)
+    envVars.push(`FTP_PROXY=socks5h://localhost:${socksProxyPort}`);
+    envVars.push(`ftp_proxy=socks5h://localhost:${socksProxyPort}`);
 
     // rsync proxy support
-    envVars.push(`RSYNC_PROXY=localhost:${socksProxyPort}`)
+    envVars.push(`RSYNC_PROXY=localhost:${socksProxyPort}`);
 
     // Database tools NOTE: Most database clients don't have built-in proxy support
     // You typically need to use SSH tunneling or a SOCKS wrapper like tsocks/proxychains
@@ -370,10 +370,10 @@ export function generateProxyEnvVars(
     // This makes Docker use the HTTP proxy for registry operations
     envVars.push(
       `DOCKER_HTTP_PROXY=http://localhost:${httpProxyPort || socksProxyPort}`,
-    )
+    );
     envVars.push(
       `DOCKER_HTTPS_PROXY=http://localhost:${httpProxyPort || socksProxyPort}`,
-    )
+    );
 
     // Kubernetes kubectl - uses standard HTTPS_PROXY
     // kubectl respects HTTPS_PROXY which we already set above
@@ -384,9 +384,9 @@ export function generateProxyEnvVars(
     // Google Cloud SDK - has specific proxy settings
     // Use HTTPS proxy to match other HTTP-based tools
     if (httpProxyPort) {
-      envVars.push(`CLOUDSDK_PROXY_TYPE=https`)
-      envVars.push(`CLOUDSDK_PROXY_ADDRESS=localhost`)
-      envVars.push(`CLOUDSDK_PROXY_PORT=${httpProxyPort}`)
+      envVars.push(`CLOUDSDK_PROXY_TYPE=https`);
+      envVars.push(`CLOUDSDK_PROXY_ADDRESS=localhost`);
+      envVars.push(`CLOUDSDK_PROXY_PORT=${httpProxyPort}`);
     }
 
     // Azure CLI - uses HTTPS_PROXY
@@ -396,15 +396,15 @@ export function generateProxyEnvVars(
     // Terraform respects HTTP_PROXY/HTTPS_PROXY which we already set above
 
     // gRPC-based tools - use standard proxy vars
-    envVars.push(`GRPC_PROXY=socks5h://localhost:${socksProxyPort}`)
-    envVars.push(`grpc_proxy=socks5h://localhost:${socksProxyPort}`)
+    envVars.push(`GRPC_PROXY=socks5h://localhost:${socksProxyPort}`);
+    envVars.push(`grpc_proxy=socks5h://localhost:${socksProxyPort}`);
   }
 
   // WARNING: Do not set HTTP_PROXY/HTTPS_PROXY to SOCKS URLs when only SOCKS proxy is available
   // Most HTTP clients do not support SOCKS URLs in these variables and will fail, and we want
   // to avoid overriding the client otherwise respecting the ALL_PROXY env var which points to SOCKS.
 
-  return envVars
+  return envVars;
 }
 
 /**
@@ -412,15 +412,15 @@ export function generateProxyEnvVars(
  * Truncates to 100 chars and base64 encodes to avoid parsing issues
  */
 export function encodeSandboxedCommand(command: string): string {
-  const truncatedCommand = command.slice(0, 100)
-  return Buffer.from(truncatedCommand).toString('base64')
+  const truncatedCommand = command.slice(0, 100);
+  return Buffer.from(truncatedCommand).toString("base64");
 }
 
 /**
  * Decode a base64-encoded command from sandbox monitoring
  */
 export function decodeSandboxedCommand(encodedCommand: string): string {
-  return Buffer.from(encodedCommand, 'base64').toString('utf8')
+  return Buffer.from(encodedCommand, "base64").toString("utf8");
 }
 
 /**
@@ -439,22 +439,22 @@ export function decodeSandboxedCommand(encodedCommand: string): string {
  */
 export function globToRegex(globPattern: string): string {
   return (
-    '^' +
+    "^" +
     globPattern
       // Escape regex special characters (except glob chars * ? [ ])
-      .replace(/[.^$+{}()|\\]/g, '\\$&')
+      .replace(/[.^$+{}()|\\]/g, "\\$&")
       // Escape unclosed brackets (no matching ])
-      .replace(/\[([^\]]*?)$/g, '\\[$1')
+      .replace(/\[([^\]]*?)$/g, "\\[$1")
       // Convert glob patterns to regex (order matters - ** before *)
-      .replace(/\*\*\//g, '__GLOBSTAR_SLASH__') // Placeholder for **/
-      .replace(/\*\*/g, '__GLOBSTAR__') // Placeholder for **
-      .replace(/\*/g, '[^/]*') // * matches anything except /
-      .replace(/\?/g, '[^/]') // ? matches single character except /
+      .replace(/\*\*\//g, "__GLOBSTAR_SLASH__") // Placeholder for **/
+      .replace(/\*\*/g, "__GLOBSTAR__") // Placeholder for **
+      .replace(/\*/g, "[^/]*") // * matches anything except /
+      .replace(/\?/g, "[^/]") // ? matches single character except /
       // Restore placeholders
-      .replace(/__GLOBSTAR_SLASH__/g, '(.*/)?') // **/ matches zero or more dirs
-      .replace(/__GLOBSTAR__/g, '.*') + // ** matches anything including /
-    '$'
-  )
+      .replace(/__GLOBSTAR_SLASH__/g, "(.*/)?") // **/ matches zero or more dirs
+      .replace(/__GLOBSTAR__/g, ".*") + // ** matches anything including /
+    "$"
+  );
 }
 
 /**
@@ -468,37 +468,37 @@ export function globToRegex(globPattern: string): string {
  * @returns Array of absolute paths matching the glob pattern
  */
 export function expandGlobPattern(globPath: string): string[] {
-  const normalizedPattern = normalizePathForSandbox(globPath)
+  const normalizedPattern = normalizePathForSandbox(globPath);
 
   // Extract the static directory prefix before any glob characters
-  const staticPrefix = normalizedPattern.split(/[*?[\]]/)[0]
-  if (!staticPrefix || staticPrefix === '/') {
-    logForDebugging(`[Sandbox] Glob pattern too broad, skipping: ${globPath}`)
-    return []
+  const staticPrefix = normalizedPattern.split(/[*?[\]]/)[0];
+  if (!staticPrefix || staticPrefix === "/") {
+    logForDebugging(`[Sandbox] Glob pattern too broad, skipping: ${globPath}`);
+    return [];
   }
 
   // Get the base directory from the static prefix
-  const baseDir = staticPrefix.endsWith('/')
+  const baseDir = staticPrefix.endsWith("/")
     ? staticPrefix.slice(0, -1)
-    : path.dirname(staticPrefix)
+    : path.dirname(staticPrefix);
 
   if (!fs.existsSync(baseDir)) {
     logForDebugging(
       `[Sandbox] Base directory for glob does not exist: ${baseDir}`,
-    )
-    return []
+    );
+    return [];
   }
 
   // Build regex from the normalized glob pattern
-  const regex = new RegExp(globToRegex(normalizedPattern))
+  const regex = new RegExp(globToRegex(normalizedPattern));
 
   // List all entries recursively under the base directory
-  const results: string[] = []
+  const results: string[] = [];
   try {
     const entries = fs.readdirSync(baseDir, {
       recursive: true,
       withFileTypes: true,
-    })
+    });
 
     for (const entry of entries) {
       // Build the full path for this entry
@@ -507,18 +507,18 @@ export function expandGlobPattern(globPath: string): string[] {
       const parentDir =
         (entry as { parentPath?: string }).parentPath ??
         (entry as { path?: string }).path ??
-        baseDir
-      const fullPath = path.join(parentDir, entry.name)
+        baseDir;
+      const fullPath = path.join(parentDir, entry.name);
 
       if (regex.test(fullPath)) {
-        results.push(fullPath)
+        results.push(fullPath);
       }
     }
   } catch (err) {
     logForDebugging(
       `[Sandbox] Error expanding glob pattern ${globPath}: ${err}`,
-    )
+    );
   }
 
-  return results
+  return results;
 }

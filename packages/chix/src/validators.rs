@@ -169,24 +169,19 @@ mod tests {
 
     #[test]
     fn test_store_path() {
-        assert!(validate_store_path(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello"
-        )
-        .is_ok());
-        assert!(validate_store_path(
-            "/nix/store/abcdefghijklmnopqrstuvwxyz012345-package-1.0"
-        )
-        .is_ok());
+        assert!(validate_store_path("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello").is_ok());
+        assert!(
+            validate_store_path("/nix/store/abcdefghijklmnopqrstuvwxyz012345-package-1.0").is_ok()
+        );
         assert!(validate_store_path("/tmp/not-store").is_err());
         assert!(validate_store_path("/nix/store/short-hash").is_err());
     }
 
     #[test]
     fn test_store_subpath() {
-        assert!(validate_store_subpath(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello"
-        )
-        .is_ok());
+        assert!(
+            validate_store_subpath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello").is_ok()
+        );
         assert!(validate_store_subpath(
             "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello/bin/hello"
         )
@@ -220,22 +215,20 @@ mod tests {
             "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.hidden-dir/.hidden-file"
         )
         .is_ok());
-        assert!(validate_store_subpath(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/."
-        )
-        .is_err());
-        assert!(validate_store_subpath(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.."
-        )
-        .is_err());
-        assert!(validate_store_subpath(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/./bin"
-        )
-        .is_err());
-        assert!(validate_store_subpath(
-            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/../other"
-        )
-        .is_err());
+        assert!(
+            validate_store_subpath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.").is_err()
+        );
+        assert!(
+            validate_store_subpath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/..").is_err()
+        );
+        assert!(
+            validate_store_subpath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/./bin")
+                .is_err()
+        );
+        assert!(
+            validate_store_subpath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/../other")
+                .is_err()
+        );
     }
 
     #[test]

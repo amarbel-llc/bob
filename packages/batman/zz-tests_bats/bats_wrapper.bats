@@ -163,9 +163,9 @@ EOF
   assert_output --partial "ok 1"
   # Extract BATS_RUN_TMPDIR from output (printed by --no-tempdir-cleanup)
   bats_run_dir="$(echo "$output" | grep "BATS_RUN_TMPDIR" | cut -d' ' -f2)"
-  [[ -n "$bats_run_dir" ]]
+  [[ -n $bats_run_dir ]]
   # Verify the temp dir survived sandcastle cleanup
-  [[ -d "$bats_run_dir" ]]
+  [[ -d $bats_run_dir ]]
   [[ -f "$bats_run_dir/test/1/marker.txt" ]]
   # Clean up manually
   rm -rf "$bats_run_dir"

@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawnSync } from "node:child_process";
 
 /**
  * Find the path to an executable, similar to the `which` command.
@@ -9,20 +9,20 @@ import { spawnSync } from 'node:child_process'
  */
 export function whichSync(bin: string): string | null {
   // Check if we're running in Bun
-  if (typeof globalThis.Bun !== 'undefined') {
-    return globalThis.Bun.which(bin)
+  if (typeof globalThis.Bun !== "undefined") {
+    return globalThis.Bun.which(bin);
   }
 
   // Fallback to Node.js implementation
-  const result = spawnSync('which', [bin], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
+  const result = spawnSync("which", [bin], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
     timeout: 1000,
-  })
+  });
 
   if (result.status === 0 && result.stdout) {
-    return result.stdout.trim()
+    return result.stdout.trim();
   }
 
-  return null
+  return null;
 }

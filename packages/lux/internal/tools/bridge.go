@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/formatter"
 	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/server"
 	"github.com/amarbel-llc/lux/internal/subprocess"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 	"github.com/gobwas/glob"
 )
 
@@ -962,15 +962,15 @@ func (b *Bridge) DefaultInitParams(uri lsp.DocumentURI) *lsp.InitializeParams {
 				WorkspaceFolders: true,
 			},
 			TextDocument: &lsp.TextDocumentClientCapabilities{
-				Hover:          &lsp.HoverClientCaps{},
-				Definition:     &lsp.DefinitionClientCaps{},
-				References:     &lsp.ReferencesClientCaps{},
-				Completion:     &lsp.CompletionClientCaps{},
-				DocumentSymbol: &lsp.DocumentSymbolClientCaps{},
-				CodeAction:     &lsp.CodeActionClientCaps{},
-				Formatting:     &lsp.FormattingClientCaps{},
+				Hover:              &lsp.HoverClientCaps{},
+				Definition:         &lsp.DefinitionClientCaps{},
+				References:         &lsp.ReferencesClientCaps{},
+				Completion:         &lsp.CompletionClientCaps{},
+				DocumentSymbol:     &lsp.DocumentSymbolClientCaps{},
+				CodeAction:         &lsp.CodeActionClientCaps{},
+				Formatting:         &lsp.FormattingClientCaps{},
 				Rename:             &lsp.RenameClientCaps{},
-				CallHierarchy:     &lsp.CallHierarchyClientCaps{},
+				CallHierarchy:      &lsp.CallHierarchyClientCaps{},
 				PublishDiagnostics: &lsp.PublishDiagnosticsClientCaps{},
 			},
 			Window: &lsp.WindowClientCapabilities{

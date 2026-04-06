@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/lux/internal/server"
 	"github.com/amarbel-llc/lux/internal/tools"
+	mcpserver "github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 )
 
 func newTestResourceProvider() *resourceProvider {

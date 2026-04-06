@@ -107,11 +107,11 @@ function exec_parallel_j1_enforces_serial_execution { # @test
   local prev=""
   while IFS= read -r line; do
     local kind="${line%%-*}"
-    if [[ "$kind" == "start" && "$prev" == "start" ]]; then
+    if [[ $kind == "start" && $prev == "start" ]]; then
       fail "two starts in a row — jobs overlapped: $(cat "$dir/log")"
     fi
     prev="$kind"
-  done < "$dir/log"
+  done <"$dir/log"
 
   # All 3 jobs completed
   run grep -c "^end-" "$dir/log"
@@ -160,13 +160,13 @@ function exec_parallel_failure_diagnostics_include_stderr { # @test
 function exec_parallel_produces_valid_tap { # @test
   local tap_output
   tap_output=$("$tap_dancer" exec-parallel echo {} ::: a b c 2>/dev/null)
-  run "$tap_dancer" validate <<< "$tap_output"
+  run "$tap_dancer" validate <<<"$tap_output"
   assert_success
 }
 
 function exec_parallel_j1_produces_valid_tap { # @test
   local tap_output
   tap_output=$("$tap_dancer" exec-parallel -j 1 echo {} ::: a b c 2>/dev/null)
-  run "$tap_dancer" validate <<< "$tap_output"
+  run "$tap_dancer" validate <<<"$tap_output"
   assert_success
 }

@@ -31,9 +31,9 @@ type Provider struct {
 func NewProvider(client *caldav.Client) *Provider {
 	registry := mcpserver.NewResourceRegistry()
 	p := &Provider{
-		registry: registry,
-		client:   client,
-		index:    NewWordIndex(),
+		registry:   registry,
+		client:     client,
+		index:      NewWordIndex(),
 		taskMap:    make(map[string]*caldav.TaskWithMeta),
 		eventMap:   make(map[string]*caldav.EventWithMeta),
 		calHrefs:   make(map[string]string),

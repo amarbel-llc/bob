@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
-	"github.com/amarbel-llc/lux/internal/config"
 )
 
 func TestMCPInitialize(t *testing.T) {

@@ -13,7 +13,7 @@ teardown() {
 
 function stash_save_creates_stash_from_staged_changes { # @test
   setup_test_repo
-  echo "modified" > "$TEST_REPO/file.txt"
+  echo "modified" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
 
   run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"test stash"}' "$TEST_REPO")"
@@ -30,7 +30,7 @@ function stash_save_creates_stash_from_staged_changes { # @test
 
 function stash_save_creates_stash_from_unstaged_changes { # @test
   setup_test_repo
-  echo "modified" > "$TEST_REPO/file.txt"
+  echo "modified" >"$TEST_REPO/file.txt"
 
   run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"unstaged"}' "$TEST_REPO")"
   assert_success
@@ -54,7 +54,7 @@ function stash_save_no_changes_returns_no_changes_status { # @test
 
 function stash_save_include_untracked { # @test
   setup_test_repo
-  echo "new file" > "$TEST_REPO/untracked.txt"
+  echo "new file" >"$TEST_REPO/untracked.txt"
 
   run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"with untracked","include_untracked":true}' "$TEST_REPO")"
   assert_success
@@ -69,9 +69,9 @@ function stash_save_include_untracked { # @test
 
 function stash_save_without_include_untracked_leaves_untracked_files { # @test
   setup_test_repo
-  echo "new file" > "$TEST_REPO/untracked.txt"
+  echo "new file" >"$TEST_REPO/untracked.txt"
   # Also modify a tracked file so stash has something to save
-  echo "modified" > "$TEST_REPO/file.txt"
+  echo "modified" >"$TEST_REPO/file.txt"
 
   run run_grit_mcp "stash-save" "$(printf '{"repo_path":"%s","message":"no untracked"}' "$TEST_REPO")"
   assert_success
@@ -84,7 +84,7 @@ function stash_save_without_include_untracked_leaves_untracked_files { # @test
 
 function stash_apply_restores_stashed_changes { # @test
   setup_test_repo
-  echo "stashed content" > "$TEST_REPO/file.txt"
+  echo "stashed content" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "to apply"
 
@@ -104,10 +104,10 @@ function stash_apply_restores_stashed_changes { # @test
 function stash_apply_with_explicit_ref { # @test
   setup_test_repo
   # Create two stashes
-  echo "first" > "$TEST_REPO/file.txt"
+  echo "first" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "first stash"
-  echo "second" > "$TEST_REPO/file.txt"
+  echo "second" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "second stash"
 
@@ -128,12 +128,12 @@ function stash_apply_with_explicit_ref { # @test
 function stash_apply_with_conflict_returns_json_not_text_error { # @test
   setup_test_repo
   # Stash a change
-  echo "stashed version" > "$TEST_REPO/file.txt"
+  echo "stashed version" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "will conflict"
 
   # Make a different change and commit it
-  echo "committed version" > "$TEST_REPO/file.txt"
+  echo "committed version" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "conflicting change"
 
@@ -142,18 +142,18 @@ function stash_apply_with_conflict_returns_json_not_text_error { # @test
   result=$(run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
 
   # The result must be valid JSON with status "conflict", not a plain text error
-  run jq -e -r '.status' <<< "$result"
+  run jq -e -r '.status' <<<"$result"
   assert_success
   assert_output "conflict"
 }
 
 function stash_apply_with_conflict_lists_conflicted_files { # @test
   setup_test_repo
-  echo "stashed version" > "$TEST_REPO/file.txt"
+  echo "stashed version" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "will conflict"
 
-  echo "committed version" > "$TEST_REPO/file.txt"
+  echo "committed version" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "conflicting change"
 
@@ -161,7 +161,7 @@ function stash_apply_with_conflict_lists_conflicted_files { # @test
   result=$(run_grit_mcp "stash-apply" "$(printf '{"repo_path":"%s"}' "$TEST_REPO")")
 
   # Should list file.txt as conflicted (depends on the bug above being fixed)
-  run jq -e -r '.conflicts[]' <<< "$result"
+  run jq -e -r '.conflicts[]' <<<"$result"
   assert_success
   assert_output "file.txt"
 }
@@ -178,7 +178,7 @@ function stash_apply_nonexistent_ref_returns_error { # @test
 
 function stash_apply_preserves_stash_in_list { # @test
   setup_test_repo
-  echo "stashed" > "$TEST_REPO/file.txt"
+  echo "stashed" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "should remain"
 
@@ -197,7 +197,7 @@ function stash_apply_preserves_stash_in_list { # @test
 
 function stash_drop_removes_stash { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -229,7 +229,7 @@ function stash_drop_nonexistent_ref_returns_error { # @test
 
 function stash_drop_with_index_instead_of_stash_ref { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -255,7 +255,7 @@ function stash_drop_with_index_instead_of_stash_ref { # @test
 
 function stash_drop_with_bare_integer_ref { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -275,7 +275,7 @@ function stash_drop_with_bare_integer_ref { # @test
 
 function stash_drop_with_empty_stash_ref_does_not_drop_silently { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -294,7 +294,7 @@ function stash_drop_with_empty_stash_ref_does_not_drop_silently { # @test
 
 function stash_drop_with_missing_stash_ref_does_not_drop_silently { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -315,7 +315,7 @@ function stash_drop_with_missing_stash_ref_does_not_drop_silently { # @test
 
 function stash_drop_with_stash_at_empty_braces { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -335,7 +335,7 @@ function stash_drop_with_stash_at_empty_braces { # @test
 
 function stash_drop_ref_with_special_chars_in_printf { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -343,10 +343,11 @@ function stash_drop_ref_with_special_chars_in_printf { # @test
   # or shell interpolation. Test with the exact JSON the MCP client sends.
   # Use a heredoc to avoid any shell interpolation of {0}
   local args
-  args=$(cat <<ARGS
+  args=$(
+    cat <<ARGS
 {"repo_path":"$TEST_REPO","stash_ref":"stash@{0}"}
 ARGS
-)
+  )
   run run_grit_mcp "stash-drop" "$args"
   assert_success
 
@@ -363,7 +364,7 @@ ARGS
 
 function stash_drop_ref_survives_json_encoding { # @test
   setup_test_repo
-  echo "to drop" > "$TEST_REPO/file.txt"
+  echo "to drop" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "drop me"
 
@@ -389,7 +390,7 @@ function stash_drop_ref_survives_json_encoding { # @test
 
 function stash_apply_with_index_instead_of_stash_ref { # @test
   setup_test_repo
-  echo "stashed" > "$TEST_REPO/file.txt"
+  echo "stashed" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "apply me"
 
@@ -406,7 +407,7 @@ function stash_apply_with_index_instead_of_stash_ref { # @test
 
 function stash_apply_with_bare_integer_ref { # @test
   setup_test_repo
-  echo "stashed" > "$TEST_REPO/file.txt"
+  echo "stashed" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "apply me"
 
@@ -434,10 +435,10 @@ function stashes_resource_empty_when_no_stashes { # @test
 
 function stashes_resource_lists_stash_entries { # @test
   setup_test_repo
-  echo "first" > "$TEST_REPO/file.txt"
+  echo "first" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "first stash"
-  echo "second" > "$TEST_REPO/file.txt"
+  echo "second" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "second stash"
 
@@ -460,7 +461,7 @@ function stashes_resource_lists_stash_entries { # @test
 
 function stashes_resource_includes_message { # @test
   setup_test_repo
-  echo "change" > "$TEST_REPO/file.txt"
+  echo "change" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" stash push -m "my test message"
 
@@ -477,7 +478,7 @@ function stashes_resource_includes_message { # @test
 
 function stash_round_trip_save_list_apply_drop { # @test
   setup_test_repo
-  echo "round trip content" > "$TEST_REPO/file.txt"
+  echo "round trip content" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
 
   # Save

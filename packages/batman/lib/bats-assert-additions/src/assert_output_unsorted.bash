@@ -129,30 +129,42 @@ assert_output_unsorted() {
   : "${output?}"
 
   # Handle options.
-  if (( $# == 0 )); then
+  if (($# == 0)); then
     is_mode_nonempty=1
   fi
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-    -p|--partial) is_mode_partial=1; shift ;;
-    -e|--regexp) is_mode_regexp=1; shift ;;
-    -|--stdin) use_stdin=1; shift ;;
-    --) shift; break ;;
+    -p | --partial)
+      is_mode_partial=1
+      shift
+      ;;
+    -e | --regexp)
+      is_mode_regexp=1
+      shift
+      ;;
+    - | --stdin)
+      use_stdin=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
     *) break ;;
     esac
   done
 
-  if (( is_mode_partial )) && (( is_mode_regexp )); then
-    echo "\`--partial' and \`--regexp' are mutually exclusive" \
-    | batslib_decorate 'ERROR: assert_output_unsorted' \
-    | fail
+  if ((is_mode_partial)) && ((is_mode_regexp)); then
+    echo "\`--partial' and \`--regexp' are mutually exclusive" |
+      batslib_decorate 'ERROR: assert_output_unsorted' |
+      fail
     return $?
   fi
 
   # Arguments.
   local expected
-  if (( use_stdin )); then
+  if ((use_stdin)); then
     expected="$(cat -)"
   else
     expected="${1-}"
@@ -163,39 +175,39 @@ assert_output_unsorted() {
   output_sorted="$(echo -n "$output" | sort)"
 
   # Matching.
-  if (( is_mode_nonempty )); then
+  if ((is_mode_nonempty)); then
     if [ -z "$output_sorted" ]; then
-      echo 'expected non-empty output, but output was empty' \
-      | batslib_decorate 'no output' \
-      | fail
+      echo 'expected non-empty output, but output was empty' |
+        batslib_decorate 'no output' |
+        fail
     fi
-  elif (( is_mode_regexp )); then
-    if [[ '' =~ $expected_sorted ]] || (( $? == 2 )); then
-      echo "Invalid extended regular expression: \`$expected_sorted'" \
-      | batslib_decorate 'ERROR: assert_output_unsorted' \
-      | fail
+  elif ((is_mode_regexp)); then
+    if [[ '' =~ $expected_sorted ]] || (($? == 2)); then
+      echo "Invalid extended regular expression: \`$expected_sorted'" |
+        batslib_decorate 'ERROR: assert_output_unsorted' |
+        fail
     elif ! [[ $output_sorted =~ $expected_sorted ]]; then
       batslib_print_kv_single_or_multi 6 \
-      'regexp'  "$expected_sorted" \
-      'output' "$output_sorted" \
-      | batslib_decorate 'regular expression does not match output' \
-      | fail
+        'regexp' "$expected_sorted" \
+        'output' "$output_sorted" |
+        batslib_decorate 'regular expression does not match output' |
+        fail
     fi
-  elif (( is_mode_partial )); then
+  elif ((is_mode_partial)); then
     if [[ $output_sorted != *"$expected_sorted"* ]]; then
       batslib_print_kv_single_or_multi 9 \
-      'substring' "$expected_sorted" \
-      'output'    "$output_sorted" \
-      | batslib_decorate 'output does not contain substring' \
-      | fail
+        'substring' "$expected_sorted" \
+        'output' "$output_sorted" |
+        batslib_decorate 'output does not contain substring' |
+        fail
     fi
   else
     if [[ $output_sorted != "$expected_sorted" ]]; then
       batslib_print_kv_single_or_multi 8 \
-      'expected' "$expected_sorted" \
-      'actual'   "$output_sorted" \
-      | batslib_decorate 'output differs' \
-      | fail
+        'expected' "$expected_sorted" \
+        'actual' "$output_sorted" |
+        batslib_decorate 'output differs' |
+        fail
     fi
   fi
 }

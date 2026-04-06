@@ -48,11 +48,17 @@ batslib_is_caller() {
   local -i is_mode_direct=1
 
   # Handle options.
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      -i|--indirect) is_mode_direct=0; shift ;;
-      --) shift; break ;;
-      *) break ;;
+    -i | --indirect)
+      is_mode_direct=0
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *) break ;;
     esac
   done
 
@@ -60,11 +66,11 @@ batslib_is_caller() {
   local -r func="$1"
 
   # Check call stack.
-  if (( is_mode_direct )); then
+  if ((is_mode_direct)); then
     [[ $func == "${FUNCNAME[2]}" ]] && return 0
   else
     local -i depth
-    for (( depth=2; depth<${#FUNCNAME[@]}; ++depth )); do
+    for ((depth = 2; depth < ${#FUNCNAME[@]}; ++depth)); do
       [[ $func == "${FUNCNAME[$depth]}" ]] && return 0
     done
   fi

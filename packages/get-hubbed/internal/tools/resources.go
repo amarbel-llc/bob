@@ -692,9 +692,9 @@ func (p *resourceProvider) readTree(ctx context.Context, uri string, q url.Value
 
 		result := struct {
 			Entries []json.RawMessage `json:"entries"`
-			Total   int              `json:"total"`
-			Offset  int              `json:"offset"`
-			Count   int              `json:"count"`
+			Total   int               `json:"total"`
+			Offset  int               `json:"offset"`
+			Count   int               `json:"count"`
 		}{
 			Entries: paginated,
 			Total:   total,

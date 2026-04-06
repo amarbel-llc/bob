@@ -26,7 +26,8 @@ func PreBuildAll(ctx context.Context, cfg *config.Config, executor subprocess.Ex
 }
 
 func StartRelevantLSPs(ctx context.Context, pool *subprocess.Pool, scanner *Scanner,
-	dirs []string, initParams *lsp.InitializeParams, cfg *config.Config) {
+	dirs []string, initParams *lsp.InitializeParams, cfg *config.Config,
+) {
 	result := scanner.ScanDirectories(dirs)
 
 	// Merge in eager_start LSPs
@@ -53,7 +54,8 @@ func StartRelevantLSPs(ctx context.Context, pool *subprocess.Pool, scanner *Scan
 }
 
 func StartAllLSPs(ctx context.Context, pool *subprocess.Pool, cfg *config.Config,
-	initParams *lsp.InitializeParams) {
+	initParams *lsp.InitializeParams,
+) {
 	var wg sync.WaitGroup
 	for _, l := range cfg.LSPs {
 		if !pool.IsIdleOrFailed(l.Name) {

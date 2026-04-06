@@ -15,15 +15,15 @@ setup_multi_commit_scenario() {
 
   # Create feature branch with multiple commits
   git -C "$TEST_REPO" checkout -b feature
-  echo "first" > "$TEST_REPO/first.txt"
+  echo "first" >"$TEST_REPO/first.txt"
   git -C "$TEST_REPO" add first.txt
   git -C "$TEST_REPO" commit -m "feature: add first"
 
-  echo "second" > "$TEST_REPO/second.txt"
+  echo "second" >"$TEST_REPO/second.txt"
   git -C "$TEST_REPO" add second.txt
   git -C "$TEST_REPO" commit -m "feature: add second"
 
-  echo "third" > "$TEST_REPO/third.txt"
+  echo "third" >"$TEST_REPO/third.txt"
   git -C "$TEST_REPO" add third.txt
   git -C "$TEST_REPO" commit -m "feature: add third"
 }
@@ -195,16 +195,16 @@ function execute_blocked_on_main { # @test
 function execute_conflict_returns_conflict_status { # @test
   setup_test_repo
   git -C "$TEST_REPO" checkout -b feature
-  echo "feature change" > "$TEST_REPO/file.txt"
+  echo "feature change" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "feature: modify file"
 
-  echo "more" > "$TEST_REPO/more.txt"
+  echo "more" >"$TEST_REPO/more.txt"
   git -C "$TEST_REPO" add more.txt
   git -C "$TEST_REPO" commit -m "feature: add more"
 
   git -C "$TEST_REPO" checkout main
-  echo "main change" > "$TEST_REPO/file.txt"
+  echo "main change" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
   git -C "$TEST_REPO" commit -m "main: modify file"
   git -C "$TEST_REPO" checkout feature

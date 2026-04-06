@@ -14,7 +14,7 @@ setup() {
 
   # fake-gofumpt: rejects invalid syntax, echoes valid input.
   fake_gofumpt="$BATS_TEST_TMPDIR/fake-gofumpt"
-  cat > "$fake_gofumpt" <<'SCRIPT'
+  cat >"$fake_gofumpt" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 input=$(cat)
@@ -29,7 +29,7 @@ SCRIPT
 
   # fake-empty: exits 0 but produces no output (truncation bug).
   fake_empty="$BATS_TEST_TMPDIR/fake-empty"
-  cat > "$fake_empty" <<'SCRIPT'
+  cat >"$fake_empty" <<'SCRIPT'
 #!/usr/bin/env bash
 cat > /dev/null
 exit 0
@@ -40,7 +40,7 @@ SCRIPT
   # Mimics a filepath-mode formatter misconfigured as stdin mode — it expects
   # a file path argument and ignores stdin, producing no stdout.
   fake_ignores_stdin="$BATS_TEST_TMPDIR/fake-ignores-stdin"
-  cat > "$fake_ignores_stdin" <<'SCRIPT'
+  cat >"$fake_ignores_stdin" <<'SCRIPT'
 #!/usr/bin/env bash
 cat > /dev/null
 exit 0
@@ -59,7 +59,7 @@ write_config() {
   local filetype_mode="${3:-chain}"
   local formatter_mode="${4:-}"
 
-  cat > "$lux_config_dir/filetype/go.toml" <<TOML
+  cat >"$lux_config_dir/filetype/go.toml" <<TOML
 extensions = [".go"]
 language_ids = ["go"]
 formatters = ["${name}"]
@@ -67,11 +67,11 @@ formatter_mode = "${filetype_mode}"
 TOML
 
   local mode_line=""
-  if [[ -n "$formatter_mode" ]]; then
+  if [[ -n $formatter_mode ]]; then
     mode_line="mode = \"${formatter_mode}\""
   fi
 
-  cat > "$lux_config_dir/formatters.toml" <<TOML
+  cat >"$lux_config_dir/formatters.toml" <<TOML
 [[formatter]]
 name = "${name}"
 path = "${path}"
@@ -82,14 +82,14 @@ TOML
 # Write filetype + formatter config for two chained formatters.
 # Usage: write_chain_config <name1> <path1> <name2> <path2>
 write_chain_config() {
-  cat > "$lux_config_dir/filetype/go.toml" <<TOML
+  cat >"$lux_config_dir/filetype/go.toml" <<TOML
 extensions = [".go"]
 language_ids = ["go"]
 formatters = ["${1}", "${3}"]
 formatter_mode = "chain"
 TOML
 
-  cat > "$lux_config_dir/formatters.toml" <<TOML
+  cat >"$lux_config_dir/formatters.toml" <<TOML
 [[formatter]]
 name = "${1}"
 path = "${2}"
@@ -110,7 +110,7 @@ function fmt_fails_on_invalid_go_syntax { # @test
   write_config "gofumpt" "$fake_gofumpt"
 
   local bad_file="$BATS_TEST_TMPDIR/bad.go"
-  cat > "$bad_file" <<'GO'
+  cat >"$bad_file" <<'GO'
 package main
 
 func {{{ invalid syntax
@@ -125,7 +125,7 @@ function fmt_succeeds_on_valid_go_syntax { # @test
   write_config "gofumpt" "$fake_gofumpt"
 
   local good_file="$BATS_TEST_TMPDIR/good.go"
-  cat > "$good_file" <<'GO'
+  cat >"$good_file" <<'GO'
 package main
 
 func main() {}
@@ -140,7 +140,7 @@ function fmt_does_not_modify_file_on_failure { # @test
   write_config "gofumpt" "$fake_gofumpt"
 
   local bad_file="$BATS_TEST_TMPDIR/bad.go"
-  cat > "$bad_file" <<'GO'
+  cat >"$bad_file" <<'GO'
 package main
 
 func {{{ invalid syntax
@@ -162,7 +162,7 @@ function fmt_with_empty_stdout_formatter_does_not_truncate_file { # @test
   write_config "empty-fmt" "$fake_empty"
 
   local go_file="$BATS_TEST_TMPDIR/truncate.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -179,7 +179,7 @@ GO
   after=$(cat "$go_file")
   local after_size=${#after}
 
-  [[ "$after_size" -gt 0 ]] || {
+  [[ $after_size -gt 0 ]] || {
     echo "file was truncated to 0 bytes"
     return 1
   }
@@ -189,7 +189,7 @@ function fmt_stdout_with_empty_formatter_does_not_produce_empty_output { # @test
   write_config "empty-fmt" "$fake_empty"
 
   local go_file="$BATS_TEST_TMPDIR/truncate.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -199,8 +199,8 @@ GO
 
   # If the formatter produces empty output, lux should either error or
   # preserve the original content — never emit nothing.
-  if [[ "$status" -eq 0 ]]; then
-    [[ -n "$output" ]] || {
+  if [[ $status -eq 0 ]]; then
+    [[ -n $output ]] || {
       echo "stdout was empty on success — content would be lost"
       return 1
     }
@@ -211,7 +211,7 @@ function fmt_chain_with_empty_first_formatter_does_not_truncate { # @test
   write_chain_config "empty-fmt" "$fake_empty" "gofumpt" "$fake_gofumpt"
 
   local go_file="$BATS_TEST_TMPDIR/chain.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -226,7 +226,7 @@ GO
   after=$(cat "$go_file")
   local after_size=${#after}
 
-  [[ "$after_size" -gt 0 ]] || {
+  [[ $after_size -gt 0 ]] || {
     echo "file was truncated to 0 bytes after chain formatting"
     return 1
   }
@@ -241,7 +241,7 @@ function fmt_filepath_formatter_in_stdin_mode_does_not_truncate { # @test
   write_config "ignores-stdin" "$fake_ignores_stdin" "chain" "stdin"
 
   local go_file="$BATS_TEST_TMPDIR/mismatch.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -267,7 +267,7 @@ function fmt_fails_when_formatter_binary_missing { # @test
   write_config "missing-fmt" "$fake_missing"
 
   local go_file="$BATS_TEST_TMPDIR/missing.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -286,15 +286,15 @@ GO
 
 function fmt_fails_when_no_formatter_configured { # @test
   # Write filetype config without any formatters.
-  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+  cat >"$lux_config_dir/filetype/go.toml" <<'TOML'
 extensions = [".go"]
 language_ids = ["go"]
 TOML
-  cat > "$lux_config_dir/formatters.toml" <<'TOML'
+  cat >"$lux_config_dir/formatters.toml" <<'TOML'
 TOML
 
   local go_file="$BATS_TEST_TMPDIR/noconfig.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -312,7 +312,7 @@ function fmt_invokes_goimports_when_configured { # @test
   # then echoes stdin back (acts as identity formatter).
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
   local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
-  cat > "$fake_goimports" <<SCRIPT
+  cat >"$fake_goimports" <<SCRIPT
 #!/usr/bin/env bash
 set -euo pipefail
 touch "$sentinel"
@@ -323,7 +323,7 @@ SCRIPT
   write_config "goimports" "$fake_goimports"
 
   local go_file="$BATS_TEST_TMPDIR/test.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -332,7 +332,7 @@ GO
   run lux fmt --file "$go_file"
   assert_success
 
-  [[ -f "$sentinel" ]] || {
+  [[ -f $sentinel ]] || {
     echo "goimports was never invoked"
     return 1
   }
@@ -344,7 +344,7 @@ function fmt_silently_skips_formatter_not_in_formatters_toml { # @test
   # resulting in "no formatter configured" instead of a clear error.
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
   local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
-  cat > "$fake_goimports" <<SCRIPT
+  cat >"$fake_goimports" <<SCRIPT
 #!/usr/bin/env bash
 set -euo pipefail
 touch "$sentinel"
@@ -353,18 +353,18 @@ SCRIPT
   chmod +x "$fake_goimports"
 
   # Filetype references goimports...
-  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+  cat >"$lux_config_dir/filetype/go.toml" <<'TOML'
 extensions = [".go"]
 language_ids = ["go"]
 formatters = ["goimports"]
 TOML
 
   # ...but formatters.toml is empty (goimports not defined).
-  cat > "$lux_config_dir/formatters.toml" <<'TOML'
+  cat >"$lux_config_dir/formatters.toml" <<'TOML'
 TOML
 
   local go_file="$BATS_TEST_TMPDIR/test.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -376,7 +376,7 @@ GO
   assert_output --partial "not defined in formatters.toml"
 
   # goimports was never called.
-  [[ ! -f "$sentinel" ]] || {
+  [[ ! -f $sentinel ]] || {
     echo "goimports should not have been called"
     return 1
   }
@@ -388,7 +388,7 @@ function fmt_silently_drops_undefined_formatter_from_chain { # @test
   # chain without warning — the user thinks both are running but only one is.
   local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
 
-  cat > "$lux_config_dir/filetype/go.toml" <<'TOML'
+  cat >"$lux_config_dir/filetype/go.toml" <<'TOML'
 extensions = [".go"]
 language_ids = ["go"]
 formatters = ["goimports", "gofumpt"]
@@ -396,14 +396,14 @@ formatter_mode = "chain"
 TOML
 
   # Only gofumpt is defined; goimports is missing.
-  cat > "$lux_config_dir/formatters.toml" <<TOML
+  cat >"$lux_config_dir/formatters.toml" <<TOML
 [[formatter]]
 name = "gofumpt"
 path = "$fake_gofumpt"
 TOML
 
   local go_file="$BATS_TEST_TMPDIR/test.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {}
@@ -414,7 +414,7 @@ GO
   assert_output --partial 'references formatter "goimports"'
   assert_output --partial "not defined in formatters.toml"
 
-  [[ ! -f "$sentinel" ]] || {
+  [[ ! -f $sentinel ]] || {
     echo "goimports should not have been called (it's not even defined)"
     return 1
   }
@@ -423,7 +423,7 @@ GO
 function fmt_goimports_adds_missing_import { # @test
   # Fake goimports: simulates adding a missing import for fmt.Println.
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
-  cat > "$fake_goimports" <<'SCRIPT'
+  cat >"$fake_goimports" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 input=$(cat)
@@ -447,7 +447,7 @@ SCRIPT
   write_config "goimports" "$fake_goimports"
 
   local go_file="$BATS_TEST_TMPDIR/needs-import.go"
-  cat > "$go_file" <<'GO'
+  cat >"$go_file" <<'GO'
 package main
 
 func main() {

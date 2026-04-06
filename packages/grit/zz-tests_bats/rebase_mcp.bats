@@ -38,7 +38,7 @@ function mcp_continue_after_resolving { # @test
   run_grit_mcp "rebase" "$(printf '{"repo_path":"%s","upstream":"main"}' "$TEST_REPO")"
 
   # Resolve conflict
-  echo "resolved" > "$TEST_REPO/file.txt"
+  echo "resolved" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
 
   # Continue — this is the hang test

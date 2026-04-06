@@ -2399,7 +2399,10 @@ mod tests {
     #[test]
     fn test_output_block_sgr_no_color() {
         let mut buf = Vec::new();
-        let mut tw = TapWriterBuilder::new(&mut buf).color(false).build().unwrap();
+        let mut tw = TapWriterBuilder::new(&mut buf)
+            .color(false)
+            .build()
+            .unwrap();
         tw.output_block("test", |ob| {
             ob.line("hello \x1b[32mgreen\x1b[0m").unwrap();
             None

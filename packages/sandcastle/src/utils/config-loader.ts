@@ -1,8 +1,8 @@
-import * as fs from 'fs'
+import * as fs from "fs";
 import {
   SandboxRuntimeConfigSchema,
   type SandboxRuntimeConfig,
-} from '../sandbox/sandbox-config.js'
+} from "../sandbox/sandbox-config.js";
 
 /**
  * Parse and validate sandbox configuration from a string
@@ -12,18 +12,18 @@ export function loadConfigFromString(
   content: string,
 ): SandboxRuntimeConfig | null {
   if (!content.trim()) {
-    return null
+    return null;
   }
 
   try {
-    const parsed = JSON.parse(content)
-    const result = SandboxRuntimeConfigSchema.safeParse(parsed)
+    const parsed = JSON.parse(content);
+    const result = SandboxRuntimeConfigSchema.safeParse(parsed);
     if (!result.success) {
-      return null
+      return null;
     }
-    return result.data
+    return result.data;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -33,36 +33,38 @@ export function loadConfigFromString(
 export function loadConfig(filePath: string): SandboxRuntimeConfig | null {
   try {
     if (!fs.existsSync(filePath)) {
-      return null
+      return null;
     }
-    const content = fs.readFileSync(filePath, 'utf-8')
-    if (content.trim() === '') {
-      return null
+    const content = fs.readFileSync(filePath, "utf-8");
+    if (content.trim() === "") {
+      return null;
     }
 
     // Parse JSON
-    const parsed = JSON.parse(content)
+    const parsed = JSON.parse(content);
 
     // Validate with zod schema
-    const result = SandboxRuntimeConfigSchema.safeParse(parsed)
+    const result = SandboxRuntimeConfigSchema.safeParse(parsed);
 
     if (!result.success) {
-      console.error(`Invalid configuration in ${filePath}:`)
-      result.error.issues.forEach(issue => {
-        const path = issue.path.join('.')
-        console.error(`  - ${path}: ${issue.message}`)
-      })
-      return null
+      console.error(`Invalid configuration in ${filePath}:`);
+      result.error.issues.forEach((issue) => {
+        const path = issue.path.join(".");
+        console.error(`  - ${path}: ${issue.message}`);
+      });
+      return null;
     }
 
-    return result.data
+    return result.data;
   } catch (error) {
     // Log parse errors to help users debug invalid config files
     if (error instanceof SyntaxError) {
-      console.error(`Invalid JSON in config file ${filePath}: ${error.message}`)
+      console.error(
+        `Invalid JSON in config file ${filePath}: ${error.message}`,
+      );
     } else {
-      console.error(`Failed to load config from ${filePath}: ${error}`)
+      console.error(`Failed to load config from ${filePath}: ${error}`);
     }
-    return null
+    return null;
   }
 }

@@ -96,8 +96,8 @@ func main() {
 			"filter metadata for non-empty rrule to find RRULE-based tasks, " +
 			"and look for repeated summaries or categories to identify instance-per-occurrence tasks. " +
 			"A task without RRULE may still recur regularly.",
-		Tools:         registry,
-		Resources:     provider,
+		Tools:     registry,
+		Resources: provider,
 	})
 	if err != nil {
 		log.Fatalf("creating server: %v", err)

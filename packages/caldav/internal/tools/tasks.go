@@ -346,10 +346,10 @@ func handleMoveTask(_ context.Context, args json.RawMessage, provider *resources
 	if err := provider.Client().DeleteTask(tm.Task.Href, tm.Task.ETag); err != nil {
 		// Best effort — task is already in target
 		return command.JSONResult(map[string]any{
-			"uid":              params.UID,
-			"status":           "moved",
-			"warning":          "failed to delete from source calendar",
-			"target_calendar":  params.TargetCalendarID,
+			"uid":             params.UID,
+			"status":          "moved",
+			"warning":         "failed to delete from source calendar",
+			"target_calendar": params.TargetCalendarID,
 		}), nil
 	}
 
@@ -363,4 +363,3 @@ func handleMoveTask(_ context.Context, args json.RawMessage, provider *resources
 func generateUID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
-

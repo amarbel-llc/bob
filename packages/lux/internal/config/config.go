@@ -19,14 +19,14 @@ type Config struct {
 }
 
 type LSP struct {
-	Name         string              `toml:"name"`
-	Flake        string              `toml:"flake"`
-	Binary       string              `toml:"binary,omitempty"`
-	Args         []string            `toml:"args"`
-	Env          map[string]string   `toml:"env,omitempty"`
-	InitOptions  map[string]any      `toml:"init_options,omitempty"`
-	Settings     map[string]any      `toml:"settings,omitempty"`
-	SettingsKey  string              `toml:"settings_key,omitempty"`
+	Name            string              `toml:"name"`
+	Flake           string              `toml:"flake"`
+	Binary          string              `toml:"binary,omitempty"`
+	Args            []string            `toml:"args"`
+	Env             map[string]string   `toml:"env,omitempty"`
+	InitOptions     map[string]any      `toml:"init_options,omitempty"`
+	Settings        map[string]any      `toml:"settings,omitempty"`
+	SettingsKey     string              `toml:"settings_key,omitempty"`
 	Capabilities    *CapabilityOverride `toml:"capabilities,omitempty"`
 	WaitForReady    *bool               `toml:"wait_for_ready,omitempty"`
 	ReadyTimeout    string              `toml:"ready_timeout,omitempty"`
@@ -282,44 +282,44 @@ func isValidEnvVarName(name string) bool {
 }
 
 var knownCapabilities = map[string]bool{
-	"hover":                       true,
-	"hoverProvider":               true,
-	"completion":                  true,
-	"completionProvider":          true,
-	"definition":                  true,
-	"definitionProvider":          true,
-	"typeDefinition":              true,
-	"typeDefinitionProvider":      true,
-	"implementation":              true,
-	"implementationProvider":      true,
-	"references":                  true,
-	"referencesProvider":          true,
-	"documentHighlight":           true,
-	"documentHighlightProvider":   true,
-	"documentSymbol":              true,
-	"documentSymbolProvider":      true,
-	"codeAction":                  true,
-	"codeActionProvider":          true,
-	"codeLens":                    true,
-	"codeLensProvider":            true,
-	"documentFormatting":          true,
-	"documentFormattingProvider":  true,
-	"documentRangeFormatting":     true,
+	"hover":                           true,
+	"hoverProvider":                   true,
+	"completion":                      true,
+	"completionProvider":              true,
+	"definition":                      true,
+	"definitionProvider":              true,
+	"typeDefinition":                  true,
+	"typeDefinitionProvider":          true,
+	"implementation":                  true,
+	"implementationProvider":          true,
+	"references":                      true,
+	"referencesProvider":              true,
+	"documentHighlight":               true,
+	"documentHighlightProvider":       true,
+	"documentSymbol":                  true,
+	"documentSymbolProvider":          true,
+	"codeAction":                      true,
+	"codeActionProvider":              true,
+	"codeLens":                        true,
+	"codeLensProvider":                true,
+	"documentFormatting":              true,
+	"documentFormattingProvider":      true,
+	"documentRangeFormatting":         true,
 	"documentRangeFormattingProvider": true,
-	"rename":                      true,
-	"renameProvider":              true,
-	"foldingRange":                true,
-	"foldingRangeProvider":        true,
-	"selectionRange":              true,
-	"selectionRangeProvider":      true,
-	"semanticTokens":              true,
-	"semanticTokensProvider":      true,
-	"inlayHint":                   true,
-	"inlayHintProvider":           true,
-	"diagnostic":                  true,
-	"diagnosticProvider":          true,
-	"workspaceSymbol":             true,
-	"workspaceSymbolProvider":     true,
+	"rename":                          true,
+	"renameProvider":                  true,
+	"foldingRange":                    true,
+	"foldingRangeProvider":            true,
+	"selectionRange":                  true,
+	"selectionRangeProvider":          true,
+	"semanticTokens":                  true,
+	"semanticTokensProvider":          true,
+	"inlayHint":                       true,
+	"inlayHintProvider":               true,
+	"diagnostic":                      true,
+	"diagnosticProvider":              true,
+	"workspaceSymbol":                 true,
+	"workspaceSymbolProvider":         true,
 }
 
 func isKnownCapability(name string) bool {

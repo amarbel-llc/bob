@@ -20,16 +20,16 @@ const (
 )
 
 type Writer struct {
-	w                 io.Writer
-	n                 int
-	depth             int
-	planEmitted       bool
-	failed            bool
-	color             bool
-	locale            language.Tag
-	printer           *message.Printer
-	streamedOutput    bool
-	ttyBuildLastLine  bool
+	w                io.Writer
+	n                int
+	depth            int
+	planEmitted      bool
+	failed           bool
+	color            bool
+	locale           language.Tag
+	printer          *message.Printer
+	streamedOutput   bool
+	ttyBuildLastLine bool
 }
 
 func NewWriter(w io.Writer) *Writer {

@@ -34,7 +34,7 @@ function continue_after_resolving_does_not_hang { # @test
   git -C "$TEST_REPO" rebase main || true
 
   # Resolve the conflict
-  echo "resolved" > "$TEST_REPO/file.txt"
+  echo "resolved" >"$TEST_REPO/file.txt"
   git -C "$TEST_REPO" add file.txt
 
   # Continue should not hang (this is the key test)

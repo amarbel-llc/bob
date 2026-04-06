@@ -46,7 +46,7 @@ func registerInteractiveRebaseCommands(app *command.App) {
 			{
 				Name: "todo", Type: command.Array,
 				Description: "Ordered list of {action, hash, message?} objects. Actions: pick, reword, squash, fixup, drop",
-				Required: true,
+				Required:    true,
 				Items: []command.Param{
 					{Name: "action", Type: command.String, Description: "Rebase action: pick, reword, squash, fixup, drop", Required: true},
 					{Name: "hash", Type: command.String, Description: "Commit hash", Required: true},

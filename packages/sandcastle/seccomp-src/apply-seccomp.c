@@ -68,9 +68,8 @@ static int apply_bpf_file(const char *path) {
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
-    fprintf(stderr,
-            "usage: apply-seccomp <bpf-file> [<bpf-file>...] [--] "
-            "<command> [args...]\n");
+    fprintf(stderr, "usage: apply-seccomp <bpf-file> [<bpf-file>...] [--] "
+                    "<command> [args...]\n");
     return 1;
   }
 

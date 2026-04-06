@@ -1,5 +1,5 @@
 set_xdg() {
-  if [[ -z "${1:-}" ]]; then
+  if [[ -z ${1:-} ]]; then
     echo "set_xdg: base directory argument required" >&2
     return 1
   fi
@@ -7,7 +7,7 @@ set_xdg() {
   local loc
   loc="$(realpath "$1" 2>/dev/null)"
 
-  if [[ -z "$loc" ]]; then
+  if [[ -z $loc ]]; then
     echo "set_xdg: realpath failed for '$1'" >&2
     return 1
   fi

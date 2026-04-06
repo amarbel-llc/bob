@@ -4,8 +4,10 @@ import (
 	"strings"
 )
 
-const branchRecordSep = "\x1e"
-const fieldSep = "\x1f"
+const (
+	branchRecordSep = "\x1e"
+	fieldSep        = "\x1f"
+)
 
 func ParseBranchList(output string) []BranchEntry {
 	var branches []BranchEntry

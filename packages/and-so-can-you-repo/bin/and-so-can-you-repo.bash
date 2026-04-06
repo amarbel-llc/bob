@@ -16,7 +16,7 @@ generate_file_if_missing() {
   local filepath="$1"
   local content="$2"
 
-  if [[ -f "$filepath" ]]; then
+  if [[ -f $filepath ]]; then
     gum log --level warn "Skipping $filepath (already exists)"
     return 1
   fi
@@ -618,7 +618,7 @@ main() {
     local url
     url="$(gum input --placeholder "Repository URL")"
 
-    if [[ -z "$url" ]]; then
+    if [[ -z $url ]]; then
       gum log --level error "URL cannot be empty"
       exit 1
     fi
@@ -626,7 +626,7 @@ main() {
     name="$(basename "$url" .git)"
     repo_dir="$REPOS_DIR/$name"
 
-    if [[ -d "$repo_dir" ]]; then
+    if [[ -d $repo_dir ]]; then
       gum log --level error "$repo_dir already exists"
       exit 1
     fi
@@ -636,14 +636,14 @@ main() {
   else
     name="$(gum input --placeholder "Project name (e.g. my-tool)")"
 
-    if [[ -z "$name" ]]; then
+    if [[ -z $name ]]; then
       gum log --level error "Name cannot be empty"
       exit 1
     fi
 
     repo_dir="$REPOS_DIR/$name"
 
-    if [[ -d "$repo_dir" ]]; then
+    if [[ -d $repo_dir ]]; then
       gum log --level error "$repo_dir already exists"
       exit 1
     fi
@@ -657,13 +657,13 @@ main() {
       local gh_user
       gh_user="$(gh api user --jq '.login' 2>/dev/null || true)"
 
-      if [[ -z "$gh_user" ]]; then
+      if [[ -z $gh_user ]]; then
         gum log --level error "Not authenticated with gh. Run 'gh auth login' first."
         exit 1
       fi
 
       local choices="$gh_user (personal)"
-      if [[ -n "$orgs" ]]; then
+      if [[ -n $orgs ]]; then
         while IFS= read -r org; do
           choices="$choices"$'\n'"$org"
         done <<<"$orgs"
@@ -688,7 +688,7 @@ main() {
   local description
   description="$(gum input --placeholder "Short project description")"
 
-  if [[ -z "$description" ]]; then
+  if [[ -z $description ]]; then
     description="$name"
   fi
 
@@ -704,26 +704,26 @@ main() {
   local flake_content justfile_content gitignore_content
 
   case "$lang" in
-    go)
-      flake_content="$(apply_placeholders "$(template_flake_go)" "$name" "$sed_description")"
-      justfile_content="$(apply_placeholders "$(template_justfile_go)" "$name" "$sed_description")"
-      gitignore_content="$(apply_placeholders "$(template_gitignore_go)" "$name" "$sed_description")"
-      ;;
-    rust)
-      flake_content="$(apply_placeholders "$(template_flake_rust)" "$name" "$sed_description")"
-      justfile_content="$(apply_placeholders "$(template_justfile_rust)" "$name" "$sed_description")"
-      gitignore_content="$(apply_placeholders "$(template_gitignore_rust)" "$name" "$sed_description")"
-      ;;
-    zig)
-      flake_content="$(apply_placeholders "$(template_flake_zig)" "$name" "$sed_description")"
-      justfile_content="$(apply_placeholders "$(template_justfile_zig)" "$name" "$sed_description")"
-      gitignore_content="$(apply_placeholders "$(template_gitignore_zig)" "$name" "$sed_description")"
-      ;;
-    shell)
-      flake_content="$(apply_placeholders "$(template_flake_shell)" "$name" "$sed_description")"
-      justfile_content="$(apply_placeholders "$(template_justfile_shell)" "$name" "$sed_description")"
-      gitignore_content="$(apply_placeholders "$(template_gitignore_shell)" "$name" "$sed_description")"
-      ;;
+  go)
+    flake_content="$(apply_placeholders "$(template_flake_go)" "$name" "$sed_description")"
+    justfile_content="$(apply_placeholders "$(template_justfile_go)" "$name" "$sed_description")"
+    gitignore_content="$(apply_placeholders "$(template_gitignore_go)" "$name" "$sed_description")"
+    ;;
+  rust)
+    flake_content="$(apply_placeholders "$(template_flake_rust)" "$name" "$sed_description")"
+    justfile_content="$(apply_placeholders "$(template_justfile_rust)" "$name" "$sed_description")"
+    gitignore_content="$(apply_placeholders "$(template_gitignore_rust)" "$name" "$sed_description")"
+    ;;
+  zig)
+    flake_content="$(apply_placeholders "$(template_flake_zig)" "$name" "$sed_description")"
+    justfile_content="$(apply_placeholders "$(template_justfile_zig)" "$name" "$sed_description")"
+    gitignore_content="$(apply_placeholders "$(template_gitignore_zig)" "$name" "$sed_description")"
+    ;;
+  shell)
+    flake_content="$(apply_placeholders "$(template_flake_shell)" "$name" "$sed_description")"
+    justfile_content="$(apply_placeholders "$(template_justfile_shell)" "$name" "$sed_description")"
+    gitignore_content="$(apply_placeholders "$(template_gitignore_shell)" "$name" "$sed_description")"
+    ;;
   esac
 
   local envrc_content
@@ -736,35 +736,35 @@ main() {
 
   # Language-specific scaffolding
   case "$lang" in
-    go)
-      local go_main
-      go_main="$(apply_placeholders "$(template_go_main)" "$name" "$sed_description")"
-      generate_file_if_missing "cmd/$name/main.go" "$go_main"
-      generate_file_if_missing "gomod2nix.toml" ""
-      ;;
-    rust)
-      local cargo_toml rust_main
-      cargo_toml="$(apply_placeholders "$(template_rust_cargo_toml)" "$name" "$sed_description")"
-      rust_main="$(apply_placeholders "$(template_rust_main)" "$name" "$sed_description")"
-      generate_file_if_missing "Cargo.toml" "$cargo_toml"
-      generate_file_if_missing "src/main.rs" "$rust_main"
-      ;;
-    zig)
-      local zig_build zig_zon zig_main
-      zig_build="$(apply_placeholders "$(template_zig_build)" "$name" "$sed_description")"
-      zig_zon="$(apply_placeholders "$(template_zig_build_zon)" "$name" "$sed_description")"
-      zig_main="$(apply_placeholders "$(template_zig_main)" "$name" "$sed_description")"
-      generate_file_if_missing "build.zig" "$zig_build"
-      generate_file_if_missing "build.zig.zon" "$zig_zon"
-      generate_file_if_missing "src/main.zig" "$zig_main"
-      ;;
-    shell)
-      local shell_main
-      shell_main="$(apply_placeholders "$(template_shell_main)" "$name" "$sed_description")"
-      generate_file_if_missing "bin/$name.bash" "$shell_main"
-      mkdir -p tests
-      gum log --level info "Created tests/"
-      ;;
+  go)
+    local go_main
+    go_main="$(apply_placeholders "$(template_go_main)" "$name" "$sed_description")"
+    generate_file_if_missing "cmd/$name/main.go" "$go_main"
+    generate_file_if_missing "gomod2nix.toml" ""
+    ;;
+  rust)
+    local cargo_toml rust_main
+    cargo_toml="$(apply_placeholders "$(template_rust_cargo_toml)" "$name" "$sed_description")"
+    rust_main="$(apply_placeholders "$(template_rust_main)" "$name" "$sed_description")"
+    generate_file_if_missing "Cargo.toml" "$cargo_toml"
+    generate_file_if_missing "src/main.rs" "$rust_main"
+    ;;
+  zig)
+    local zig_build zig_zon zig_main
+    zig_build="$(apply_placeholders "$(template_zig_build)" "$name" "$sed_description")"
+    zig_zon="$(apply_placeholders "$(template_zig_build_zon)" "$name" "$sed_description")"
+    zig_main="$(apply_placeholders "$(template_zig_main)" "$name" "$sed_description")"
+    generate_file_if_missing "build.zig" "$zig_build"
+    generate_file_if_missing "build.zig.zon" "$zig_zon"
+    generate_file_if_missing "src/main.zig" "$zig_main"
+    ;;
+  shell)
+    local shell_main
+    shell_main="$(apply_placeholders "$(template_shell_main)" "$name" "$sed_description")"
+    generate_file_if_missing "bin/$name.bash" "$shell_main"
+    mkdir -p tests
+    gum log --level info "Created tests/"
+    ;;
   esac
 
   # Step 5: Post-generation
@@ -780,29 +780,29 @@ main() {
   direnv allow . 2>/dev/null || true
 
   case "$lang" in
-    go)
-      local go_module_owner="$github_owner"
-      if [[ -z "$go_module_owner" ]]; then
-        go_module_owner="friedenberg"
-      fi
-      gum log --level info "Initializing Go module..."
-      nix develop --command bash -c "go mod init github.com/$go_module_owner/$name && gomod2nix" 2>&1 |
-        while IFS= read -r line; do gum log --level debug "$line"; done
-      git add -A
-      ;;
-    rust)
-      gum log --level info "Generating Cargo.lock..."
-      nix develop --command cargo generate-lockfile 2>&1 |
-        while IFS= read -r line; do gum log --level debug "$line"; done
-      git add -A
-      ;;
-    shell)
-      chmod +x "bin/$name.bash"
-      ;;
+  go)
+    local go_module_owner="$github_owner"
+    if [[ -z $go_module_owner ]]; then
+      go_module_owner="friedenberg"
+    fi
+    gum log --level info "Initializing Go module..."
+    nix develop --command bash -c "go mod init github.com/$go_module_owner/$name && gomod2nix" 2>&1 |
+      while IFS= read -r line; do gum log --level debug "$line"; done
+    git add -A
+    ;;
+  rust)
+    gum log --level info "Generating Cargo.lock..."
+    nix develop --command cargo generate-lockfile 2>&1 |
+      while IFS= read -r line; do gum log --level debug "$line"; done
+    git add -A
+    ;;
+  shell)
+    chmod +x "bin/$name.bash"
+    ;;
   esac
 
   # Step 6: Create GitHub repo
-  if [[ "$create_github" == "true" ]]; then
+  if [[ $create_github == "true" ]]; then
     gum log --level info "Creating GitHub repository $github_owner/$name..."
 
     local gh_args=(
@@ -827,7 +827,7 @@ main() {
     "Description: $description"
   )
 
-  if [[ "$create_github" == "true" ]]; then
+  if [[ $create_github == "true" ]]; then
     summary_lines+=("GitHub: $github_owner/$name ($github_visibility)")
   fi
 

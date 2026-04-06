@@ -7,13 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
-	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/config"
 	"github.com/amarbel-llc/lux/internal/config/filetype"
 	"github.com/amarbel-llc/lux/internal/formatter"
+	"github.com/amarbel-llc/lux/internal/logfile"
 	"github.com/amarbel-llc/lux/internal/lsp"
 	"github.com/amarbel-llc/lux/internal/warmup"
+	"github.com/amarbel-llc/purse-first/libs/go-mcp/jsonrpc"
 )
 
 type Handler struct {
@@ -497,4 +497,3 @@ type CachedCapabilities struct {
 func loadCapabilityCache(name string) (*CachedCapabilities, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-
