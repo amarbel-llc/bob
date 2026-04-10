@@ -55,12 +55,6 @@ func main() {
 		return
 	}
 
-	if flag.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "caldav: unexpected arguments: %v\n", flag.Args())
-		flag.Usage()
-		os.Exit(1)
-	}
-
 	// Runtime mode — require CalDAV credentials
 	cfg, err := caldav.ConfigFromEnv()
 	if err != nil {
@@ -70,6 +64,16 @@ func main() {
 	client := caldav.NewClient(cfg)
 	provider := resources.NewProvider(client)
 	app := tools.RegisterAll(provider)
+
+	if flag.NArg() > 0 {
+		// Route CLI subcommands through the command.App
+		ctx := context.Background()
+		if err := app.RunCLI(ctx, flag.Args(), nil); err != nil {
+			fmt.Fprintf(os.Stderr, "caldav: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
