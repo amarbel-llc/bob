@@ -5,6 +5,10 @@ setup_test_home() {
 
   set_xdg "$BATS_TEST_TMPDIR"
 
+  # Suppress GNU parallel warnings when bats runs with --jobs
+  export PARALLEL_HOME="$BATS_TEST_TMPDIR/parallel"
+  mkdir -p "$PARALLEL_HOME"
+
   mkdir -p "$XDG_CONFIG_HOME/git"
   export GIT_CONFIG_GLOBAL="$XDG_CONFIG_HOME/git/config"
   export GIT_CONFIG_SYSTEM=/dev/null
