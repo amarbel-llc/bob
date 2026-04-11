@@ -17,6 +17,10 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 		Title: "Create Event",
 		Description: command.Description{
 			Short: "Create a new VEVENT in a CalDAV calendar",
+			Long: `Creates a new calendar event on the CalDAV server. Specify either dtend or
+duration (not both) to set the event length. Use YYYY-MM-DD format for all-day
+events or iCalendar datetime format (20260401T090000Z) for timed events. Status
+defaults to CONFIRMED if not specified.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -37,6 +41,17 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 			{Name: "rrule", Type: command.String, Description: "Recurrence rule (e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR)"},
 			{Name: "transp", Type: command.String, Description: "Time transparency: OPAQUE (busy) or TRANSPARENT (free)"},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Create a one-hour meeting",
+				Command:     "caldav create_event --calendar_id work --summary 'Team standup' --dtstart 20260415T090000Z --duration PT1H",
+			},
+			{
+				Description: "Create a recurring weekly event",
+				Command:     "caldav create_event --calendar_id personal --summary 'Yoga' --dtstart 20260414T180000Z --duration PT1H30M --rrule 'FREQ=WEEKLY;BYDAY=MO,WE,FR'",
+			},
+		},
+		SeeAlso: []string{"caldav-update_event", "caldav-delete_event", "caldav-create_calendar"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleCreateEvent(ctx, args, provider)
 		},
@@ -47,6 +62,9 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 		Title: "Update Event",
 		Description: command.Description{
 			Short: "Update fields on an existing VEVENT by UID",
+			Long: `Fetches the event by UID, applies the specified field changes, increments the
+SEQUENCE number, and writes it back with ETag-based optimistic concurrency. Only
+provided fields are updated; omitted fields are left unchanged.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -67,6 +85,13 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 			{Name: "rrule", Type: command.String, Description: "New recurrence rule"},
 			{Name: "transp", Type: command.String, Description: "New time transparency"},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Reschedule an event",
+				Command:     "caldav update_event --uid 1234567890 --dtstart 20260420T100000Z --duration PT2H",
+			},
+		},
+		SeeAlso: []string{"caldav-create_event", "caldav-delete_event"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleUpdateEvent(ctx, args, provider)
 		},
@@ -77,6 +102,8 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 		Title: "Delete Event",
 		Description: command.Description{
 			Short: "Delete a VEVENT by UID",
+			Long: `Permanently deletes an event from the CalDAV server. The event is located by UID
+across all calendars, then deleted using its ETag for concurrency safety.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -87,6 +114,13 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 		Params: []command.Param{
 			{Name: "uid", Type: command.String, Description: "Event UID to delete", Required: true},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Delete an event",
+				Command:     "caldav delete_event --uid 1234567890",
+			},
+		},
+		SeeAlso: []string{"caldav-create_event", "caldav-move_event"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleDeleteEvent(ctx, args, provider)
 		},
@@ -97,6 +131,10 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 		Title: "Move Event",
 		Description: command.Description{
 			Short: "Move an event between calendars",
+			Long: `Moves an event from its current calendar to a different one. Implemented as a
+copy-then-delete: the event is created in the target calendar first, then
+deleted from the source. If the source delete fails, the event remains in both
+calendars and a warning is returned.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -108,6 +146,13 @@ func registerEventCommands(app *command.App, provider *resources.Provider) {
 			{Name: "uid", Type: command.String, Description: "Event UID to move", Required: true},
 			{Name: "target_calendar_id", Type: command.String, Description: "Destination calendar ID", Required: true},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Move an event to a shared calendar",
+				Command:     "caldav move_event --uid 1234567890 --target_calendar_id shared",
+			},
+		},
+		SeeAlso: []string{"caldav-create_event", "caldav-delete_event", "caldav-create_calendar"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleMoveEvent(ctx, args, provider)
 		},

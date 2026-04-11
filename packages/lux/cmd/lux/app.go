@@ -27,6 +27,12 @@ func buildApp() *command.App {
 	app.Description.Long = "Lux multiplexes LSP requests to multiple language servers based on file type."
 	app.Version = version
 	app.MCPArgs = []string{"mcp-stdio"}
+	app.Files = []command.FilePath{
+		{Path: "$XDG_CONFIG_HOME/lux/lsps.toml", Description: "LSP server configuration (name, flake, extensions, settings)"},
+		{Path: "$XDG_CONFIG_HOME/lux/formatters.toml", Description: "External formatter configuration (name, flake, args)"},
+		{Path: "$XDG_CONFIG_HOME/lux/filetype/", Description: "Per-filetype config directory mapping extensions to LSPs and formatters"},
+		{Path: "$XDG_DATA_HOME/lux/capabilities/", Description: "Cached LSP server capabilities discovered during lux add"},
+	}
 
 	addCLICommands(app)
 
@@ -93,6 +99,10 @@ With --force, overwrites existing files.`,
 			{Name: "default", Type: command.Bool, Description: "Write curated default configs for common languages"},
 			{Name: "force", Type: command.Bool, Description: "Overwrite existing config files"},
 		},
+		Examples: []command.Example{
+			{Description: "Create empty config structure", Command: "lux init"},
+			{Description: "Initialize with curated defaults for common languages", Command: "lux init --default"},
+		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {
 				Default bool `json:"default"`
@@ -132,6 +142,11 @@ With --formatter, adds a formatter to formatters.toml:
 			{Name: "formatter-mode", Type: command.String, Description: "Formatter mode for --filetype: chain or fallback"},
 			{Name: "formatter", Type: command.String, Description: "Add a formatter with this name"},
 		},
+		Examples: []command.Example{
+			{Description: "Add an LSP from a nix flake", Command: "lux add nixpkgs#gopls"},
+			{Description: "Create a filetype config for Go", Command: "lux add --filetype go --extensions go --lsp gopls"},
+			{Description: "Add a formatter", Command: "lux add --formatter prettierd --flake nixpkgs#prettierd"},
+		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {
 				Flake         string   `json:"flake"`
@@ -168,6 +183,9 @@ With --formatter, adds a formatter to formatters.toml:
 		Description: command.Description{
 			Short: "List configured filetypes and their routing",
 			Long:  "List all filetype configs showing extensions, LSP, formatters, and formatter mode.",
+		},
+		Examples: []command.Example{
+			{Description: "Show all configured filetypes", Command: "lux list"},
 		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			filetypes, err := filetype.LoadMerged()
@@ -209,6 +227,9 @@ With --formatter, adds a formatter to formatters.toml:
 			Short: "Validate lux configuration",
 			Long:  "Check lsps.toml, formatters.toml, and filetype configs for structural errors and missing cross-references.",
 		},
+		Examples: []command.Example{
+			{Description: "Validate all config files", Command: "lux validate"},
+		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			return runValidate()
 		},
@@ -227,6 +248,10 @@ Supported config names:
 		},
 		Params: []command.Param{
 			{Name: "config", Type: command.String, Description: "Config to edit: lsps, formatters, or filetype/NAME", Required: true},
+		},
+		Examples: []command.Example{
+			{Description: "Edit LSP configuration", Command: "lux config-edit --config lsps"},
+			{Description: "Edit a filetype config", Command: "lux config-edit --config filetype/go"},
 		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {
@@ -248,6 +273,10 @@ Supported config names:
 		Params: []command.Param{
 			{Name: "file", Type: command.String, Description: "File to format", Required: true},
 			{Name: "stdout", Type: command.Bool, Description: "Print formatted output to stdout instead of writing in-place"},
+		},
+		Examples: []command.Example{
+			{Description: "Format a Go file in-place", Command: "lux fmt --file main.go"},
+			{Description: "Preview formatting without writing", Command: "lux fmt --file main.go --stdout"},
 		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {
@@ -339,6 +368,9 @@ Supported config names:
 			Short: "Format all files in the project",
 			Long:  "Walk the project tree and format every recognized file using configured formatters.",
 		},
+		Examples: []command.Example{
+			{Description: "Format all files in the current project", Command: "lux fmt-all"},
+		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {
 				Args []string `json:"args"`
@@ -358,6 +390,10 @@ Supported config names:
 		},
 		Params: []command.Param{
 			{Name: "lang", Type: command.String, Description: "Restrict to a single language/LSP name (e.g., gopls)"},
+		},
+		Examples: []command.Example{
+			{Description: "Start as LSP server for all languages", Command: "lux lsp"},
+			{Description: "Start as LSP server for gopls only", Command: "lux lsp --lang gopls"},
 		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
 			var p struct {

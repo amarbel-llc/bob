@@ -18,6 +18,11 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Title: "Create Task",
 		Description: command.Description{
 			Short: "Create a new VTODO task in a CalDAV calendar",
+			Long: `Creates a new VTODO task on the CalDAV server. The task is assigned a unique UID
+and placed in the specified calendar collection. Supports subtasks via
+parent_uid (RELATED-TO), recurrence via rrule, and tasks.org-compatible fields
+like sort_order (X-APPLE-SORT-ORDER). Status defaults to NEEDS-ACTION if not
+specified.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -39,6 +44,17 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 			{Name: "location", Type: command.String, Description: "Task location"},
 			{Name: "sort_order", Type: command.Int, Description: "Manual sort order (X-APPLE-SORT-ORDER)"},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Create a simple task",
+				Command:     "caldav create_task --calendar_id inbox --summary 'Buy groceries'",
+			},
+			{
+				Description: "Create a task with due date and tags",
+				Command:     "caldav create_task --calendar_id work --summary 'Review PR' --due 2026-04-15 --categories review,urgent --priority 1",
+			},
+		},
+		SeeAlso: []string{"caldav-update_task", "caldav-complete_task", "caldav-delete_task", "caldav-create_calendar"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleCreateTask(ctx, args, provider)
 		},
@@ -49,6 +65,10 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Title: "Update Task",
 		Description: command.Description{
 			Short: "Update fields on an existing VTODO task by UID",
+			Long: `Fetches the task by UID, applies the specified field changes, increments the
+SEQUENCE number, and writes it back with ETag-based optimistic concurrency.
+Only provided fields are updated; omitted fields are left unchanged. Categories
+replaces the entire list when specified.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -70,6 +90,17 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 			{Name: "location", Type: command.String, Description: "New location"},
 			{Name: "sort_order", Type: command.Int, Description: "New sort order"},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Change a task's due date",
+				Command:     "caldav update_task --uid 1234567890 --due 2026-04-20",
+			},
+			{
+				Description: "Re-tag and reprioritize a task",
+				Command:     "caldav update_task --uid 1234567890 --categories urgent,blocked --priority 2",
+			},
+		},
+		SeeAlso: []string{"caldav-create_task", "caldav-complete_task"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleUpdateTask(ctx, args, provider)
 		},
@@ -80,6 +111,9 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Title: "Complete Task",
 		Description: command.Description{
 			Short: "Mark a task as completed (sets STATUS=COMPLETED and COMPLETED timestamp)",
+			Long: `Sets STATUS to COMPLETED, records the COMPLETED timestamp, sets
+PERCENT-COMPLETE to 100, and increments the SEQUENCE number. Uses ETag-based
+optimistic concurrency to prevent overwriting concurrent changes.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -90,6 +124,13 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Params: []command.Param{
 			{Name: "uid", Type: command.String, Description: "Task UID to complete", Required: true},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Complete a task",
+				Command:     "caldav complete_task --uid 1234567890",
+			},
+		},
+		SeeAlso: []string{"caldav-create_task", "caldav-update_task"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleCompleteTask(ctx, args, provider)
 		},
@@ -100,6 +141,8 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Title: "Delete Task",
 		Description: command.Description{
 			Short: "Delete a VTODO task by UID",
+			Long: `Permanently deletes a task from the CalDAV server. The task is located by UID
+across all calendars, then deleted using its ETag for concurrency safety.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -113,6 +156,13 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		MapsTools: []command.ToolMapping{
 			{Replaces: "Bash", CommandPrefixes: []string{"curl.*caldav", "curl.*dav"}, UseWhen: "interacting with CalDAV servers"},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Delete a task",
+				Command:     "caldav delete_task --uid 1234567890",
+			},
+		},
+		SeeAlso: []string{"caldav-create_task", "caldav-move_task"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleDeleteTask(ctx, args, provider)
 		},
@@ -123,6 +173,10 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 		Title: "Move Task",
 		Description: command.Description{
 			Short: "Move a task between calendars",
+			Long: `Moves a task from its current calendar to a different one. Implemented as a
+copy-then-delete: the task is created in the target calendar first, then deleted
+from the source. If the source delete fails, the task remains in both calendars
+and a warning is returned.`,
 		},
 		Annotations: &protocol.ToolAnnotations{
 			ReadOnlyHint:    protocol.BoolPtr(false),
@@ -134,6 +188,13 @@ func registerTaskCommands(app *command.App, provider *resources.Provider) {
 			{Name: "uid", Type: command.String, Description: "Task UID to move", Required: true},
 			{Name: "target_calendar_id", Type: command.String, Description: "Destination calendar ID", Required: true},
 		},
+		Examples: []command.Example{
+			{
+				Description: "Move a task from inbox to the work calendar",
+				Command:     "caldav move_task --uid 1234567890 --target_calendar_id work",
+			},
+		},
+		SeeAlso: []string{"caldav-create_task", "caldav-delete_task", "caldav-create_calendar"},
 		Run: func(ctx context.Context, args json.RawMessage, _ command.Prompter) (*command.Result, error) {
 			return handleMoveTask(ctx, args, provider)
 		},
