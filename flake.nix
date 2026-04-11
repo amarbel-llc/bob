@@ -247,7 +247,6 @@
             localPkgs = buildPackages system;
           in
           [
-            pkgs-master.claude-code
             pkgs.neovim
             localPkgs.batmanPkgs.default
             purse-first.packages.${system}.purse-first
