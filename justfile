@@ -10,14 +10,8 @@ build:
     nix build
 
 # Build individual packages
-build-grit:
-    nix build .#grit
-
 build-lux:
     nix build .#lux
-
-build-get-hubbed:
-    nix build .#get-hubbed
 
 build-chix:
     nix build .#chix
@@ -36,12 +30,6 @@ tap-dancer-go-test := "go run " + cmd-tap-dancer + " go-test -skip-empty"
 tap-dancer-cargo-test := "go run " + cmd-tap-dancer + " cargo-test -skip-empty"
 
 # Test individual Go packages
-test-grit:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/grit/...
-
-test-get-hubbed:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/get-hubbed/...
-
 test-lux:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/lux/...
 
@@ -104,12 +92,6 @@ validate:
     {{cmd_nix_dev}} go run ./dummies/go/cmd/... validate .claude-plugin/plugin.json || true
 
 # Validate MCP server annotations via purse-first validate-mcp
-validate-mcp-grit: build-grit
-    purse-first validate-mcp result/bin/grit
-
-validate-mcp-get-hubbed: build-get-hubbed
-    purse-first validate-mcp result/bin/get-hubbed
-
 validate-mcp-lux: build-lux
     #!/usr/bin/env bash
     set -euo pipefail
@@ -125,11 +107,7 @@ validate-mcp-chix: build-chix
 validate-mcp-caldav: build-caldav
     CALDAV_URL="http://localhost:1" CALDAV_USERNAME="test" CALDAV_PASSWORD="test" purse-first validate-mcp result/bin/caldav
 
-validate-mcp: validate-mcp-grit validate-mcp-get-hubbed validate-mcp-lux validate-mcp-chix validate-mcp-caldav
-
-test-grit-bats: build-batman
-    nix build .#grit
-    GRIT_BIN={{justfile_directory()}}/result/bin/grit PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/grit/zz-tests_bats/test
+validate-mcp: validate-mcp-lux validate-mcp-chix validate-mcp-caldav
 
 test-tap-dancer-bats: build-batman
     nix build .#tap-dancer
@@ -142,7 +120,7 @@ test-lux-bats: build-batman
 test-batman-bats: build-batman
     BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
 
-# Bump version for a package. Usage: just bump-version grit 0.2.0
+# Bump version for a package. Usage: just bump-version lux 0.2.0
 bump-version package version:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -160,10 +138,7 @@ test: \
     test-batman-bats \
     test-caldav \
     test-chix \
-    test-get-hubbed \
     test-go \
-    test-grit \
-    test-grit-bats \
     test-integration \
     test-lux \
     test-lux-bats \

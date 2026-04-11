@@ -3,8 +3,7 @@ go 1.26
 use (
 	./dummies/go
 	./packages/caldav
-	./packages/get-hubbed
-	./packages/grit
+
 	./packages/lux
 	./packages/potato
 	./packages/tap-dancer/go

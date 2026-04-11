@@ -57,7 +57,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-UXNyyOa+Xkw5mkmkiVPPKEeDnuFXy6ZXzuHcZSTPiOw=";
+      goVendorHash = "sha256-E+U9wODTOqR+rAwab5Oktje7uUsrlwinqYWYXjTPE5c=";
 
       buildDevShellPackages =
         system:
@@ -178,38 +178,6 @@
               ;
           };
 
-          gritPkg = import ./lib/packages/grit.nix {
-            inherit
-              pkgs
-              goWorkspaceSrc
-              goVendorHash
-              go
-              ;
-          };
-
-          get-hubbed-unwrapped = import ./lib/packages/get-hubbed.nix {
-            inherit
-              pkgs
-              goWorkspaceSrc
-              goVendorHash
-              go
-              ;
-          };
-
-          get-hubbed-wrapped =
-            pkgs.runCommand "get-hubbed"
-              {
-                nativeBuildInputs = [ pkgs.makeWrapper ];
-              }
-              ''
-                mkdir -p $out/bin
-                makeWrapper ${get-hubbed-unwrapped}/bin/get-hubbed $out/bin/get-hubbed \
-                  --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.gh ]}
-                if [ -d "${get-hubbed-unwrapped}/share" ]; then
-                  cp -r ${get-hubbed-unwrapped}/share $out/share
-                fi
-              '';
-
           luxPkg = import ./lib/packages/lux.nix {
             inherit
               pkgs
@@ -254,8 +222,6 @@
         {
           inherit
             caldavPkg
-            gritPkg
-            get-hubbed-wrapped
             luxPkg
             chixPkg
             tapDancerPkgs
@@ -283,10 +249,8 @@
           in
           [
             pkgs.caldavPkg
-            pkgs.gritPkg
             pkgs.luxPkg
             pkgs.chixPkg
-            pkgs.get-hubbed-wrapped
             pkgs.batmanPkgs.robin
             pkgs.tapDancerPkgs.default
           ];
@@ -334,8 +298,6 @@
                 paths = [ marketplacePkgs.default ] ++ nonPluginPkgs;
               };
               caldav = localPkgs.caldavPkg;
-              grit = localPkgs.gritPkg;
-              get-hubbed = localPkgs.get-hubbed-wrapped;
               lux = localPkgs.luxPkg;
               chix = localPkgs.chixPkg;
               robin = localPkgs.batmanPkgs.robin;
@@ -349,8 +311,6 @@
                 name = "mcp-all";
                 paths = [
                   localPkgs.caldavPkg
-                  localPkgs.gritPkg
-                  localPkgs.get-hubbed-wrapped
                   localPkgs.luxPkg
                   localPkgs.chixPkg
                 ];

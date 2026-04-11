@@ -11,16 +11,6 @@ teardown() {
   teardown_test_home
 }
 
-function claude_validates_grit { # @test
-  run claude plugin validate "$(plugin_share_dir grit)/.claude-plugin/plugin.json"
-  assert_success
-}
-
-function claude_validates_get_hubbed { # @test
-  run claude plugin validate "$(plugin_share_dir get-hubbed)/.claude-plugin/plugin.json"
-  assert_success
-}
-
 function claude_validates_lux { # @test
   run claude plugin validate "$(plugin_share_dir lux)/.claude-plugin/plugin.json"
   assert_success
@@ -43,16 +33,6 @@ function claude_validates_robin { # @test
 
 function claude_validates_tap_dancer { # @test
   run claude plugin validate "$(plugin_share_dir tap-dancer)/.claude-plugin/plugin.json"
-  assert_success
-}
-
-function purse_first_validates_grit { # @test
-  run "$purse_first" validate "$(plugin_share_dir grit)"
-  assert_success
-}
-
-function purse_first_validates_get_hubbed { # @test
-  run "$purse_first" validate "$(plugin_share_dir get-hubbed)"
   assert_success
 }
 
