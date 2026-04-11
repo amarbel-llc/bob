@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -14,8 +15,9 @@ const requestTimeout = 30 * time.Second
 // Client is a CalDAV HTTP client that supports PROPFIND, REPORT, PUT, DELETE,
 // and MKCALENDAR operations.
 type Client struct {
-	cfg  *Config
-	http *http.Client
+	cfg    *Config
+	http   *http.Client
+	logger *log.Logger
 }
 
 // Calendar represents a CalDAV calendar collection.
@@ -28,11 +30,13 @@ type Calendar struct {
 }
 
 // NewClient creates a CalDAV client from the given configuration.
-func NewClient(cfg *Config) *Client {
+func NewClient(cfg *Config, logger *log.Logger) *Client {
 	return &Client{
-		cfg: cfg,
+		cfg:    cfg,
+		logger: logger,
 		http: &http.Client{
-			Timeout: requestTimeout,
+			Timeout:   requestTimeout,
+			Transport: &loggingTransport{base: http.DefaultTransport, log: logger},
 		},
 	}
 }
@@ -187,8 +191,9 @@ func (c *Client) ListTasks(calendarHref string) (*TaskListResult, error) {
 			}
 			task, err := parseIcalString(ps.Prop.CalendarData)
 			if err != nil {
-				result.ParseErrors = append(result.ParseErrors,
-					fmt.Sprintf("%s: %v", r.Href, err))
+				parseErr := fmt.Sprintf("%s: %v", r.Href, err)
+				c.logger.Printf("caldav: parse error (VTODO): %s", parseErr)
+				result.ParseErrors = append(result.ParseErrors, parseErr)
 				continue
 			}
 			task.Href = r.Href
@@ -244,8 +249,9 @@ func (c *Client) ListEvents(calendarHref string) (*EventListResult, error) {
 			}
 			event, err := ParseVEVENT(ps.Prop.CalendarData)
 			if err != nil {
-				result.ParseErrors = append(result.ParseErrors,
-					fmt.Sprintf("%s: %v", r.Href, err))
+				parseErr := fmt.Sprintf("%s: %v", r.Href, err)
+				c.logger.Printf("caldav: parse error (VEVENT): %s", parseErr)
+				result.ParseErrors = append(result.ParseErrors, parseErr)
 				continue
 			}
 			event.Href = r.Href

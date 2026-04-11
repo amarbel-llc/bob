@@ -19,6 +19,7 @@ recurrence, and reminders.`
 		{Name: "CALDAV_PASSWORD", Description: "HTTP Basic auth password"},
 	}
 
+	registerReadCommands(app, provider)
 	registerTaskCommands(app, provider)
 	registerEventCommands(app, provider)
 	registerCalendarCommands(app, provider)

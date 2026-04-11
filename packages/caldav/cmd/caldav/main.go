@@ -32,10 +32,11 @@ func main() {
 
 	flag.Parse()
 
-	// generate-plugin and hook work without CalDAV credentials
+	// generate-plugin and hook work without CalDAV credentials or logging
 	if flag.NArg() >= 1 && flag.Arg(0) == "generate-plugin" {
 		cfg := &caldav.Config{URL: "http://placeholder", Username: "x", Password: "x"}
-		client := caldav.NewClient(cfg)
+		logger := log.New(os.Stderr, "", log.LstdFlags)
+		client := caldav.NewClient(cfg, logger)
 		provider := resources.NewProvider(client)
 		app := tools.RegisterAll(provider)
 		if err := app.HandleGeneratePlugin(flag.Args()[1:], os.Stdout); err != nil {
@@ -46,7 +47,8 @@ func main() {
 
 	if flag.NArg() >= 1 && flag.Arg(0) == "hook" {
 		cfg := &caldav.Config{URL: "http://placeholder", Username: "x", Password: "x"}
-		client := caldav.NewClient(cfg)
+		logger := log.New(os.Stderr, "", log.LstdFlags)
+		client := caldav.NewClient(cfg, logger)
 		provider := resources.NewProvider(client)
 		app := tools.RegisterAll(provider)
 		if err := app.HandleHook(os.Stdin, os.Stdout); err != nil {
@@ -55,18 +57,20 @@ func main() {
 		return
 	}
 
-	// Runtime mode — require CalDAV credentials
+	// Runtime mode — require CalDAV credentials, set up file logging
+	logger, closeLog := caldav.InitLogging()
+	defer closeLog()
+
 	cfg, err := caldav.ConfigFromEnv()
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
 	}
 
-	client := caldav.NewClient(cfg)
+	client := caldav.NewClient(cfg, logger)
 	provider := resources.NewProvider(client)
 	app := tools.RegisterAll(provider)
 
 	if flag.NArg() > 0 {
-		// Route CLI subcommands through the command.App
 		ctx := context.Background()
 		if err := app.RunCLI(ctx, flag.Args(), nil); err != nil {
 			fmt.Fprintf(os.Stderr, "caldav: %v\n", err)
@@ -87,9 +91,10 @@ func main() {
 		ServerName:    app.Name,
 		ServerVersion: app.Version,
 		Instructions: "CalDAV MCP server for managing tasks and calendars. " +
-			"Reads are exposed as resources with progressive disclosure " +
-			"(caldav://calendars → caldav://calendar/{id} → caldav://task/{uid} → caldav://task/{uid}/ical). " +
-			"Writes use tools (create_task, update_task, complete_task, delete_task, move_task, create_calendar). " +
+			"All operations are tools. Start with list_calendars to discover calendars and " +
+			"populate the search index, then use list_tasks, get_task, search_tasks, etc. " +
+			"Write tools: create_task, update_task, complete_task, delete_task, move_task, " +
+			"create_event, update_event, delete_event, move_event, create_calendar. " +
 			"Compatible with tasks.org VTODO format including subtasks, tags, recurrence, and reminders.\n\n" +
 			"RECURRING TASKS: Tasks.org uses two distinct recurrence patterns. " +
 			"(1) RRULE on VTODO — a single task with an RRULE property (e.g. FREQ=DAILY). " +
@@ -97,11 +102,10 @@ func main() {
 			"(2) Instance-per-occurrence — individual VTODO items created for each recurrence, with no RRULE. " +
 			"These appear as separate tasks (e.g. weekly chores like laundry, cleaning). " +
 			"When searching for recurring work, check BOTH patterns: " +
-			"filter metadata for non-empty rrule to find RRULE-based tasks, " +
+			"use list_recurring_tasks for RRULE-based tasks, " +
 			"and look for repeated summaries or categories to identify instance-per-occurrence tasks. " +
 			"A task without RRULE may still recur regularly.",
-		Tools:     registry,
-		Resources: provider,
+		Tools: registry,
 	})
 	if err != nil {
 		log.Fatalf("creating server: %v", err)
