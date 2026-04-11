@@ -21,7 +21,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    fh.url = "https://flakehub.com/f/DeterminateSystems/fh/*.tar.gz";
   };
 
   outputs =
@@ -34,7 +33,6 @@
       gomod2nix,
       crane,
       rust-overlay,
-      fh,
     }:
     let
       mkMarketplace = purse-first.lib.mkMarketplace;
@@ -126,7 +124,6 @@
             strictDeps = true;
           };
           rustCargoArtifacts = craneLib.buildDepsOnly rustCommonArgs;
-          fhPkg = fh.packages.${system}.default;
           purse-first-cli = purse-first.packages.${system}.purse-first;
 
           go = pkgs-master.go;
@@ -187,17 +184,6 @@
               ;
           };
 
-          chixPkg = import ./lib/packages/chix.nix {
-            inherit
-              pkgs
-              craneLib
-              fhPkg
-              rustWorkspaceSrc
-              rustCargoArtifacts
-              ;
-            src = ./packages/chix;
-          };
-
           tapDancerPkgs = import ./lib/packages/tap-dancer.nix {
             inherit
               pkgs
@@ -223,7 +209,6 @@
           inherit
             caldavPkg
             luxPkg
-            chixPkg
             tapDancerPkgs
             batmanPkgs
             sandcastlePkg
@@ -250,7 +235,6 @@
           [
             pkgs.caldavPkg
             pkgs.luxPkg
-            pkgs.chixPkg
             pkgs.batmanPkgs.robin
             pkgs.tapDancerPkgs.default
           ];
@@ -299,7 +283,6 @@
               };
               caldav = localPkgs.caldavPkg;
               lux = localPkgs.luxPkg;
-              chix = localPkgs.chixPkg;
               robin = localPkgs.batmanPkgs.robin;
               batman = localPkgs.batmanPkgs.default;
               tap-dancer = localPkgs.tapDancerPkgs.default;
@@ -312,7 +295,6 @@
                 paths = [
                   localPkgs.caldavPkg
                   localPkgs.luxPkg
-                  localPkgs.chixPkg
                 ];
               };
             };

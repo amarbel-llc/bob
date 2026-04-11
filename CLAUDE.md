@@ -7,7 +7,7 @@ code in this repository.
 
 Bob is the purse-first marketplace package containing MCP servers, CLI tools,
 and development workflow skills. It consumes `purse-first.lib.mkMarketplace` as
-a flake input to assemble 6 packages and 22 skills into a single installable
+a flake input to assemble 5 packages and 22 skills into a single installable
 marketplace.
 
 ## Build & Test Commands
@@ -34,7 +34,6 @@ just release-tap-dancer 0.2.0  # Bump versions, build, commit, tag (does not pus
 just test-lux           # packages/lux/...
 just test-caldav        # packages/caldav/...
 just test-go-mcp        # libs/go-mcp/... (from purse-first, not local)
-just test-chix          # packages/chix (Rust, via cargo test)
 
 # Single Go test function:
 nix develop --command go test -run TestFunctionName ./packages/lux/...
@@ -50,7 +49,6 @@ just test-integration
 
 ``` sh
 nix build .#lux
-nix build .#chix
 nix build .#robin       # skill-only package from batman
 nix build .#tap-dancer
 ```
@@ -60,7 +58,6 @@ nix build .#tap-dancer
 - **Package** (not "plugin") --- the user-facing term. Three flavors:
   - **MCP package** --- MCP server only (lux, caldav)
   - **Skill package** --- Skill only (robin, tap-dancer, bob skills)
-  - **MCP + Skill package** --- Both (chix)
 - **Marketplace** --- aggregated `symlinkJoin` output with `marketplace.json`
 
 ## Architecture
@@ -93,7 +90,7 @@ the same reason.
 
 ### Rust Workspace
 
-`packages/chix` and `packages/tap-dancer/rust` share a Cargo workspace.
+`packages/tap-dancer/rust` uses a Cargo workspace for Rust builds.
 
 ### Package Lifecycle (Three-Mode Main)
 
@@ -123,9 +120,9 @@ Skills live in `skills/<name>/SKILL.md` with YAML frontmatter. Skills MAY have
   -----------------------------------------------------------------------------
   Directory                                  Purpose
   ------------------------------------------ ----------------------------------
-  `packages/`                                All packages (caldav, lux, chix,
-                                             batman, tap-dancer, potato,
-                                             sandcastle, and-so-can-you-repo)
+  `packages/`                                All packages (caldav, lux, batman,
+                                             tap-dancer, potato, sandcastle,
+                                             and-so-can-you-repo)
 
   `skills/`                                  22 general-purpose skills
                                              (workflow, documentation,

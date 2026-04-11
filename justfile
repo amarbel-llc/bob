@@ -13,9 +13,6 @@ build:
 build-lux:
     nix build .#lux
 
-build-chix:
-    nix build .#chix
-
 build-robin:
     nix build .#robin
 
@@ -40,10 +37,6 @@ test-tap-dancer-go:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/tap-dancer/go/...
 
 # Test Rust packages
-[working-directory: 'packages/chix']
-test-chix:
-  {{cmd_nix_dev}} {{tap-dancer-cargo-test}} test
-
 [working-directory: 'packages/tap-dancer/rust']
 test-tap-dancer-rust:
     {{cmd_nix_dev}} {{tap-dancer-cargo-test}} test
@@ -101,13 +94,10 @@ validate-mcp-lux: build-lux
     touch "$tmpdir/lux/lsps.toml"
     XDG_CONFIG_HOME="$tmpdir" purse-first validate-mcp result/bin/lux mcp-stdio
 
-validate-mcp-chix: build-chix
-    purse-first validate-mcp result/bin/chix
-
 validate-mcp-caldav: build-caldav
     CALDAV_URL="http://localhost:1" CALDAV_USERNAME="test" CALDAV_PASSWORD="test" purse-first validate-mcp result/bin/caldav
 
-validate-mcp: validate-mcp-lux validate-mcp-chix validate-mcp-caldav
+validate-mcp: validate-mcp-lux validate-mcp-caldav
 
 test-tap-dancer-bats: build-batman
     nix build .#tap-dancer
@@ -137,7 +127,6 @@ build-dummies-go:
 test: \
     test-batman-bats \
     test-caldav \
-    test-chix \
     test-go \
     test-integration \
     test-lux \

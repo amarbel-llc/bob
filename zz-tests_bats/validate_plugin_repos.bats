@@ -16,11 +16,6 @@ function claude_validates_lux { # @test
   assert_success
 }
 
-function claude_validates_chix { # @test
-  run claude plugin validate "$(plugin_share_dir chix)/.claude-plugin/plugin.json"
-  assert_success
-}
-
 function claude_validates_bob { # @test
   run claude plugin validate "$(plugin_share_dir bob)/.claude-plugin/plugin.json"
   assert_success
@@ -38,11 +33,6 @@ function claude_validates_tap_dancer { # @test
 
 function purse_first_validates_lux { # @test
   run "$purse_first" validate "$(plugin_share_dir lux)"
-  assert_success
-}
-
-function purse_first_validates_chix { # @test
-  run "$purse_first" validate "$(plugin_share_dir chix)"
   assert_success
 }
 

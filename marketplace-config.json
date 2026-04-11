@@ -31,18 +31,6 @@
         "mcp"
       ]
     },
-    "chix": {
-      "description": "Nix MCP server and skills for Claude Code — build, evaluate, search, and manage flakes",
-      "version": "0.1.0",
-      "homepage": "https://github.com/amarbel-llc/bob",
-      "category": "development",
-      "tags": [
-        "nix",
-        "package-manager",
-        "mcp",
-        "skills"
-      ]
-    },
     "robin": {
       "description": "BATS integration testing skill with bundled assertion libraries, sandcastle isolation, and justfile patterns",
       "version": "0.1.0",
