@@ -12,6 +12,7 @@ bats_load_library "bats-island"
 bats_load_library "bats-emo"
 
 require_bin PURSE_FIRST_BIN purse-first
+require_bin CLAUDE_BIN claude
 
 result_dir() {
   local result_path="${PURSE_FIRST_RESULT:-$BATS_CWD/result}"

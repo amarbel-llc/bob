@@ -70,9 +70,12 @@ vendor-hash:
     echo "updated goVendorHash to $hash"
 
 # Run integration tests
+# CLAUDE_BIN is injected explicitly because .git/spinclass/bin/claude may
+# shadow the real binary on PATH (see spinclass#22).
 test-integration: build-batman
     nix build
-    {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
+    CLAUDE_BIN="$(readlink -f "$HOME/.nix-profile/bin/claude")" \
+      {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
       zz-tests_bats/validate_plugin_repos.bats
 
 # Run lifecycle tests

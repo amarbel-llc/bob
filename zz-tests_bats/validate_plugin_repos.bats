@@ -5,6 +5,7 @@ setup() {
   setup_test_home
   export output
   purse_first="$(purse_first_bin)"
+  claude_bin="${CLAUDE_BIN:-claude}"
 }
 
 teardown() {
@@ -12,22 +13,22 @@ teardown() {
 }
 
 function claude_validates_lux { # @test
-  run claude plugin validate "$(plugin_share_dir lux)/.claude-plugin/plugin.json"
+  run "$claude_bin" plugin validate "$(plugin_share_dir lux)/.claude-plugin/plugin.json"
   assert_success
 }
 
 function claude_validates_bob { # @test
-  run claude plugin validate "$(plugin_share_dir bob)/.claude-plugin/plugin.json"
+  run "$claude_bin" plugin validate "$(plugin_share_dir bob)/.claude-plugin/plugin.json"
   assert_success
 }
 
 function claude_validates_robin { # @test
-  run claude plugin validate "$(plugin_share_dir robin)/.claude-plugin/plugin.json"
+  run "$claude_bin" plugin validate "$(plugin_share_dir robin)/.claude-plugin/plugin.json"
   assert_success
 }
 
 function claude_validates_tap_dancer { # @test
-  run claude plugin validate "$(plugin_share_dir tap-dancer)/.claude-plugin/plugin.json"
+  run "$claude_bin" plugin validate "$(plugin_share_dir tap-dancer)/.claude-plugin/plugin.json"
   assert_success
 }
 
