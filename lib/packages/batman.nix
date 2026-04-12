@@ -11,11 +11,15 @@ let
     pname = "bats-support";
     version = "0.3.0";
     src = "${src}/lib/bats-support";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/bats-support/src
       cp load.bash $out/share/bats/bats-support/
       cp src/*.bash $out/share/bats/bats-support/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < doc/bats-support.7.scd > $out/share/man/man7/bats-support.7
     '';
   };
 
@@ -23,11 +27,15 @@ let
     pname = "bats-assert";
     version = "2.1.0";
     src = "${src}/lib/bats-assert";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/bats-assert/src
       cp load.bash $out/share/bats/bats-assert/
       cp src/*.bash $out/share/bats/bats-assert/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < doc/bats-assert.7.scd > $out/share/man/man7/bats-assert.7
     '';
   };
 
@@ -35,11 +43,15 @@ let
     pname = "bats-assert-additions";
     version = "0.1.0";
     src = "${src}/lib/bats-assert-additions";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/bats-assert-additions/src
       cp load.bash $out/share/bats/bats-assert-additions/
       cp src/*.bash $out/share/bats/bats-assert-additions/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < doc/bats-assert-additions.7.scd > $out/share/man/man7/bats-assert-additions.7
     '';
   };
 
@@ -47,11 +59,15 @@ let
     pname = "tap-writer";
     version = "0.1.0";
     src = "${src}/lib/tap-writer";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/tap-writer/src
       cp load.bash $out/share/bats/tap-writer/
       cp src/*.bash $out/share/bats/tap-writer/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < doc/tap-writer.7.scd > $out/share/man/man7/tap-writer.7
     '';
   };
 
@@ -59,12 +75,16 @@ let
     pname = "bats-island";
     version = "0.1.0";
     src = "${src}/lib/bats-island";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontUnpack = true;
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/bats-island/src
       cp $src/load.bash $out/share/bats/bats-island/
       cp $src/src/*.bash $out/share/bats/bats-island/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < $src/doc/bats-island.7.scd > $out/share/man/man7/bats-island.7
     '';
   };
 
@@ -72,12 +92,16 @@ let
     pname = "bats-emo";
     version = "0.1.0";
     src = "${src}/lib/bats-emo";
+    nativeBuildInputs = [ pkgs.scdoc ];
     dontUnpack = true;
     dontBuild = true;
     installPhase = ''
       mkdir -p $out/share/bats/bats-emo/src
       cp $src/load.bash $out/share/bats/bats-emo/
       cp $src/src/*.bash $out/share/bats/bats-emo/src/
+
+      mkdir -p $out/share/man/man7
+      scdoc < $src/doc/bats-emo.7.scd > $out/share/man/man7/bats-emo.7
     '';
   };
 
