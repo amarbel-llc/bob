@@ -127,6 +127,15 @@ bump-version package version:
 build-dummies-go:
     {{cmd_nix_dev}} go build -o build/ ./dummies/go/cmd/...
 
+# Validate lux default configs are internally consistent
+validate-lux-defaults: build-lux
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+    XDG_CONFIG_HOME="$tmpdir" result/bin/lux init --default --force
+    XDG_CONFIG_HOME="$tmpdir" result/bin/lux validate
+
 test: \
     test-batman-bats \
     test-caldav \
@@ -137,6 +146,7 @@ test: \
     test-tap-dancer-bats \
     test-tap-dancer-go \
     test-tap-dancer-rust \
+    validate-lux-defaults \
     validate-mcp
 
 update: update-nix
