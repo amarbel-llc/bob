@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,52 +10,56 @@ import (
 	"syscall"
 
 	"github.com/amarbel-llc/lux/internal/config"
-	"github.com/amarbel-llc/lux/internal/config/filetype"
+	"github.com/amarbel-llc/lux/internal/validate"
 )
 
-func runValidate() error {
-	var errs []string
+func runValidate(checkFlakes, checkFormatters, checkLSPs bool) error {
+	ctx := context.Background()
 
-	// Validate lsps.toml
-	cfg, err := config.Load()
+	result, err := validate.Run(ctx, validate.Options{
+		CheckFlakes:     checkFlakes,
+		CheckFormatters: checkFormatters,
+		CheckLSPs:       checkLSPs,
+	})
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("lsps.toml: %v", err))
+		return err
 	}
 
-	// Validate formatters.toml
-	fmtCfg, err := config.LoadMergedFormatters()
-	if err != nil {
-		errs = append(errs, fmt.Sprintf("formatters.toml: %v", err))
-	} else {
-		if err := fmtCfg.Validate(); err != nil {
-			errs = append(errs, fmt.Sprintf("formatters.toml: %v", err))
-		}
-	}
+	printResults(result)
 
-	// Validate filetype configs with cross-references
-	filetypes, err := filetype.LoadMerged()
-	if err != nil {
-		errs = append(errs, fmt.Sprintf("filetype: %v", err))
-	} else if cfg != nil && fmtCfg != nil {
-		lspNames := make(map[string]bool)
-		for _, l := range cfg.LSPs {
-			lspNames[l.Name] = true
-		}
-		fmtNames := make(map[string]bool)
-		for _, f := range fmtCfg.Formatters {
-			fmtNames[f.Name] = true
-		}
-		if err := filetype.Validate(filetypes, lspNames, fmtNames); err != nil {
-			errs = append(errs, err.Error())
-		}
+	if result.Failed > 0 {
+		return fmt.Errorf("%d check(s) failed", result.Failed)
 	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("validation failed:\n  %s", strings.Join(errs, "\n  "))
-	}
-
-	fmt.Println("All configs valid.")
 	return nil
+}
+
+func printResults(result *validate.Result) {
+	var lastCategory string
+	for _, c := range result.Checks {
+		if c.Category != lastCategory {
+			if lastCategory != "" {
+				fmt.Println()
+			}
+			fmt.Println(c.Category)
+			lastCategory = c.Category
+		}
+
+		line := fmt.Sprintf("  %s %s", c.Status, c.Name)
+		if c.Message != "" {
+			// For failures, put the message on a separate indented line
+			if c.Status == validate.Fail {
+				line += "\n      " + strings.ReplaceAll(c.Message, "\n", "\n      ")
+			} else {
+				line += " — " + c.Message
+			}
+		}
+		if c.Duration > 0 {
+			line += fmt.Sprintf(" (%.1fs)", c.Duration.Seconds())
+		}
+		fmt.Println(line)
+	}
+
+	fmt.Printf("\n%d passed, %d failed, %d skipped\n", result.Passed, result.Failed, result.Skipped)
 }
 
 func runConfigEdit(name string) error {
@@ -110,9 +115,9 @@ func runConfigEdit(name string) error {
 		return fmt.Errorf("editor exited with error: %w", err)
 	}
 
-	// Validate after edit
+	// Validate after edit (config-only)
 	fmt.Println("\nValidating config...")
-	if err := runValidate(); err != nil {
+	if err := runValidate(false, false, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 		return err
 	}

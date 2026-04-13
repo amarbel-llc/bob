@@ -225,13 +225,33 @@ With --formatter, adds a formatter to formatters.toml:
 		Name: "validate",
 		Description: command.Description{
 			Short: "Validate lux configuration",
-			Long:  "Check lsps.toml, formatters.toml, and filetype configs for structural errors and missing cross-references.",
+			Long: `Check lsps.toml, formatters.toml, and filetype configs for errors.
+
+By default, only static config validation is performed (syntax, cross-references).
+Use flags to enable runtime checks that verify configured tools actually work.`,
+		},
+		Params: []command.Param{
+			{Name: "check-flakes", Type: command.Bool, Description: "Verify all flake references resolve to valid binaries"},
+			{Name: "check-formatters", Type: command.Bool, Description: "Smoke-test each formatter against a sample file"},
+			{Name: "check-lsps", Type: command.Bool, Description: "Test LSP initialization and shutdown"},
+			{Name: "all", Type: command.Bool, Description: "Enable all runtime checks"},
 		},
 		Examples: []command.Example{
-			{Description: "Validate all config files", Command: "lux validate"},
+			{Description: "Validate config files only", Command: "lux validate"},
+			{Description: "Validate everything including runtime checks", Command: "lux validate --all"},
+			{Description: "Check only flake references", Command: "lux validate --check-flakes"},
 		},
 		RunCLI: func(ctx context.Context, args json.RawMessage) error {
-			return runValidate()
+			var p struct {
+				CheckFlakes     bool `json:"check-flakes"`
+				CheckFormatters bool `json:"check-formatters"`
+				CheckLSPs       bool `json:"check-lsps"`
+				All             bool `json:"all"`
+			}
+			if err := json.Unmarshal(args, &p); err != nil {
+				return fmt.Errorf("invalid arguments: %w", err)
+			}
+			return runValidate(p.CheckFlakes || p.All, p.CheckFormatters || p.All, p.CheckLSPs || p.All)
 		},
 	})
 
