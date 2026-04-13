@@ -204,6 +204,11 @@
             tap-dancer-cli = tapDancerPkgs.cli;
             src = ./packages/batman;
           };
+
+          polkadotsPkg = import ./lib/packages/polkadots.nix {
+            inherit pkgs;
+            src = ./packages/polkadots;
+          };
         in
         {
           inherit
@@ -214,6 +219,7 @@
             sandcastlePkg
             andSoCanYouRepoPkg
             potatoPkg
+            polkadotsPkg
             ;
         };
 
@@ -272,6 +278,7 @@
                 localPkgs.sandcastlePkg
                 localPkgs.andSoCanYouRepoPkg
                 localPkgs.potatoPkg
+                localPkgs.polkadotsPkg
               ];
             in
             marketplacePkgs
@@ -289,6 +296,7 @@
               sandcastle = localPkgs.sandcastlePkg;
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
+              polkadots = localPkgs.polkadotsPkg;
               mcp-all = pkgs.symlinkJoin {
                 name = "mcp-all";
                 paths = [

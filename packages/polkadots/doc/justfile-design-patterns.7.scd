@@ -283,4 +283,4 @@ clean-build:
 
 # SEE ALSO
 
-*bats-emo*(7), *bats-assert*(7), *bats-island*(7)
+*manpages*(7)

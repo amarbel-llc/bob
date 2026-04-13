@@ -105,19 +105,6 @@ let
     '';
   };
 
-  justfile-design-patterns-man = pkgs.stdenvNoCC.mkDerivation {
-    pname = "justfile-design-patterns-man";
-    version = "0.1.0";
-    src = "${src}/doc";
-    nativeBuildInputs = [ pkgs.scdoc ];
-    dontUnpack = true;
-    dontBuild = true;
-    installPhase = ''
-      mkdir -p $out/share/man/man7
-      scdoc < $src/justfile-design-patterns.7.scd > $out/share/man/man7/justfile-design-patterns.7
-    '';
-  };
-
   bats-libs = pkgs.symlinkJoin {
     name = "bats-libs";
     paths = [
@@ -300,7 +287,6 @@ in
       bats-libs
       bats
       robin
-      justfile-design-patterns-man
     ];
   };
   inherit
@@ -313,6 +299,5 @@ in
     bats-libs
     bats
     robin
-    justfile-design-patterns-man
     ;
 }
