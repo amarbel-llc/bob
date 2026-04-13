@@ -41,6 +41,7 @@ pkgs.buildNpmPackage {
       --prefix PATH : ${
         pkgs.lib.makeBinPath (
           [
+            pkgs.which
             pkgs.socat
             pkgs.ripgrep
           ]

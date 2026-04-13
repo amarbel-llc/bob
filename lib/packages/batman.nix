@@ -138,7 +138,9 @@ let
       pkgs.bats
       pkgs.coreutils
       pkgs.gawk
+      pkgs.git
       pkgs.parallel
+      pkgs.python3
       sandcastle
       tap-dancer-cli
     ];
