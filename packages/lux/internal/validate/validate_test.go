@@ -44,7 +44,7 @@ func TestValidateFlakesPass(t *testing.T) {
 
 	executor := &mockExecutor{
 		buildResults: map[string]string{
-			"nixpkgs#gopls::":  "/nix/store/mock-gopls",
+			"nixpkgs#gopls::":   "/nix/store/mock-gopls",
 			"nixpkgs#gofumpt::": "/nix/store/mock-gofumpt",
 		},
 	}
