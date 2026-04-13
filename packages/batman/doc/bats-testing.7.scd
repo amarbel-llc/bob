@@ -13,6 +13,36 @@ libraries, sandcastle isolation, and TAP-14 output formatting.
 This manpage covers the conventions for writing, organizing, and running
 BATS tests.
 
+# LIBRARY STACK
+
+Batman bundles six BATS libraries:
+
+*bats-support*(7)
+	Output formatting and error reporting primitives used by other
+	libraries. Rarely used directly in tests.
+
+*bats-assert*(7)
+	Standard assertions: exit status, output matching, line matching,
+	and regex comparison. The most commonly used library.
+
+*bats-assert-additions*(7)
+	Extended assertions for order-independent (*assert_output_unsorted*)
+	and field-extracted (*assert_output_cut*) output matching.
+
+*bats-island*(7)
+	Test isolation: temporary HOME, XDG base directories, and git
+	repositories. Prevents tests from reading or modifying the real
+	user environment.
+
+*bats-emo*(7)
+	Binary injection via *require_bin*. Makes tests
+	implementation-agnostic by discovering binaries through environment
+	variables or PATH lookup.
+
+*tap-writer*(7)
+	TAP version 14 output for non-BATS bash scripts. Not loaded via
+	*bats_load_library* — sourced directly in standalone scripts.
+
 # DIRECTORY STRUCTURE
 
 Tests live in *zz-tests_bats/* at the project root:
@@ -46,12 +76,34 @@ function my_tool_produces_expected_output { # @test
 }
 ```
 
+BATS supports two test declaration styles:
+
+*Function-name style* (preferred):
+
+```
+function descriptive_test_name { # @test
+  ...
+}
+```
+
+*Directive style*:
+
+```
+@test 'descriptive test name' {
+  ...
+}
+```
+
+Both are valid BATS, but function-name style SHOULD be used because it
+enables *shfmt* formatting and *shellcheck* analysis. The directive
+style is opaque to both tools — they cannot parse or lint the test body.
+
 Rules:
 
 - Shebang is always *#!/usr/bin/env bats*.
 - *setup()* loads common.bash; never duplicate library loading per test.
 - Test function names are descriptive sentences with underscores.
-- The *# @test* annotation enables function-name discovery.
+- The *# @test* comment annotation enables BATS function-name discovery.
 
 # COMMON.BASH
 

@@ -81,4 +81,4 @@ bats_load_library bats-support
 
 # SEE ALSO
 
-*bats-assert*(7), *bats-island*(7)
+*bats-testing*(7), *bats-assert*(7), *bats-island*(7)

@@ -14,11 +14,15 @@ On load, *tap-writer* immediately prints the *TAP version 14* header and
 registers an EXIT trap that emits a trailing plan line (*1..N*) if no
 explicit plan was declared.
 
-Source the library:
+*tap-writer* is designed for standalone bash scripts, not BATS test
+files. Source it directly using the batman store path:
 
 ```
-source "path/to/tap-writer/load.bash"
+source "${BATS_LIB_PATH%%:*}/tap-writer/load.bash"
 ```
+
+Or, in non-BATS scripts where *BATS_LIB_PATH* is unavailable, source it
+from a known location.
 
 # FUNCTIONS
 
@@ -66,4 +70,4 @@ ok 3 - network test # SKIP no connectivity
 
 # SEE ALSO
 
-*bats-assert*(7), *bats-support*(7)
+*bats-testing*(7), *bats-support*(7)

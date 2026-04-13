@@ -85,13 +85,13 @@ All assertion functions operate on the *$status*, *$output*, and
 # EXAMPLE
 
 ```
-@test 'greet produces expected output' {
+function greet_produces_expected_output { # @test
   run greet "world"
   assert_success
   assert_output "hello, world"
 }
 
-@test 'error on missing argument' {
+function error_on_missing_argument { # @test
   run greet
   assert_failure
   assert_output --partial "usage:"
@@ -100,4 +100,5 @@ All assertion functions operate on the *$status*, *$output*, and
 
 # SEE ALSO
 
-*bats-assert-additions*(7), *bats-support*(7), *bats-island*(7)
+*bats-testing*(7), *bats-assert-additions*(7), *bats-emo*(7),
+*bats-support*(7), *bats-island*(7)

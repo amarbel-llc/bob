@@ -78,4 +78,4 @@ teardown() {
 
 # SEE ALSO
 
-*bats-assert*(7), *bats-emo*(7), *bats-support*(7)
+*bats-testing*(7), *bats-assert*(7), *bats-emo*(7), *bats-support*(7)
