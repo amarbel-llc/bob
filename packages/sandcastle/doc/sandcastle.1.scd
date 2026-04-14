@@ -74,7 +74,11 @@ and *network*.
 	Domain denylist.
 
 *allowAllUnixSockets* = _true_ | _false_
-	Allow all Unix socket connections (macOS only).
+	Allow all Unix socket connections. Required for binaries that use
+	async runtimes (tokio, async-std) which create Unix socketpairs
+	during initialization for signal handling. Without this, such
+	binaries will panic with "failed to create UnixStream:
+	PermissionDenied" before any user code runs.
 
 *allowLocalBinding* = _true_ | _false_
 	Allow binding to localhost ports.

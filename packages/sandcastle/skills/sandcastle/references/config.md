@@ -144,6 +144,21 @@ Resolution:
 - Wrap the entire test runner in a single sandcastle invocation, not each individual test
 - The socat bridges start once per sandcastle invocation and are shared across all commands within
 
+### Async Runtime Panic: "failed to create UnixStream"
+
+If a binary using tokio, async-std, or another async runtime panics with:
+
+```
+thread 'main' panicked at tokio/src/signal/unix.rs:
+failed to create UnixStream: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+```
+
+This happens because the sandbox's seccomp BPF filter blocks `socket(AF_UNIX, ...)` by default. Async runtimes call `socketpair(AF_UNIX, ...)` during initialization (before any user code runs), so even `--help` and `--version` will fail.
+
+**Fix:** Enable Unix socket access:
+- **sandcastle CLI:** Add `"allowAllUnixSockets": true` to the network section of your config file
+- **batman bats wrapper:** Pass `--allow-unix-sockets` before the BATS arguments
+
 ### Tests Pass Locally but Fail in Sandbox
 
 - The sandbox has a separate network namespace; `localhost` services may not be reachable

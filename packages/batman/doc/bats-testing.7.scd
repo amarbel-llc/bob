@@ -277,7 +277,9 @@ arguments:
 	Disable sandcastle isolation.
 
 *--allow-unix-sockets*
-	Allow Unix socket access in sandbox.
+	Allow Unix socket access in sandbox. Required when testing binaries
+	that use async runtimes (tokio, async-std) — these create Unix
+	socketpairs during initialization and will panic without this flag.
 
 *--allow-local-binding*
 	Allow localhost binding in sandbox.
