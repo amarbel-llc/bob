@@ -12,7 +12,10 @@ pkgs.buildNpmPackage {
 
   npmDepsHash = "sha256-wL1aNji3WBRCN054dK9rMFyGZWc+Hl7KfuLXkSODld4=";
 
-  nativeBuildInputs = [ pkgs.makeWrapper ];
+  nativeBuildInputs = [
+    pkgs.makeWrapper
+    pkgs.scdoc
+  ];
 
   buildPhase = ''
     runHook preBuild
@@ -48,6 +51,9 @@ pkgs.buildNpmPackage {
           ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.bubblewrap ]
         )
       }
+
+    mkdir -p $out/share/man/man1
+    scdoc < ${src}/doc/sandcastle.1.scd > $out/share/man/man1/sandcastle.1
 
     runHook postInstall
   '';

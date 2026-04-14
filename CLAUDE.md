@@ -49,7 +49,6 @@ just test-integration
 
 ``` sh
 nix build .#lux
-nix build .#robin       # skill-only package from batman
 nix build .#tap-dancer
 ```
 
@@ -57,7 +56,7 @@ nix build .#tap-dancer
 
 - **Package** (not "plugin") --- the user-facing term. Three flavors:
   - **MCP package** --- MCP server only (lux, caldav)
-  - **Skill package** --- Skill only (robin, tap-dancer, bob skills)
+  - **Skill package** --- Skill only (tap-dancer, bob skills)
 - **Marketplace** --- aggregated `symlinkJoin` output with `marketplace.json`
 
 ## Architecture

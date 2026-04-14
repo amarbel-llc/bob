@@ -200,7 +200,7 @@
           };
 
           batmanPkgs = import ./lib/packages/batman.nix {
-            inherit pkgs purse-first-cli;
+            inherit pkgs;
             sandcastle = sandcastlePkg;
             tap-dancer-cli = tapDancerPkgs.cli;
             src = ./packages/batman;
@@ -242,7 +242,6 @@
           [
             pkgs.caldavPkg
             pkgs.luxPkg
-            pkgs.batmanPkgs.robin
             pkgs.tapDancerPkgs.default
           ];
         skills = ./skills;
@@ -276,6 +275,7 @@
             let
               marketplacePkgs = marketplaceOutputs.packages.${system} or { };
               nonPluginPkgs = [
+                localPkgs.batmanPkgs.default
                 localPkgs.sandcastlePkg
                 localPkgs.andSoCanYouRepoPkg
                 localPkgs.potatoPkg
@@ -290,7 +290,6 @@
               };
               caldav = localPkgs.caldavPkg;
               lux = localPkgs.luxPkg;
-              robin = localPkgs.batmanPkgs.robin;
               batman = localPkgs.batmanPkgs.default;
               tap-dancer = localPkgs.tapDancerPkgs.default;
               tap-dancer-bash = localPkgs.tapDancerPkgs.bash-lib;

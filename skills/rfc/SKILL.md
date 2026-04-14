@@ -166,8 +166,6 @@ This section specifies:
 2. **Where tests live**: Path to a `zz-tests_bats/` directory containing the conformance suite
 3. **Binary injection**: Tests MUST use the `bats-emo` library (`require_bin`) for binary injection — never hardcode build output paths. This makes the suite portable across implementations (e.g., a Go binary and a Rust rewrite can run the same tests)
 
-Use the `robin:bats-testing` skill for test structure and the `robin:emo` skill for binary injection patterns.
-
 ### When to Include
 
 Include this section when:
@@ -208,5 +206,3 @@ Tests use binary injection via `bats-emo`:
 - **bob:adr** — Architecture Decision Records for documenting choices and trade-offs
 - **bob:fdr** — Feature Design Records for documenting user-facing features
 - **bob:overview** — Framework orientation, terminology, and workflow overview
-- **robin:bats-testing** — BATS test structure, helpers, and integration patterns
-- **robin:emo** — Binary injection via `require_bin` for conformance test portability

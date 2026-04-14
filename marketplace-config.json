@@ -31,19 +31,6 @@
         "mcp"
       ]
     },
-    "robin": {
-      "description": "BATS integration testing skill with bundled assertion libraries, sandcastle isolation, and justfile patterns",
-      "version": "0.1.0",
-      "homepage": "https://github.com/amarbel-llc/bob",
-      "category": "testing",
-      "tags": [
-        "bats",
-        "testing",
-        "integration",
-        "shell",
-        "nix"
-      ]
-    },
     "tap-dancer": {
       "description": "TAP-14 writer libraries (Go + Rust) and skill for producing spec-compliant TAP output",
       "version": "0.1.0",

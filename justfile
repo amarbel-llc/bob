@@ -13,9 +13,6 @@ build:
 build-lux:
     nix build .#lux
 
-build-robin:
-    nix build .#robin
-
 build-caldav:
     nix build .#caldav
 

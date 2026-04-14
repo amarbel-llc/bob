@@ -22,11 +22,6 @@ function claude_validates_bob { # @test
   assert_success
 }
 
-function claude_validates_robin { # @test
-  run "$claude_bin" plugin validate "$(plugin_share_dir robin)/.claude-plugin/plugin.json"
-  assert_success
-}
-
 function claude_validates_tap_dancer { # @test
   run "$claude_bin" plugin validate "$(plugin_share_dir tap-dancer)/.claude-plugin/plugin.json"
   assert_success
@@ -39,11 +34,6 @@ function purse_first_validates_lux { # @test
 
 function purse_first_validates_bob { # @test
   run "$purse_first" validate "$(plugin_share_dir bob)"
-  assert_success
-}
-
-function purse_first_validates_robin { # @test
-  run "$purse_first" validate "$(plugin_share_dir robin)"
   assert_success
 }
 

@@ -2,7 +2,6 @@
   pkgs,
   src,
   sandcastle,
-  purse-first-cli,
   tap-dancer-cli,
 }:
 
@@ -283,19 +282,6 @@ let
     '';
   };
 
-  robin = pkgs.stdenvNoCC.mkDerivation {
-    pname = "robin";
-    version = "0.1.0";
-    inherit src;
-    dontBuild = true;
-    nativeBuildInputs = [ purse-first-cli ];
-    installPhase = ''
-      purse-first generate-plugin \
-        --root $src \
-        --output $out \
-        --skills-dir $src/skills
-    '';
-  };
 in
 {
   default = pkgs.symlinkJoin {
@@ -303,7 +289,6 @@ in
     paths = [
       bats-libs
       bats
-      robin
       batman-manpages
     ];
   };
@@ -316,7 +301,6 @@ in
     bats-emo
     bats-libs
     bats
-    robin
     batman-manpages
     ;
 }
