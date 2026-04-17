@@ -13,7 +13,7 @@
 
     # Build tooling
     gomod2nix = {
-      url = "github:nix-community/gomod2nix";
+      url = "github:amarbel-llc/gomod2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     crane.follows = "purse-first/crane";
@@ -62,6 +62,11 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          pkgs-unfree = import nixpkgs {
+            inherit system;
+            config.allowUnfreePredicate =
+              pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "claude-code" ];
+          };
           pkgs-master = import nixpkgs-master { inherit system; };
           pkgs-rust = import nixpkgs-master.outPath {
             inherit system;
@@ -105,6 +110,9 @@
           pkgs.shellcheck
           pkgs.shfmt
           pkgs.parallel
+
+          # CLI
+          pkgs-unfree.claude-code
         ];
 
       buildPackages =
