@@ -6,7 +6,7 @@
 
 pkgs.buildNpmPackage {
   pname = "sandcastle";
-  version = "0.0.37";
+  version = "0.0.39";
 
   inherit src;
 

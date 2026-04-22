@@ -115,6 +115,62 @@ through socat bridges (HTTP on port 3128, SOCKS on port 1080).
 On macOS, sandcastle uses the native sandbox-exec facility with glob-based
 path filtering. Sandbox violations are logged to the system log.
 
+# TROUBLESHOOTING
+
+## sandbox-exec: sandbox_apply: Operation not permitted (macOS, exit 71)
+
+The generated sandbox profile could not be applied. Sandcastle surfaces a
+diagnostic hint pointing here when a child exits with code 71 on macOS.
+
+Common causes:
+
+- A malformed rule in the sandbox profile (a syntactically invalid TinyScheme
+  expression emitted by the profile generator). Run with *-d* / *--debug*
+  to see the full profile and check for unbalanced parens or unknown
+  predicates.
+- A profile rule references a path or Mach service that is denied by
+  System Integrity Protection, by the binary's entitlements, or by the
+  hardened runtime. Non-Apple-signed binaries can be subject to stricter
+  defaults than the profile would otherwise allow.
+- Running inside an environment that already applies a sandbox (e.g. a
+  nested sandcastle invocation, or an outer sandbox-exec from a CI agent).
+  Nested sandbox application is not supported.
+
+If the failure is specific to a multi-process application (Firefox,
+Chromium-based browsers), see also the BiDi / Mach IPC discussion tracked
+in the project issue tracker — those cases require caller-supplied Mach
+global-name allowlists rather than a profile fix.
+
+## bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted (Linux)
+
+On Ubuntu 23.10 and later — including 24.04 LTS by default — the sysctl
+*kernel.apparmor_restrict_unprivileged_userns* is set to _1_. Unprivileged
+processes can then only create user namespaces if they run under an
+AppArmor profile that includes a *userns,* rule, or if they have
+*CAP_SYS_ADMIN*. Sandcastle's bwrap invocation satisfies neither on a
+Nix-installed bwrap, so the user/network namespaces cannot be fully
+configured and bwrap fails during loopback setup.
+
+Workarounds, roughly in order of invasiveness:
+
+- Temporarily set the sysctl to _0_ on the host:
+  *sysctl -w kernel.apparmor_restrict_unprivileged_userns=0*. Affects the
+  entire host and is not appropriate for shared or production machines.
+- Add an AppArmor profile for the Nix-installed bwrap binary that includes
+  the *userns,* rule. Distro-specific.
+- Run sandcastle with a configuration that does not require network
+  namespace isolation, so *--unshare-net* is not passed to bwrap. The
+  exact config surface for this is in flight; see the project issue
+  tracker.
+
+## Sandcastle cannot be nested
+
+Running *sandcastle* inside another *sandcastle* invocation fails with a
+bridge socket error. The outer sandbox's seccomp filter blocks the inner
+invocation's setup calls. Use *--no-sandbox* (via *batman*(1) / *bats* or
+equivalent) on the inner layer if a nested test harness needs direct
+command execution.
+
 # EXAMPLE
 
 Run bats tests inside a sandbox that blocks sensitive directories:

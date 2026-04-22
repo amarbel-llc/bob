@@ -31,6 +31,23 @@ function shellQuote(s) {
   return "'" + s.replace(/'/g, "'\\''") + "'"
 }
 
+/**
+ * Emit a hint to stderr when a child exit code matches a known sandbox
+ * failure signature. Currently only darwin exit 71 (sandbox-exec could not
+ * apply the profile) has a specific hint. See sandcastle(1) § TROUBLESHOOTING.
+ */
+function maybeEmitExitDiagnostic(code, platform) {
+  if (platform === 'darwin' && code === 71) {
+    process.stderr.write(
+      'sandcastle: sandbox-exec returned exit code 71. The generated profile ' +
+        'could not be applied. Common causes: malformed rule in the profile, ' +
+        'a rule referencing a path/service denied by SIP or the process\u2019s ' +
+        'entitlements, or the hardened runtime.\n' +
+        "See 'man sandcastle' \u00a7 TROUBLESHOOTING for details.\n",
+    )
+  }
+}
+
 async function main() {
   const program = new Command()
 
@@ -185,6 +202,7 @@ async function main() {
               process.exit(1)
             }
           }
+          maybeEmitExitDiagnostic(code, process.platform)
           process.exit(code ?? 0)
         })
 
