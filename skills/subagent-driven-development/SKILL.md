@@ -49,13 +49,17 @@ digraph process {
         "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [shape=box];
         "Code quality reviewer subagent approves?" [shape=diamond];
         "Implementer subagent fixes quality issues" [shape=box];
+        "spinclass merge-this-session (git_sync=true)" [shape=box];
+        "Merge succeeded?" [shape=diamond];
+        "Implementer subagent fixes merge failure" [shape=box];
+        "Flailing? (2+ failed attempts or unrelated failure)" [shape=diamond];
+        "Halt: present failure to user" [shape=box style=filled fillcolor=red];
         "Mark task complete in TodoWrite" [shape=box];
     }
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
-    "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
@@ -70,11 +74,16 @@ digraph process {
     "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" -> "Code quality reviewer subagent approves?";
     "Code quality reviewer subagent approves?" -> "Implementer subagent fixes quality issues" [label="no"];
     "Implementer subagent fixes quality issues" -> "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [label="re-review"];
-    "Code quality reviewer subagent approves?" -> "Mark task complete in TodoWrite" [label="yes"];
+    "Code quality reviewer subagent approves?" -> "spinclass merge-this-session (git_sync=true)" [label="yes"];
+    "spinclass merge-this-session (git_sync=true)" -> "Merge succeeded?";
+    "Merge succeeded?" -> "Mark task complete in TodoWrite" [label="yes"];
+    "Merge succeeded?" -> "Implementer subagent fixes merge failure" [label="no"];
+    "Implementer subagent fixes merge failure" -> "Flailing? (2+ failed attempts or unrelated failure)";
+    "Flailing? (2+ failed attempts or unrelated failure)" -> "Halt: present failure to user" [label="yes"];
+    "Flailing? (2+ failed attempts or unrelated failure)" -> "spinclass merge-this-session (git_sync=true)" [label="no, retry"];
     "Mark task complete in TodoWrite" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (./implementer-prompt.md)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
-    "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
 
@@ -114,6 +123,9 @@ digraph process {
     [Get git SHAs, dispatch code quality reviewer]
     Code reviewer: Strengths: Good test coverage, clean. Issues: None. Approved.
 
+    [spinclass merge-this-session git_sync=true]
+    Merge: ✅ All checks passed
+
     [Mark Task 1 complete]
 
     Task 2: Recovery modes
@@ -148,13 +160,22 @@ digraph process {
     [Code reviewer reviews again]
     Code reviewer: ✅ Approved
 
+    [spinclass merge-this-session git_sync=true]
+    Merge: ❌ premerge hook failed — test TestFoo panicked
+
+    [Implementer investigates and fixes]
+    Implementer: Fixed nil pointer in repair mode, tests pass
+
+    [spinclass merge-this-session git_sync=true]
+    Merge: ✅ All checks passed
+
     [Mark Task 2 complete]
 
     ...
 
     [After all tasks]
     [Dispatch final code-reviewer]
-    Final reviewer: All requirements met, ready to merge
+    Final reviewer: All requirements met, implementation looks solid
 
     Done!
 
@@ -172,9 +193,10 @@ text) - Controller curates exactly what context is needed - Subagent gets
 complete information upfront - Questions surfaced before work begins (not after)
 
 **Quality gates:** - Self-review catches issues before handoff - Two-stage
-review: spec compliance, then code quality - Review loops ensure fixes actually
-work - Spec compliance prevents over/under-building - Code quality ensures
-implementation is well-built
+review: spec compliance, then code quality - spinclass merge runs full premerge
+hook suite after each task - Review loops ensure fixes actually work - Spec
+compliance prevents over/under-building - Code quality ensures implementation is
+well-built
 
 **Cost:** - More subagent invocations (implementer + 2 reviewers per task) -
 Controller does more prep work (extracting all tasks upfront) - Review loops add
@@ -192,13 +214,19 @@ compliance (spec reviewer found issues = not done) - Skip review loops (reviewer
 found issues = implementer fixes = review again) - Let implementer self-review
 replace actual review (both are needed) - **Start code quality review before
 spec compliance is ✅** (wrong order) - Move to next task while either review
-has open issues
+has open issues - Skip spinclass merge after task approval - Proceed to next
+task if merge failed
 
 **If subagent asks questions:** - Answer clearly and completely - Provide
 additional context if needed - Don't rush them into implementation
 
 **If reviewer finds issues:** - Implementer (same subagent) fixes them -
 Reviewer reviews again - Repeat until approved - Don't skip the re-review
+
+**If merge fails:** - Same implementer subagent investigates and fixes (has full
+context) - Retry merge after fix - If 2+ failed fix attempts, or failure is
+clearly unrelated to this task's changes: halt and present to user - Do not
+chain hypotheses without checking in (flailing = stop)
 
 **If subagent fails task:** - Dispatch fix subagent with specific instructions -
 Don't try to fix manually (context pollution)
@@ -209,8 +237,7 @@ Don't try to fix manually (context pollution)
 REQUIRED: Understand session constraints before starting -
 **superpowers:writing-plans** - Creates the plan this skill executes -
 **superpowers:requesting-code-review** - Code review template for reviewer
-subagents - **superpowers:finishing-a-development-branch** - Complete
-development after all tasks
+subagents
 
 **Subagents should use:** - **superpowers:test-driven-development** - Subagents
 follow TDD for each task
