@@ -181,10 +181,8 @@ func TestSubtestEmitsIndentedBlock(t *testing.T) {
 
 	expected := "TAP version 14\n" +
 		"    # Subtest: nested\n" +
-		"    # Output: 1 - inner pass\n" +
 		"    ok 1 - inner pass\n" +
 		"    1..1\n" +
-		"# Output: 1 - nested\n" +
 		"ok 1 - nested\n"
 
 	if buf.String() != expected {
@@ -206,33 +204,28 @@ func TestSequentialNumbering(t *testing.T) {
 	}
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	// Each test point now has a # Output: header before it
-	if lines[1] != "# Output: 1 - pass" {
+	// Output headers are lazy: no body lines follow these test points,
+	// so no "# Output:" headers are emitted.
+	if lines[1] != "ok 1 - pass" {
 		t.Errorf("line 1: %q", lines[1])
 	}
-	if lines[2] != "ok 1 - pass" {
+	if lines[2] != "not ok 2 - fail" {
 		t.Errorf("line 2: %q", lines[2])
 	}
-	if lines[3] != "# Output: 2 - fail" {
+	if lines[3] != "ok 3 - skip # SKIP lazy" {
 		t.Errorf("line 3: %q", lines[3])
 	}
-	if lines[4] != "not ok 2 - fail" {
+	if lines[4] != "not ok 4 - todo # TODO later" {
 		t.Errorf("line 4: %q", lines[4])
 	}
-	if lines[5] != "# Output: 3 - skip" {
-		t.Errorf("line 5: %q", lines[5])
+	if lines[5] != "1..4" {
+		t.Errorf("plan line: %q", lines[5])
 	}
-	if lines[6] != "ok 3 - skip # SKIP lazy" {
-		t.Errorf("line 6: %q", lines[6])
-	}
-	if lines[7] != "# Output: 4 - todo" {
-		t.Errorf("line 7: %q", lines[7])
-	}
-	if lines[8] != "not ok 4 - todo # TODO later" {
-		t.Errorf("line 8: %q", lines[8])
-	}
-	if lines[9] != "1..4" {
-		t.Errorf("plan line: %q", lines[9])
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# Output:") {
+			t.Errorf("unexpected eager Output header in output:\n%s", buf.String())
+			break
+		}
 	}
 }
 
@@ -250,13 +243,10 @@ func TestNestedSubtestTwoLevelsDeep(t *testing.T) {
 	expected := "TAP version 14\n" +
 		"    # Subtest: outer\n" +
 		"        # Subtest: inner\n" +
-		"        # Output: 1 - deep test\n" +
 		"        ok 1 - deep test\n" +
 		"        1..1\n" +
-		"    # Output: 1 - inner\n" +
 		"    ok 1 - inner\n" +
 		"    1..1\n" +
-		"# Output: 1 - outer\n" +
 		"ok 1 - outer\n"
 
 	if buf.String() != expected {
@@ -411,9 +401,7 @@ func TestWriteAllBasicOk(t *testing.T) {
 		{Description: "second", Ok: true},
 	}))
 	expected := "TAP version 14\n" +
-		"# Output: 1 - first\n" +
 		"ok 1 - first\n" +
-		"# Output: 2 - second\n" +
 		"ok 2 - second\n" +
 		"1..2\n"
 	if buf.String() != expected {
@@ -488,10 +476,8 @@ func TestWriteAllSubtest(t *testing.T) {
 	}))
 	expected := "TAP version 14\n" +
 		"    # Subtest: nested\n" +
-		"    # Output: 1 - inner pass\n" +
 		"    ok 1 - inner pass\n" +
 		"    1..1\n" +
-		"# Output: 1 - nested\n" +
 		"ok 1 - nested\n" +
 		"1..1\n"
 	if buf.String() != expected {
@@ -938,49 +924,47 @@ func TestPragmaTracksTTYBuildLastLine(t *testing.T) {
 	}
 }
 
-func TestOkEmitsOutputHeader(t *testing.T) {
+func TestOkSuppressesOutputHeaderWhenEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewWriter(&buf)
 	tw.Ok("lint")
 	out := buf.String()
-	want := "TAP version 14\n# Output: 1 - lint\nok 1 - lint\n"
+	want := "TAP version 14\nok 1 - lint\n"
 	if out != want {
 		t.Errorf("expected:\n%s\ngot:\n%s", want, out)
 	}
 }
 
-func TestNotOkEmitsOutputHeader(t *testing.T) {
+func TestNotOkSuppressesOutputHeaderWhenEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewWriter(&buf)
 	tw.NotOk("build", nil)
 	out := buf.String()
-	if !strings.Contains(out, "# Output: 1 - build\n") {
-		t.Errorf("expected Output header before not ok, got:\n%s", out)
+	if strings.Contains(out, "# Output:") {
+		t.Errorf("expected no Output header without body lines, got:\n%s", out)
 	}
-	headerIdx := strings.Index(out, "# Output: 1 - build\n")
-	notOkIdx := strings.Index(out, "not ok 1 - build\n")
-	if headerIdx >= notOkIdx {
-		t.Errorf("Output header must appear before not ok line")
+	if !strings.Contains(out, "not ok 1 - build\n") {
+		t.Errorf("expected not ok line, got:\n%s", out)
 	}
 }
 
-func TestSkipEmitsOutputHeader(t *testing.T) {
+func TestSkipSuppressesOutputHeaderWhenEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewWriter(&buf)
 	tw.Skip("optional", "not needed")
 	out := buf.String()
-	if !strings.Contains(out, "# Output: 1 - optional\n") {
-		t.Errorf("expected Output header before skip, got:\n%s", out)
+	if strings.Contains(out, "# Output:") {
+		t.Errorf("expected no Output header without body lines, got:\n%s", out)
 	}
 }
 
-func TestTodoEmitsOutputHeader(t *testing.T) {
+func TestTodoSuppressesOutputHeaderWhenEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	tw := NewWriter(&buf)
 	tw.Todo("pending", "not yet")
 	out := buf.String()
-	if !strings.Contains(out, "# Output: 1 - pending\n") {
-		t.Errorf("expected Output header before todo, got:\n%s", out)
+	if strings.Contains(out, "# Output:") {
+		t.Errorf("expected no Output header without body lines, got:\n%s", out)
 	}
 }
 
@@ -1063,11 +1047,88 @@ func TestOutputBlockEmpty(t *testing.T) {
 	})
 	tw.Plan()
 	want := "TAP version 14\n" +
-		"# Output: 1 - no output\n" +
 		"ok 1 - no output\n" +
 		"1..1\n"
 	if got := buf.String(); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestOutputBlockLazyHeaderFiresOnFirstLine(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("build", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("step 1")
+		ob.Line("step 2")
+		return nil
+	})
+	tw.Plan()
+	want := "TAP version 14\n" +
+		"# Output: 1 - build\n" +
+		"    step 1\n" +
+		"    step 2\n" +
+		"ok 1 - build\n" +
+		"1..1\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestOutputBlockEmptyValidatesWithReader(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.OutputBlock("no output", func(ob *OutputBlockWriter) *Diagnostics {
+		return nil
+	})
+	tw.OutputBlock("with output", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("hello")
+		return nil
+	})
+	tw.Plan()
+
+	r := NewReader(strings.NewReader(buf.String()))
+	s := r.Summary()
+	if !s.Valid {
+		for _, d := range r.Diagnostics() {
+			t.Errorf("diagnostic: line %d: %s: %s", d.Line, d.Severity, d.Message)
+		}
+		t.Fatalf("lazy Output header emission did not validate as TAP-14:\n%s", buf.String())
+	}
+	if s.TotalTests != 2 || s.Passed != 2 {
+		t.Errorf("expected 2/2 passed, got %d/%d in:\n%s", s.Passed, s.TotalTests, buf.String())
+	}
+}
+
+func TestLazyOutputHeaderAcrossAllMethodsValidates(t *testing.T) {
+	var buf bytes.Buffer
+	tw := NewWriter(&buf)
+	tw.Ok("a")
+	tw.OkDiag("b", &Diagnostics{Message: "note"})
+	tw.NotOk("c", map[string]string{"message": "boom"})
+	tw.Skip("d", "later")
+	tw.SkipDiag("e", "soon", &Diagnostics{Message: "why"})
+	tw.Todo("f", "pending")
+	tw.OutputBlock("g", func(ob *OutputBlockWriter) *Diagnostics { return nil })
+	tw.OutputBlock("h", func(ob *OutputBlockWriter) *Diagnostics {
+		ob.Line("line")
+		return nil
+	})
+	tw.Plan()
+
+	if strings.Contains(buf.String(), "# Output: 1 - a") {
+		t.Errorf("Ok with no body must not emit header, got:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "# Output: 8 - h") {
+		t.Errorf("OutputBlock with body must emit header, got:\n%s", buf.String())
+	}
+
+	r := NewReader(strings.NewReader(buf.String()))
+	s := r.Summary()
+	if !s.Valid {
+		for _, d := range r.Diagnostics() {
+			t.Errorf("diagnostic: line %d: %s: %s", d.Line, d.Severity, d.Message)
+		}
+		t.Fatalf("output did not validate as TAP-14:\n%s", buf.String())
 	}
 }
 

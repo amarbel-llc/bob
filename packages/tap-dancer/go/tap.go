@@ -60,10 +60,6 @@ func (tw *Writer) formatNumber(n int) string {
 	return fmt.Sprintf("%d", n)
 }
 
-func (tw *Writer) emitOutputHeader(num, description string) {
-	fmt.Fprintf(tw.w, "# Output: %s - %s\n", num, description)
-}
-
 func (tw *Writer) colorOk() string {
 	if tw.color {
 		return ansiGreen + "ok" + ansiReset
@@ -102,7 +98,6 @@ func (tw *Writer) colorBailOut() string {
 func (tw *Writer) Ok(description string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
 	return tw.n
 }
@@ -110,7 +105,6 @@ func (tw *Writer) Ok(description string) int {
 func (tw *Writer) OkDiag(description string, diagnostics *Diagnostics) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
 	writeDiagnostics(tw.w, diagnostics, tw.color)
 	return tw.n
@@ -124,7 +118,6 @@ func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 	tw.n++
 	tw.failed = true
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, description)
 	if len(diagnostics) > 0 {
 		fmt.Fprintln(tw.w, "  ---")
@@ -156,7 +149,6 @@ func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 func (tw *Writer) Skip(description, reason string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
 	return tw.n
 }
@@ -164,7 +156,6 @@ func (tw *Writer) Skip(description, reason string) int {
 func (tw *Writer) SkipDiag(description, reason string, diagnostics *Diagnostics) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
 	writeDiagnostics(tw.w, diagnostics, tw.color)
 	return tw.n
@@ -173,7 +164,6 @@ func (tw *Writer) SkipDiag(description, reason string, diagnostics *Diagnostics)
 func (tw *Writer) Todo(description, reason string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	tw.emitOutputHeader(num, description)
 	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorNotOk(), num, description, tw.colorTodo(), reason)
 	return tw.n
 }
@@ -231,13 +221,25 @@ func (tw *Writer) FinishLastLine() {
 }
 
 // OutputBlockWriter writes indented body lines inside an Output Block.
+// The "# Output:" header is emitted lazily on the first Line call, so a
+// block whose callback never writes a body line produces no header at all.
 type OutputBlockWriter struct {
-	w     io.Writer
-	color bool
+	w             io.Writer
+	color         bool
+	pendingHeader *pendingOutputHeader
+}
+
+type pendingOutputHeader struct {
+	num, description string
 }
 
 // Line writes a single 4-space-indented output line, applying SGR filtering.
+// On first invocation it flushes the deferred "# Output:" header.
 func (ob *OutputBlockWriter) Line(text string) {
+	if ob.pendingHeader != nil {
+		fmt.Fprintf(ob.w, "# Output: %s - %s\n", ob.pendingHeader.num, ob.pendingHeader.description)
+		ob.pendingHeader = nil
+	}
 	text = sanitizeYAMLValue(text, ob.color)
 	fmt.Fprintf(ob.w, "    %s\n", text)
 }
@@ -248,8 +250,11 @@ func (ob *OutputBlockWriter) Line(text string) {
 func (tw *Writer) OutputBlock(description string, fn func(*OutputBlockWriter) *Diagnostics) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "# Output: %s - %s\n", num, description)
-	ob := &OutputBlockWriter{w: tw.w, color: tw.color}
+	ob := &OutputBlockWriter{
+		w:             tw.w,
+		color:         tw.color,
+		pendingHeader: &pendingOutputHeader{num: num, description: description},
+	}
 	diag := fn(ob)
 	if diag != nil {
 		tw.failed = true
@@ -397,14 +402,12 @@ func (tw *Writer) WriteAll(tests iter.Seq[TestPoint]) {
 		} else if tp.Ok {
 			tw.n++
 			num := tw.formatNumber(tw.n)
-			tw.emitOutputHeader(num, tp.Description)
 			fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, tp.Description)
 			writeDiagnostics(tw.w, tp.Diagnostics, tw.color)
 		} else {
 			tw.n++
 			tw.failed = true
 			num := tw.formatNumber(tw.n)
-			tw.emitOutputHeader(num, tp.Description)
 			fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, tp.Description)
 			writeDiagnostics(tw.w, tp.Diagnostics, tw.color)
 		}

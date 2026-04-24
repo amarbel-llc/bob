@@ -210,7 +210,6 @@ impl<'a> TapWriter<'a> {
     pub fn ok(&mut self, desc: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -225,7 +224,6 @@ impl<'a> TapWriter<'a> {
         self.counter += 1;
         self.failed = true;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -240,7 +238,6 @@ impl<'a> TapWriter<'a> {
         self.counter += 1;
         self.failed = true;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {}",
@@ -255,7 +252,6 @@ impl<'a> TapWriter<'a> {
     pub fn skip(&mut self, desc: &str, reason: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {} # {} {}",
@@ -271,7 +267,6 @@ impl<'a> TapWriter<'a> {
     pub fn todo(&mut self, desc: &str, reason: &str) -> io::Result<usize> {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         writeln!(
             self.w,
             "{} {} - {} # {} {}",
@@ -347,7 +342,6 @@ impl<'a> TapWriter<'a> {
         };
 
         let num = self.config.format_number(result.number);
-        writeln!(self.w, "# Output: {} - {}", num, result.name)?;
         if let Some(ref directive) = result.directive {
             writeln!(self.w, "{status} {num} - {} # {directive}", result.name)?;
         } else {
@@ -405,11 +399,14 @@ impl<'a> TapWriter<'a> {
     {
         self.counter += 1;
         let num = self.config.format_number(self.counter);
-        writeln!(self.w, "# Output: {} - {}", num, desc)?;
         let diag = {
             let mut ob = OutputBlockWriter {
                 w: &mut *self.w,
                 color: self.config.color(),
+                pending_header: Some(PendingOutputHeader {
+                    num: num.clone(),
+                    description: desc.to_string(),
+                }),
             };
             f(&mut ob)
         };
@@ -446,10 +443,22 @@ impl<'a> TapWriter<'a> {
 pub struct OutputBlockWriter<'a> {
     w: &'a mut dyn Write,
     color: bool,
+    pending_header: Option<PendingOutputHeader>,
+}
+
+struct PendingOutputHeader {
+    num: String,
+    description: String,
 }
 
 impl OutputBlockWriter<'_> {
+    /// Writes a single 4-space-indented output line. On first invocation
+    /// the deferred "# Output:" header is flushed, so a block whose callback
+    /// never calls `line` emits no header at all.
     pub fn line(&mut self, text: &str) -> io::Result<()> {
+        if let Some(h) = self.pending_header.take() {
+            writeln!(self.w, "# Output: {} - {}", h.num, h.description)?;
+        }
         let text = sanitize_yaml_value(text, self.color);
         writeln!(self.w, "    {}", text)
     }
@@ -2288,55 +2297,52 @@ mod tests {
     }
 
     #[test]
-    fn test_ok_emits_output_header() {
+    fn test_ok_suppresses_output_header_when_empty() {
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
         tw.ok("lint").unwrap();
         tw.plan().unwrap();
         let got = String::from_utf8(buf).unwrap();
         let want = "TAP version 14\n\
-                    # Output: 1 - lint\n\
                     ok 1 - lint\n\
                     1..1\n";
         assert_eq!(got, want);
     }
 
     #[test]
-    fn test_not_ok_emits_output_header() {
+    fn test_not_ok_suppresses_output_header_when_empty() {
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
         tw.not_ok("build").unwrap();
         let got = String::from_utf8(buf).unwrap();
         assert!(
-            got.contains("# Output: 1 - build\n"),
-            "expected Output header, got:\n{got}"
+            !got.contains("# Output:"),
+            "expected no Output header without body lines, got:\n{got}"
         );
-        let header_idx = got.find("# Output: 1 - build\n").unwrap();
-        let not_ok_idx = got.find("not ok 1 - build\n").unwrap();
-        assert!(header_idx < not_ok_idx, "Output header must precede not ok");
+        assert!(got.contains("not ok 1 - build\n"));
     }
 
     #[test]
-    fn test_skip_emits_output_header() {
+    fn test_skip_suppresses_output_header_when_empty() {
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
         tw.skip("optional", "not needed").unwrap();
         let got = String::from_utf8(buf).unwrap();
         assert!(
-            got.contains("# Output: 1 - optional\n"),
-            "expected Output header, got:\n{got}"
+            !got.contains("# Output:"),
+            "expected no Output header without body lines, got:\n{got}"
         );
     }
 
     #[test]
-    fn test_todo_emits_output_header() {
+    fn test_todo_suppresses_output_header_when_empty() {
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
         tw.todo("pending", "not yet").unwrap();
         let got = String::from_utf8(buf).unwrap();
         assert!(
-            got.contains("# Output: 1 - pending\n"),
-            "expected Output header, got:\n{got}"
+            !got.contains("# Output:"),
+            "expected no Output header without body lines, got:\n{got}"
         );
     }
 
@@ -2421,9 +2427,51 @@ mod tests {
         tw.plan().unwrap();
         let got = String::from_utf8(buf).unwrap();
         let want = "TAP version 14\n\
-                    # Output: 1 - no output\n\
                     ok 1 - no output\n\
                     1..1\n";
         assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_output_block_lazy_header_fires_on_first_line() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.output_block("build", |ob| {
+            ob.line("step 1").unwrap();
+            ob.line("step 2").unwrap();
+            None
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        let want = "TAP version 14\n\
+                    # Output: 1 - build\n\
+                    \x20\x20\x20\x20step 1\n\
+                    \x20\x20\x20\x20step 2\n\
+                    ok 1 - build\n\
+                    1..1\n";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_output_block_header_suppressed_when_no_line() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.output_block("silent", |_ob| None).unwrap();
+        tw.output_block("noisy", |ob| {
+            ob.line("hello").unwrap();
+            None
+        })
+        .unwrap();
+        tw.plan().unwrap();
+        let got = String::from_utf8(buf).unwrap();
+        assert!(
+            !got.contains("# Output: 1 - silent"),
+            "silent block must not emit a header, got:\n{got}"
+        );
+        assert!(
+            got.contains("# Output: 2 - noisy"),
+            "noisy block must emit a header, got:\n{got}"
+        );
     }
 }
