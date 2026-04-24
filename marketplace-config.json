@@ -33,7 +33,7 @@
     },
     "tap-dancer": {
       "description": "TAP-14 writer libraries (Go + Rust) and skill for producing spec-compliant TAP output",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "homepage": "https://github.com/amarbel-llc/bob",
       "category": "testing",
       "tags": [
