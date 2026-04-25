@@ -43,18 +43,26 @@ function batman_fails_on_missing_fence_jsonc { # @test
 }
 
 function batman_runs_passing_test_under_fence_with_network { # @test
+  # Skipped: fence's bwrap nests inside the dev-shell wrapped bats's
+  # bwrap → fence sandbox init fails. Tracked in
+  # https://github.com/amarbel-llc/bob/issues/113 .
+  skip "fence + dev-shell bats nested-bwrap; see bob#113"
   run "$BATMAN_BIN" "$FIXTURES/network-allowed"
   assert_success
   assert_output --partial "ok 1 curl_to_example_com_succeeds"
 }
 
 function batman_blocks_network_when_fence_denies { # @test
+  # Skipped: same reason as the network-allowed sibling. See bob#113.
+  skip "fence + dev-shell bats nested-bwrap; see bob#113"
   run "$BATMAN_BIN" "$FIXTURES/network-blocked"
   assert_success
   assert_output --partial "ok 1 curl_anywhere_fails"
 }
 
 function batman_aggregates_exit_codes { # @test
+  # Skipped: spawns fence; see bob#113.
+  skip "fence + dev-shell bats nested-bwrap; see bob#113"
   local fail_dir="$BATS_TEST_TMPDIR/always-fails"
   mkdir -p "$fail_dir"
   cat >"$fail_dir/fence.jsonc" <<'JSON'

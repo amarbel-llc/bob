@@ -106,7 +106,7 @@ test-lux-bats: build-batman
     {{cmd_nix_dev}} {{cmd_batman_bats}} --bin-dir result/bin --jobs {{num_cpus()}} packages/lux/zz-tests_bats/fmt.bats
 
 test-batman-bats: build-batman
-    BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
+    BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
 
 # Run batman.bats under PLAIN nixpkgs bats. Filters /home/* dirs out of
 # PATH inside the dev shell so a profile-installed sandcastle-wrapped
