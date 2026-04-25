@@ -130,6 +130,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
           pkgs-master = import nixpkgs-master { inherit system; };
+          pkgs-amarbel = import amarbel-nixpkgs { inherit system; };
           pkgs-overlay = import nixpkgs {
             inherit system;
             overlays = [ (import rust-overlay) ];
@@ -227,7 +228,7 @@
             sandcastle = sandcastlePkg;
             tap-dancer-cli = tapDancerPkgs.cli;
             src = ./packages/batman;
-            fence = pkgs-master.fence;
+            fence = pkgs-amarbel.fence;
             buildZxScriptFromFile = bun2nixLib.buildZxScriptFromFile;
           };
 

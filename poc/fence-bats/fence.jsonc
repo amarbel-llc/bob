@@ -1,0 +1,20 @@
+{
+  "allowPty": true,
+  "network": {
+    "allowedDomains": ["example.com"],
+    "allowLocalBinding": true,
+    "allowLocalOutbound": true
+  },
+  "filesystem": {
+    "allowRead": ["/"],
+    "allowExecute": ["/"],
+    "allowWrite": ["/"],
+    "denyRead": [],
+    "denyWrite": []
+  },
+  "command": {
+    "useDefaults": false,
+    "deny": [],
+    "allow": []
+  }
+}

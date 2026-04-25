@@ -1,4 +1,17 @@
+// Bisect step: argv-aware runtime exec + allowPty off.
 {
-  "network": { "allowedDomains": ["example.com"] },
-  "filesystem": { "denyRead": [] }
+  "allowPty": false,
+  "network": {
+    "allowedDomains": ["example.com"]
+  },
+  "filesystem": {
+    "strictDenyRead": true,
+    "allowRead": ["/nix/store"],
+    "allowExecute": ["/nix/store"],
+    "allowWrite": ["/tmp"]
+  },
+  "command": {
+    "useDefaults": true,
+"acceptSharedBinaryCannotRuntimeDeny": ["chroot"]
+  }
 }

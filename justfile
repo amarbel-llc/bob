@@ -108,10 +108,16 @@ test-lux-bats: build-batman
 test-batman-bats: build-batman
     BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
 
-# Run only the batman-fence-wrapper tests (batman.bats) under plain bats.
-# Use this for the inner agent dev loop on the fence-based batman binary.
+# Run batman.bats under PLAIN nixpkgs bats. Filters /home/* dirs out of
+# PATH inside the dev shell so a profile-installed sandcastle-wrapped
+# `bats` (e.g. /home/$user/eng/result/bin/bats from a purse-first
+# install) doesn't shadow the dev-shell's plain pkgs.bats. Without this
+# filter, the wrapped bats's default sandbox=true causes sandcastle's
+# bwrap to nest inside fence's bwrap and fence fails to set up sockets.
 test-batman-fence: build-batman
-    BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test-targets batman.bats
+    BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman \
+      BATS_LIB_PATH={{justfile_directory()}}/result-batman/share/bats \
+      {{cmd_nix_dev}} bash -c 'PATH=$(echo "$PATH" | tr ":" "\n" | grep -Ev "^/home/" | tr "\n" ":"); exec bats --tap --jobs $(nproc) packages/batman/zz-tests_bats/batman.bats'
 
 # Invoke the built batman binary with arbitrary args. Useful for manual smoke-testing.
 run-batman *args: build-batman
