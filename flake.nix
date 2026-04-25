@@ -11,6 +11,13 @@
     # Master nixpkgs pinned directly for go_1_26 availability.
     nixpkgs-master.url = "github:NixOS/nixpkgs/e2dde111aea2c0699531dc616112a96cd55ab8b5";
 
+    # zx packaging via buildZxScriptFromFile
+    amarbel-nixpkgs.url = "github:amarbel-llc/nixpkgs";
+    bun2nix = {
+      url = "github:nix-community/bun2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Build tooling
     gomod2nix = {
       url = "github:amarbel-llc/gomod2nix";
@@ -29,6 +36,8 @@
       purse-first,
       nixpkgs,
       nixpkgs-master,
+      amarbel-nixpkgs,
+      bun2nix,
       utils,
       gomod2nix,
       crane,
