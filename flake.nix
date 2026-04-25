@@ -203,6 +203,11 @@
               ;
           };
 
+          bun2nixLib = import "${amarbel-nixpkgs}/pkgs/build-support/bun2nix" {
+            inherit pkgs;
+            cacheEntryCreator = bun2nix.packages.${system}.cacheEntryCreator;
+          };
+
           tapDancerPkgs = import ./lib/packages/tap-dancer.nix {
             inherit
               pkgs
@@ -222,6 +227,8 @@
             sandcastle = sandcastlePkg;
             tap-dancer-cli = tapDancerPkgs.cli;
             src = ./packages/batman;
+            fence = pkgs-master.fence;
+            buildZxScriptFromFile = bun2nixLib.buildZxScriptFromFile;
           };
 
           polkadotsPkg = import ./lib/packages/polkadots.nix {

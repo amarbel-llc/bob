@@ -3,6 +3,8 @@
   src,
   sandcastle,
   tap-dancer-cli,
+  fence,
+  buildZxScriptFromFile,
 }:
 
 let
@@ -282,6 +284,18 @@ let
     '';
   };
 
+  batman = buildZxScriptFromFile {
+    pname = "batman";
+    version = "0.0.1";
+    script = "${src}/src/batman.ts";
+    runtimeInputs = [
+      fence
+      pkgs.bats
+      pkgs.coreutils
+      pkgs.gawk
+    ];
+  };
+
 in
 {
   default = pkgs.symlinkJoin {
@@ -289,6 +303,7 @@ in
     paths = [
       bats-libs
       bats
+      batman
       batman-manpages
     ];
   };
@@ -301,6 +316,7 @@ in
     bats-emo
     bats-libs
     bats
+    batman
     batman-manpages
     ;
 }
