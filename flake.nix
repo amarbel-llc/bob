@@ -11,12 +11,8 @@
     # Master nixpkgs pinned directly for go_1_26 availability.
     nixpkgs-master.url = "github:NixOS/nixpkgs/e2dde111aea2c0699531dc616112a96cd55ab8b5";
 
-    # zx packaging via buildZxScriptFromFile
-    amarbel-nixpkgs.url = "github:amarbel-llc/nixpkgs";
-    bun2nix = {
-      url = "github:nix-community/bun2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # Fork carrying pkgs/build-support/bun2nix (buildZxScriptFromFile).
+    amarbel-nixpkgs.url = "github:amarbel-llc/nixpkgs/9bad1e489bd4c713da002618bd825372d35430af";
 
     # Build tooling
     gomod2nix = {
@@ -28,6 +24,11 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # cacheEntryCreator (Zig binary) consumed by bun2nix's buildZxScriptFromFile.
+    bun2nix = {
+      url = "github:nix-community/bun2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -37,11 +38,11 @@
       nixpkgs,
       nixpkgs-master,
       amarbel-nixpkgs,
-      bun2nix,
       utils,
       gomod2nix,
       crane,
       rust-overlay,
+      bun2nix,
     }:
     let
       mkMarketplace = purse-first.lib.mkMarketplace;

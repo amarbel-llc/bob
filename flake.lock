@@ -12,6 +12,7 @@
       "original": {
         "owner": "amarbel-llc",
         "repo": "nixpkgs",
+        "rev": "9bad1e489bd4c713da002618bd825372d35430af",
         "type": "github"
       }
     },
