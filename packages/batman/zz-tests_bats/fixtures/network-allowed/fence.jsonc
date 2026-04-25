@@ -1,0 +1,4 @@
+{
+  "network": { "allowedDomains": ["example.com"] },
+  "filesystem": { "denyRead": [] }
+}
