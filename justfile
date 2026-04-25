@@ -108,6 +108,15 @@ test-lux-bats: build-batman
 test-batman-bats: build-batman
     BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
 
+# Run only the batman-fence-wrapper tests (batman.bats) under plain bats.
+# Use this for the inner agent dev loop on the fence-based batman binary.
+test-batman-fence: build-batman
+    BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test-targets batman.bats
+
+# Invoke the built batman binary with arbitrary args. Useful for manual smoke-testing.
+run-batman *args: build-batman
+    {{justfile_directory()}}/result-batman/bin/batman {{args}}
+
 # Bump version for a package. Usage: just bump-version lux 0.2.0
 bump-version package version:
   #!/usr/bin/env bash
