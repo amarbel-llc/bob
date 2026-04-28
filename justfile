@@ -51,6 +51,22 @@ fmt:
 lint:
     {{cmd_nix_dev}} bash -c 'set -euo pipefail; for mod in $(go work edit -json | jq -r ".Use[].DiskPath"); do (cd "$mod" && go vet ./...); done'
 
+# Sed-rewrite caldavVersion in flake.nix to the given semver. The version
+# string is burnt into the binary at build time via the fork's auto-injected
+# -X main.version ldflag (see lib/packages/caldav.nix), so flake.nix is the
+# single source of truth. No-op if already at the target version.
+# Usage: just bump-caldav-version 0.1.1
+bump-caldav-version new_version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    current=$(grep 'caldavVersion = ' flake.nix | sed 's/.*"\(.*\)".*/\1/')
+    if [[ "$current" == "{{new_version}}" ]]; then
+      echo "already at {{new_version}}"
+      exit 0
+    fi
+    sed -i.bak 's/caldavVersion = "'"$current"'"/caldavVersion = "{{new_version}}"/' flake.nix && rm flake.nix.bak
+    echo "bumped caldavVersion: $current → {{new_version}}"
+
 vendor: vendor-go vendor-hash
 
 # Regenerate workspace vendor directory after dependency changes

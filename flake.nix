@@ -2,17 +2,19 @@
   description = "MCP servers, CLI tools, and development workflow skills";
 
   inputs = {
-    purse-first.url = "github:amarbel-llc/purse-first";
-
-    # Follow purse-first's pins for stable nixpkgs.
-    nixpkgs.follows = "purse-first/nixpkgs";
-    utils.follows = "purse-first/utils";
+    # Fork of upstream nixpkgs. The overlay (`overlays.default`) adds
+    # gomod2nix's buildGoApplication / mkGoEnv, bun2nix helpers, and
+    # other amarbel-llc additions on top of an upstream pin.
+    nixpkgs.url = "github:amarbel-llc/nixpkgs";
+    utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
     # Master nixpkgs pinned directly for go_1_26 availability.
     nixpkgs-master.url = "github:NixOS/nixpkgs/e2dde111aea2c0699531dc616112a96cd55ab8b5";
 
-    # Fork carrying pkgs/build-support/bun2nix (buildZxScriptFromFile).
-    amarbel-nixpkgs.url = "github:amarbel-llc/nixpkgs/9bad1e489bd4c713da002618bd825372d35430af";
+    purse-first = {
+      url = "github:amarbel-llc/purse-first";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # Build tooling
     gomod2nix = {
@@ -24,11 +26,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # cacheEntryCreator (Zig binary) consumed by bun2nix's buildZxScriptFromFile.
-    bun2nix = {
-      url = "github:nix-community/bun2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -37,12 +34,10 @@
       purse-first,
       nixpkgs,
       nixpkgs-master,
-      amarbel-nixpkgs,
       utils,
       gomod2nix,
       crane,
       rust-overlay,
-      bun2nix,
     }:
     let
       mkMarketplace = purse-first.lib.mkMarketplace;
@@ -67,6 +62,15 @@
 
       # Computed after first `go work vendor` — placeholder until then.
       goVendorHash = "sha256-E+U9wODTOqR+rAwab5Oktje7uUsrlwinqYWYXjTPE5c=";
+
+      # Burnt into the caldav binary via the fork's auto-injected -ldflags
+      # (-X main.version / -X main.commit). Single source of truth for
+      # caldav's release version; `just bump-version` sed-rewrites this line.
+      caldavVersion = "0.1.0";
+      # shortRev for clean builds, dirtyShortRev for dirty working trees
+      # (so devshell builds show `dirty-abcdef` rather than masquerading as
+      # a clean release), "unknown" as a last-resort fallback.
+      caldavCommit = self.shortRev or self.dirtyShortRev or "unknown";
 
       buildDevShellPackages =
         system:
@@ -116,7 +120,7 @@
 
           # Shell
           pkgs.bats
-          pkgs.nodePackages.bash-language-server
+          pkgs.bash-language-server
           pkgs.shellcheck
           pkgs.shfmt
           pkgs.parallel
@@ -128,9 +132,13 @@
       buildPackages =
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          # nixpkgs is the amarbel-llc fork; overlays.default exposes
+          # buildGoApplication, mkGoEnv, fence, bun2nix helpers, etc.
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ nixpkgs.overlays.default ];
+          };
           pkgs-master = import nixpkgs-master { inherit system; };
-          pkgs-amarbel = import amarbel-nixpkgs { inherit system; };
           pkgs-overlay = import nixpkgs {
             inherit system;
             overlays = [ (import rust-overlay) ];
@@ -187,12 +195,10 @@
           };
 
           caldavPkg = import ./lib/packages/caldav.nix {
-            inherit
-              pkgs
-              goWorkspaceSrc
-              goVendorHash
-              go
-              ;
+            inherit pkgs go;
+            src = ./packages/caldav;
+            version = caldavVersion;
+            commit = caldavCommit;
           };
 
           luxPkg = import ./lib/packages/lux.nix {
@@ -202,11 +208,6 @@
               goVendorHash
               go
               ;
-          };
-
-          bun2nixLib = import "${amarbel-nixpkgs}/pkgs/build-support/bun2nix" {
-            inherit pkgs;
-            cacheEntryCreator = bun2nix.packages.${system}.cacheEntryCreator;
           };
 
           tapDancerPkgs = import ./lib/packages/tap-dancer.nix {
@@ -228,8 +229,8 @@
             sandcastle = sandcastlePkg;
             tap-dancer-cli = tapDancerPkgs.cli;
             src = ./packages/batman;
-            fence = pkgs-amarbel.fence;
-            buildZxScriptFromFile = bun2nixLib.buildZxScriptFromFile;
+            fence = pkgs.fence;
+            buildZxScriptFromFile = pkgs.buildZxScriptFromFile;
           };
 
           polkadotsPkg = import ./lib/packages/polkadots.nix {

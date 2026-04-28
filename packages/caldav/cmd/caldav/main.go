@@ -17,6 +17,15 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 )
 
+// Populated at link time via `-X main.version` / `-X main.commit` by
+// the amarbel-llc/nixpkgs fork's buildGoApplication. Single source of
+// truth for `version` lives in flake.nix as `caldavVersion`; commit is
+// derived from the flake's self.shortRev / self.dirtyShortRev.
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "caldav — an MCP server for CalDAV task management\n\n")
@@ -33,6 +42,11 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if flag.NArg() >= 1 && flag.Arg(0) == "version" {
+		fmt.Printf("%s+%s\n", version, commit)
+		return
+	}
 
 	// generate-plugin and hook work without CalDAV credentials or logging
 	if flag.NArg() >= 1 && flag.Arg(0) == "generate-plugin" {
