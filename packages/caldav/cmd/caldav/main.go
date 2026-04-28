@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"github.com/amarbel-llc/bob/packages/caldav/internal/caldav"
+	"github.com/amarbel-llc/bob/packages/caldav/internal/clownplugin"
 	"github.com/amarbel-llc/bob/packages/caldav/internal/resources"
 	"github.com/amarbel-llc/bob/packages/caldav/internal/tools"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
@@ -39,8 +41,21 @@ func main() {
 		client := caldav.NewClient(cfg, logger)
 		provider := resources.NewProvider(client)
 		app := tools.RegisterAll(provider)
-		if err := app.HandleGeneratePlugin(flag.Args()[1:], os.Stdout); err != nil {
+		generateArgs := flag.Args()[1:]
+		if err := app.HandleGeneratePlugin(generateArgs, os.Stdout); err != nil {
 			log.Fatalf("generating plugin: %v", err)
+		}
+		// Stdout-only mode ("-") emits no on-disk artifacts; nothing to extend.
+		if len(generateArgs) == 1 && generateArgs[0] == "-" {
+			return
+		}
+		dir := "."
+		if len(generateArgs) == 1 {
+			dir = generateArgs[0]
+		}
+		pluginRoot := filepath.Join(dir, "share", "purse-first", "caldav")
+		if err := clownplugin.Write(pluginRoot, "caldav"); err != nil {
+			log.Fatalf("generating clown plugin manifest: %v", err)
 		}
 		return
 	}
