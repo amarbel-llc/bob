@@ -46,9 +46,10 @@ test-go:
 fmt:
     {{cmd_nix_dev}} go fmt ./...
 
-# Lint code
+# Lint code (vet each module listed in go.work; `go vet ./...` from the workspace
+# root sees no modules)
 lint:
-    {{cmd_nix_dev}} go vet ./...
+    {{cmd_nix_dev}} bash -c 'set -euo pipefail; for mod in $(go work edit -json | jq -r ".Use[].DiskPath"); do (cd "$mod" && go vet ./...); done'
 
 vendor: vendor-go vendor-hash
 
