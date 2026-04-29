@@ -29,19 +29,14 @@ pkgs.runCommandLocal "probe-fence-sandbox"
     cat "$fenceConfigPath"
     echo
     echo "=== running: fence --settings ... -- echo hello ==="
-    set +e
-    fence --settings "$fenceConfigPath" -- /bin/sh -c 'echo hello-from-inside-fence'
-    rc=$?
-    set -e
+    rc=0
+    fence --settings "$fenceConfigPath" -- /bin/sh -c 'echo hello-from-inside-fence' || rc=$?
     echo "=== exit code: $rc ==="
-    if [ $rc -ne 0 ]; then
-      echo "PROBE-RESULT: fence failed inside Nix sandbox (exit $rc)"
-      # Don't fail the build — we want the log either way. Let user inspect.
-    else
-      echo "PROBE-RESULT: fence succeeded inside Nix sandbox"
-    fi
     mkdir -p $out
-    {
-      echo "exit=$rc"
-    } > $out/result.txt
+    echo "exit=$rc" > $out/result.txt
+    if [ "$rc" -ne 0 ]; then
+      echo "PROBE-RESULT: fence failed inside Nix sandbox (exit $rc)" >&2
+      exit "$rc"
+    fi
+    echo "PROBE-RESULT: fence succeeded inside Nix sandbox"
   ''
