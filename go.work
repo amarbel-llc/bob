@@ -6,5 +6,4 @@ use (
 
 	./packages/lux
 	./packages/potato
-	./packages/tap-dancer/go
 )

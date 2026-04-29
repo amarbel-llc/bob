@@ -14,7 +14,7 @@ marketplace.
 
 ``` sh
 just build              # nix build (marketplace bundle with all packages)
-just test               # Run ALL tests (Go + Rust + BATS integration)
+just test               # Run ALL tests (Go + BATS integration)
 just fmt                # Format code (Go, shell, Nix)
 nix flake check         # Nix-level validation
 just lint               # go vet ./...
@@ -22,9 +22,6 @@ just go-mod-sync        # After ANY Go module change (see below)
 just vendor             # Regenerate go workspace vendor after dep changes
 just vendor-hash        # Recompute goVendorHash in flake.nix from vendor/
 just deps               # go work sync + go work vendor
-
-# EXPERIMENTAL
-just release-tap-dancer 0.2.0  # Bump versions, build, commit, tag (does not push)
 ```
 
 ### Running Individual Tests
@@ -49,14 +46,14 @@ just test-integration
 
 ``` sh
 nix build .#lux
-nix build .#tap-dancer
+nix build .#caldav
 ```
 
 ## Terminology
 
-- **Package** (not "plugin") --- the user-facing term. Three flavors:
+- **Package** (not "plugin") --- the user-facing term. Two flavors:
   - **MCP package** --- MCP server only (lux, caldav)
-  - **Skill package** --- Skill only (tap-dancer, bob skills)
+  - **Skill package** --- Skill only (bob skills)
 - **Marketplace** --- aggregated `symlinkJoin` output with `marketplace.json`
 
 ## Architecture
@@ -64,7 +61,7 @@ nix build .#tap-dancer
 ### Go Workspace
 
 All Go packages share a single `go.work` workspace. Modules:
-`packages/{caldav,lux,potato}`, `packages/tap-dancer/go`, `dummies/go`.
+`packages/{caldav,lux,potato}`, `dummies/go`.
 
 The `vendor/` directory is **intentionally gitignored**. It exists only for
 local IDE/tooling use and for computing the Nix vendor hash via
@@ -86,10 +83,6 @@ default devShell builds all packages (requiring a valid vendor hash), but the
 vendor hash can't be computed until vendoring is done. The individual
 `just vendor`, `just deps`, and `just vendor-hash` recipes also use `#go` for
 the same reason.
-
-### Rust Workspace
-
-`packages/tap-dancer/rust` uses a Cargo workspace for Rust builds.
 
 ### Package Lifecycle (Three-Mode Main)
 
@@ -120,7 +113,7 @@ Skills live in `skills/<name>/SKILL.md` with YAML frontmatter. Skills MAY have
   Directory                                  Purpose
   ------------------------------------------ ----------------------------------
   `packages/`                                All packages (caldav, lux, batman,
-                                             tap-dancer, potato, sandcastle,
+                                             potato, sandcastle,
                                              and-so-can-you-repo)
 
   `skills/`                                  22 general-purpose skills
@@ -172,7 +165,3 @@ toolchain builds (go, cargo) must output to the `build/` directory.
 
 - Go MCP packages depend on `github.com/amarbel-llc/purse-first/libs/go-mcp`
   (published module, not workspace local)
-- Rust packages depend on `mcp-server` crate from the purse-first repo via git
-  dependency
-- `tap-dancer/go` is published as
-  `github.com/amarbel-llc/bob/packages/tap-dancer/go` (tagged v0.1.0)

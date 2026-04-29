@@ -31,18 +31,6 @@
         "mcp"
       ]
     },
-    "tap-dancer": {
-      "description": "TAP-14 writer libraries (Go + Rust) and skill for producing spec-compliant TAP output",
-      "version": "0.2.0",
-      "homepage": "https://github.com/amarbel-llc/bob",
-      "category": "testing",
-      "tags": [
-        "tap",
-        "tap-14",
-        "testing",
-        "output-format"
-      ]
-    },
     "sandcastle": {
       "description": "Sandbox runtime for wrapping security boundaries around arbitrary processes",
       "version": "0.0.37",

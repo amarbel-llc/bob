@@ -16,12 +16,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    tap = {
+      url = "github:amarbel-llc/tap";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Build tooling
     gomod2nix = {
       url = "github:amarbel-llc/gomod2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    crane.follows = "purse-first/crane";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -32,11 +36,11 @@
     {
       self,
       purse-first,
+      tap,
       nixpkgs,
       nixpkgs-master,
       utils,
       gomod2nix,
-      crane,
       rust-overlay,
     }:
     let
@@ -61,7 +65,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-E+U9wODTOqR+rAwab5Oktje7uUsrlwinqYWYXjTPE5c=";
+      goVendorHash = "sha256-oCjv7v2R513pLQRWnawd49k2CNQEjg3ZLPlKgkw/AGY=";
 
       # Burnt into the caldav binary via the fork's auto-injected -ldflags
       # (-X main.version / -X main.commit). Single source of truth for
@@ -139,20 +143,6 @@
             overlays = [ nixpkgs.overlays.default ];
           };
           pkgs-master = import nixpkgs-master { inherit system; };
-          pkgs-overlay = import nixpkgs {
-            inherit system;
-            overlays = [ (import rust-overlay) ];
-          };
-          craneLib = (crane.mkLib pkgs).overrideToolchain (pkgs-overlay.rust-bin.stable.latest.default);
-          rustWorkspaceSrc = craneLib.cleanCargoSource ./.;
-          rustCommonArgs = {
-            src = rustWorkspaceSrc;
-            pname = "rust-workspace-deps";
-            version = "0.1.0";
-            strictDeps = true;
-          };
-          rustCargoArtifacts = craneLib.buildDepsOnly rustCommonArgs;
-          purse-first-cli = purse-first.packages.${system}.purse-first;
 
           go = pkgs-master.go;
 
@@ -210,27 +200,10 @@
               ;
           };
 
-          tapDancerPkgs = import ./lib/packages/tap-dancer.nix {
-            inherit
-              pkgs
-              craneLib
-              purse-first-cli
-              goWorkspaceSrc
-              goVendorHash
-              go
-              rustWorkspaceSrc
-              rustCargoArtifacts
-              ;
-            src = ./packages/tap-dancer;
-            # Lazy-eval safe: tap-dancer-cli does not reference batman,
-            # and batman.passthru does not reference tap-dancer.
-            batman = batmanPkgs.default;
-          };
-
           batmanPkgs = import ./lib/packages/batman.nix {
             inherit pkgs;
             sandcastle = sandcastlePkg;
-            tap-dancer-cli = tapDancerPkgs.cli;
+            tap-dancer-cli = tap.packages.${system}.tap-dancer-cli;
             src = ./packages/batman;
             fence = pkgs.fence;
             buildZxScriptFromFile = pkgs.buildZxScriptFromFile;
@@ -250,7 +223,6 @@
           inherit
             caldavPkg
             luxPkg
-            tapDancerPkgs
             batmanPkgs
             sandcastlePkg
             andSoCanYouRepoPkg
@@ -278,7 +250,6 @@
           [
             pkgs.caldavPkg
             pkgs.luxPkg
-            pkgs.tapDancerPkgs.default
           ];
         skills = ./skills;
         packageToml = ./package.toml;
@@ -292,6 +263,7 @@
             pkgs.neovim
             localPkgs.batmanPkgs.default
             purse-first.packages.${system}.purse-first
+            tap.packages.${system}.tap-dancer
           ]
           ++ buildDevShellPackages system;
         devShellHook = ''
@@ -327,8 +299,6 @@
               caldav = localPkgs.caldavPkg;
               lux = localPkgs.luxPkg;
               batman = localPkgs.batmanPkgs.default;
-              tap-dancer = localPkgs.tapDancerPkgs.default;
-              tap-dancer-bash = localPkgs.tapDancerPkgs.bash-lib;
               sandcastle = localPkgs.sandcastlePkg;
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
@@ -357,11 +327,6 @@
             # Nix's build sandbox. If this breaks, every batman-via-Nix
             # consumer (passthru.tests, installCheckPhase) breaks too.
             probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
-
-            # End-to-end check: tap-dancer's bats suite under
-            # batman+fence inside Nix sandbox. The first real consumer
-            # of the wrapper-driven flow.
-            tap-dancer-tests = localPkgs.tapDancerPkgs.default.passthru.tests.default;
           };
         }
       )

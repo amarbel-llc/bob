@@ -19,9 +19,8 @@ build-caldav:
 build-batman:
     nix build .#batman -o result-batman
 
-cmd-tap-dancer := join(justfile_directory(), "./packages/tap-dancer/go/cmd/tap-dancer")
-tap-dancer-go-test := "go run " + cmd-tap-dancer + " go-test -skip-empty"
-tap-dancer-cargo-test := "go run " + cmd-tap-dancer + " cargo-test -skip-empty"
+tap-dancer-go-test := "tap-dancer go-test -skip-empty"
+tap-dancer-cargo-test := "tap-dancer cargo-test -skip-empty"
 
 # Test individual Go packages
 test-lux:
@@ -29,14 +28,6 @@ test-lux:
 
 test-caldav:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
-
-test-tap-dancer-go:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/tap-dancer/go/...
-
-# Test Rust packages
-[working-directory: 'packages/tap-dancer/rust']
-test-tap-dancer-rust:
-    {{cmd_nix_dev}} {{tap-dancer-cargo-test}} test
 
 # Run all Go tests
 test-go:
@@ -114,10 +105,6 @@ validate-mcp-caldav: build-caldav
 
 validate-mcp: validate-mcp-lux validate-mcp-caldav
 
-test-tap-dancer-bats: build-batman
-    nix build .#tap-dancer
-    TAP_DANCER_BIN={{justfile_directory()}}/result/bin/tap-dancer PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/tap-dancer/zz-tests_bats/test
-
 test-lux-bats: build-batman
     nix build .#lux
     {{cmd_nix_dev}} {{cmd_batman_bats}} --bin-dir result/bin --jobs {{num_cpus()}} packages/lux/zz-tests_bats/fmt.bats
@@ -170,9 +157,6 @@ test: \
     test-integration \
     test-lux \
     test-lux-bats \
-    test-tap-dancer-bats \
-    test-tap-dancer-go \
-    test-tap-dancer-rust \
     validate-lux-defaults \
     validate-mcp
 
@@ -185,67 +169,4 @@ update-nix:
 clean:
     rm -rf build/
     rm -rf result result-batman
-
-# ── EXPERIMENTAL ─────────────────────────────────────────────────────
-
-# Tag a semver release for tap-dancer (Go + Rust + Nix + skill).
-# Usage: just release-tap-dancer 0.2.0
-# Creates two git tags (Go path-prefixed + Rust) and bumps version in
-# all manifests. Does NOT push — review with `git log` first, then
-# `git push origin --tags`.
-release-tap-dancer version:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    v="{{version}}"
-
-    # Validate semver-ish format
-    if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "error: version must be semver (e.g. 0.2.0), got: $v" >&2
-      exit 1
-    fi
-
-    # Ensure clean working tree
-    if [[ -n "$(git status --porcelain)" ]]; then
-      echo "error: working tree is dirty — commit or stash first" >&2
-      exit 1
-    fi
-
-    echo "==> bumping tap-dancer to v$v"
-
-    # 1. Cargo.toml
-    sed -i -E '0,/^version = "[^"]+"/s//version = "'"$v"'"/' \
-      packages/tap-dancer/rust/Cargo.toml
-
-    # 2. lib/packages/tap-dancer.nix (first version = line only)
-    sed -i -E '0,/version = "[^"]+";/s//version = "'"$v"'";/' \
-      lib/packages/tap-dancer.nix
-
-    # 3. marketplace-config.json
-    jq --arg ver "$v" \
-      '.plugins["tap-dancer"].version = $ver' \
-      marketplace-config.json > marketplace-config.json.tmp
-    mv marketplace-config.json.tmp marketplace-config.json
-
-    # 4. SKILL.md frontmatter
-    sed -i -E 's/^version: .+/version: '"$v"'/' \
-      packages/tap-dancer/skills/tap14/SKILL.md
-
-    # 5. Verify build
-    echo "==> nix build (verify)"
-    nix build --show-trace
-
-    # 6. Commit + tag
-    git add \
-      packages/tap-dancer/rust/Cargo.toml \
-      lib/packages/tap-dancer.nix \
-      marketplace-config.json \
-      packages/tap-dancer/skills/tap14/SKILL.md
-    git commit -m "release(tap-dancer): v$v"
-
-    git tag "packages/tap-dancer/go/v$v"
-    git tag "tap-dancer-v$v"
-
-    echo "==> tagged: packages/tap-dancer/go/v$v (Go) + tap-dancer-v$v (Rust)"
-    echo "==> review, then: git push origin master --tags"
 
