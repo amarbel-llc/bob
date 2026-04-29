@@ -24,6 +24,7 @@ type ParsedArgs = {
   noTempdirCleanup: boolean;
   hidePassing: boolean;
   dryRun: boolean;
+  diagnosticsStderr: boolean;
   positional: string[];
   passthrough: string[];
 };
@@ -38,6 +39,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let noTempdirCleanup = false;
   let hidePassing = false;
   let dryRun = false;
+  let diagnosticsStderr = false;
 
   for (let i = 0; i < ours.length; i++) {
     const a = ours[i];
@@ -59,6 +61,9 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--dry-run":
         dryRun = true;
         break;
+      case "--diagnostics-stderr":
+        diagnosticsStderr = true;
+        break;
       default:
         if (a.startsWith("--")) {
           throw new Error(`unknown batman flag: ${a}`);
@@ -77,6 +82,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     noTempdirCleanup,
     hidePassing,
     dryRun,
+    diagnosticsStderr,
     positional,
     passthrough,
   };
@@ -119,7 +125,14 @@ function groupByParentDir(files: string[]): Map<string, string[]> {
   return groups;
 }
 
-async function logDiagnostic(msg: string): Promise<void> {
+async function logDiagnostic(
+  msg: string,
+  opts: { stderr?: boolean } = {},
+): Promise<void> {
+  if (opts.stderr) {
+    process.stderr.write(`batman: ${msg}\n`);
+    return;
+  }
   const home = process.env.HOME ?? "";
   const logHome =
     process.env.XDG_LOG_HOME && process.env.XDG_LOG_HOME.length > 0
@@ -134,8 +147,12 @@ async function logDiagnostic(msg: string): Promise<void> {
 function buildPath(binDirs: string[]): string {
   const existing = process.env.PATH ?? "";
   // Leftmost = highest priority; preserve user-given order.
-  const prefix = binDirs.map((d) => nodePath.resolve(d)).join(nodePath.delimiter);
-  return prefix.length > 0 ? `${prefix}${nodePath.delimiter}${existing}` : existing;
+  const prefix = binDirs
+    .map((d) => nodePath.resolve(d))
+    .join(nodePath.delimiter);
+  return prefix.length > 0
+    ? `${prefix}${nodePath.delimiter}${existing}`
+    : existing;
 }
 
 // hide-passing TAP filter: strip passing `ok N ...` lines and their YAML blocks.
@@ -166,7 +183,8 @@ function makeHidePassingFilter(): (chunk: string) => string {
         continue;
       }
       if (/^ok /.test(line)) {
-        show = / # [Ss][Kk][Ii][Pp]/.test(line) || / # [Tt][Oo][Dd][Oo]/.test(line);
+        show =
+          / # [Ss][Kk][Ii][Pp]/.test(line) || / # [Tt][Oo][Dd][Oo]/.test(line);
         if (show) out += line + "\n";
         continue;
       }
@@ -188,6 +206,7 @@ async function runGroup(
   passthrough: string[],
   pathEnv: string,
   hidePassing: boolean,
+  diagnosticsStderr: boolean,
 ): Promise<number> {
   const cfg = nodePath.join(dir, "fence.jsonc");
   const fileArgs = files.map((f) => nodePath.join(dir, f));
@@ -212,7 +231,9 @@ async function runGroup(
 
     child.on("error", (err) => {
       // Spawn failure (e.g. fence missing) - record and treat as group failure.
-      void logDiagnostic(`spawn error in ${dir}: ${err.message}`);
+      void logDiagnostic(`spawn error in ${dir}: ${err.message}`, {
+        stderr: diagnosticsStderr,
+      });
       resolve(1);
     });
     child.on("exit", (code, signal) => {
@@ -226,22 +247,40 @@ async function runGroup(
 }
 
 async function main(): Promise<number> {
+  // Pre-scan argv for --diagnostics-stderr so parse-error diagnostics
+  // can also honor the flag (we can't read parsed args before parsing).
+  const argv = process.argv.slice(2);
+  const dashIdx = argv.indexOf("--");
+  const oursPreScan = dashIdx === -1 ? argv : argv.slice(0, dashIdx);
+  const preScanStderr = oursPreScan.includes("--diagnostics-stderr");
+
   let parsed: ParsedArgs;
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (e) {
-    await logDiagnostic(`argv parse error: ${(e as Error).message}`);
+    await logDiagnostic(`argv parse error: ${(e as Error).message}`, {
+      stderr: preScanStderr,
+    });
     return 2;
   }
 
-  const { binDirs, hidePassing, dryRun, positional, passthrough } = parsed;
+  const {
+    binDirs,
+    hidePassing,
+    dryRun,
+    diagnosticsStderr,
+    positional,
+    passthrough,
+  } = parsed;
 
   // Validate paths exist before discovery.
   for (const p of positional) {
     try {
       await fsp.stat(p);
     } catch {
-      await logDiagnostic(`path does not exist: ${p}`);
+      await logDiagnostic(`path does not exist: ${p}`, {
+        stderr: diagnosticsStderr,
+      });
       return 2;
     }
   }
@@ -262,7 +301,9 @@ async function main(): Promise<number> {
     try {
       await fsp.access(cfg);
     } catch {
-      await logDiagnostic(`missing fence.jsonc: ${dir}`);
+      await logDiagnostic(`missing fence.jsonc: ${dir}`, {
+        stderr: diagnosticsStderr,
+      });
       return 2;
     }
   }
@@ -271,7 +312,14 @@ async function main(): Promise<number> {
 
   let aggregate = 0;
   for (const [dir, files] of groups) {
-    const code = await runGroup(dir, files, passthrough, pathEnv, hidePassing);
+    const code = await runGroup(
+      dir,
+      files,
+      passthrough,
+      pathEnv,
+      hidePassing,
+      diagnosticsStderr,
+    );
     if (code !== 0) aggregate = 1;
   }
   return aggregate;

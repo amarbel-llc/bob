@@ -290,6 +290,13 @@ arguments:
 *--hide-passing*
 	Filter TAP output to show only failures and skips.
 
+*--diagnostics-stderr*
+	Write batman's wrapper diagnostics (parse errors, missing
+	fence.jsonc, spawn failures) to stderr instead of the
+	*$XDG_LOG_HOME/batman/batman.log* file. Useful in build sandboxes
+	(Nix installCheckPhase, CI runners) where the log file would be
+	discarded with the build dir before the consumer can inspect it.
+
 # JUSTFILE INTEGRATION
 
 The root justfile delegates to the test-suite justfile:
