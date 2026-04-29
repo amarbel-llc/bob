@@ -2,13 +2,8 @@
 
 setup() {
   load "$(dirname "$BATS_TEST_FILE")/common.bash"
-  setup_test_home
   export output
   tap_dancer="${TAP_DANCER_BIN:-tap-dancer}"
-}
-
-teardown() {
-  teardown_test_home
 }
 
 function exec_parallel_all_succeed { # @test

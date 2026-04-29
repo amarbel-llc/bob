@@ -222,6 +222,9 @@
               rustCargoArtifacts
               ;
             src = ./packages/tap-dancer;
+            # Lazy-eval safe: tap-dancer-cli does not reference batman,
+            # and batman.passthru does not reference tap-dancer.
+            batman = batmanPkgs.default;
           };
 
           batmanPkgs = import ./lib/packages/batman.nix {
@@ -237,6 +240,11 @@
             inherit pkgs;
             src = ./packages/polkadots;
           };
+
+          probeFenceSandboxPkg = import ./lib/packages/probe-fence-sandbox.nix {
+            inherit pkgs;
+            fence = pkgs.fence;
+          };
         in
         {
           inherit
@@ -248,6 +256,7 @@
             andSoCanYouRepoPkg
             potatoPkg
             polkadotsPkg
+            probeFenceSandboxPkg
             ;
         };
 
@@ -324,6 +333,7 @@
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
               polkadots = localPkgs.polkadotsPkg;
+              probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
               mcp-all = pkgs.symlinkJoin {
                 name = "mcp-all";
                 paths = [
@@ -340,6 +350,18 @@
                 (import nixpkgs-master { inherit system; }).go
               ];
             };
+          };
+
+          checks = {
+            # Regression check: fence's bwrap must keep working inside
+            # Nix's build sandbox. If this breaks, every batman-via-Nix
+            # consumer (passthru.tests, installCheckPhase) breaks too.
+            probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
+
+            # End-to-end check: tap-dancer's bats suite under
+            # batman+fence inside Nix sandbox. The first real consumer
+            # of the wrapper-driven flow.
+            tap-dancer-tests = localPkgs.tapDancerPkgs.default.passthru.tests.default;
           };
         }
       )
