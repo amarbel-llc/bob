@@ -42,8 +42,12 @@ func TestWrite_EmitsBothManifests(t *testing.T) {
 	if !ok {
 		t.Fatalf("stdioServers.caldav missing; got %#v", got.StdioServers)
 	}
-	if srv.Command != "bin/caldav" {
-		t.Errorf("stdioServers.caldav.command = %q, want %q", srv.Command, "bin/caldav")
+	wantCmd := filepath.Join(pluginRoot, "bin", "caldav")
+	if srv.Command != wantCmd {
+		t.Errorf("stdioServers.caldav.command = %q, want %q", srv.Command, wantCmd)
+	}
+	if !filepath.IsAbs(srv.Command) {
+		t.Errorf("stdioServers.caldav.command must be absolute (clown#36 / bridge CWD bug); got %q", srv.Command)
 	}
 }
 

@@ -24,6 +24,16 @@ import (
 // relative to the link's parent directory, so escaping
 // share/purse-first/caldav/bin to <out> takes four ".." segments.
 //
+// stdioServers.<name>.command is written as the absolute path
+// abs(pluginRoot)/bin/<binaryName>. clown's bridge runs exec.LookPath on
+// this value from clown's own CWD, so a relative path like
+// "bin/<binaryName>" resolves against the wrong directory and surfaces as
+// "stdout closed before handshake". An absolute path is the correct shape
+// for a Nix-built artifact: $out is the package's permanent install
+// location, so the path baked into the manifest is stable for the
+// artifact's lifetime. See clown#36 for the upstream fix that makes
+// plugin-relative paths well-defined.
+//
 // Both manifest paths are written so the package works against today's clown
 // (which reads <root>/clown.json) and survives the clown#32 migration to
 // <root>/.clown-plugin/clown.json.
@@ -38,10 +48,15 @@ func Write(pluginRoot, binaryName string) error {
 		return fmt.Errorf("clownplugin: binaryName is empty")
 	}
 
+	absRoot, err := filepath.Abs(pluginRoot)
+	if err != nil {
+		return fmt.Errorf("clownplugin: absolutize pluginRoot %q: %w", pluginRoot, err)
+	}
+
 	manifest := clownConfig{
 		Version: 1,
 		StdioServers: map[string]stdioServer{
-			binaryName: {Command: "bin/" + binaryName},
+			binaryName: {Command: filepath.Join(absRoot, "bin", binaryName)},
 		},
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
