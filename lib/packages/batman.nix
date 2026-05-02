@@ -2,7 +2,7 @@
   pkgs,
   src,
   sandcastle,
-  tap-dancer-cli,
+  tap-dancer-go,
   fence,
   buildZxScriptFromFile,
 }:
@@ -143,7 +143,7 @@ let
       pkgs.parallel
       pkgs.python3
       sandcastle
-      tap-dancer-cli
+      tap-dancer-go
     ];
     text = ''
       bin_dirs=()

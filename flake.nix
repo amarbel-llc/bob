@@ -203,7 +203,7 @@
           batmanPkgs = import ./lib/packages/batman.nix {
             inherit pkgs;
             sandcastle = sandcastlePkg;
-            tap-dancer-cli = tap.packages.${system}.tap-dancer-cli;
+            tap-dancer-go = tap.packages.${system}.tap-dancer-go;
             src = ./packages/batman;
             fence = pkgs.fence;
             buildZxScriptFromFile = pkgs.buildZxScriptFromFile;
