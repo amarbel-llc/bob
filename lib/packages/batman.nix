@@ -131,6 +131,10 @@ let
       bats-island
       bats-emo
     ];
+    # Subpath that BATS_LIB_PATH wants directly. Consumers should use
+    # this attribute instead of appending "/share/bats" themselves.
+    # See bob#126.
+    passthru.batsLibPath = "${bats-libs}/share/bats";
   };
 
   bats = pkgs.writeShellApplication {

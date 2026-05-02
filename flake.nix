@@ -218,6 +218,11 @@
             inherit pkgs;
             fence = pkgs.fence;
           };
+
+          checkBatsLibsPathPkg = import ./lib/packages/check-bats-libs-path.nix {
+            inherit pkgs;
+            bats-libs = batmanPkgs.bats-libs;
+          };
         in
         {
           inherit
@@ -229,6 +234,7 @@
             potatoPkg
             polkadotsPkg
             probeFenceSandboxPkg
+            checkBatsLibsPathPkg
             ;
         };
 
@@ -328,6 +334,10 @@
             # Nix's build sandbox. If this breaks, every batman-via-Nix
             # consumer (passthru.tests, installCheckPhase) breaks too.
             probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
+
+            # Regression check: bats-libs.batsLibPath must be a directory
+            # that bats accepts directly as a BATS_LIB_PATH entry. See bob#126.
+            check-bats-libs-path = localPkgs.checkBatsLibsPathPkg;
           };
         }
       )
