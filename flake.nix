@@ -299,6 +299,7 @@
               caldav = localPkgs.caldavPkg;
               lux = localPkgs.luxPkg;
               batman = localPkgs.batmanPkgs.default;
+              bats-libs = localPkgs.batmanPkgs.bats-libs;
               sandcastle = localPkgs.sandcastlePkg;
               and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
               potato = localPkgs.potatoPkg;
