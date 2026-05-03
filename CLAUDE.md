@@ -7,8 +7,13 @@ code in this repository.
 
 Bob is the purse-first marketplace package containing MCP servers, CLI tools,
 and development workflow skills. It consumes `purse-first.lib.mkMarketplace` as
-a flake input to assemble 5 packages and 22 skills into a single installable
+a flake input to assemble 4 packages and 22 skills into a single installable
 marketplace.
+
+Batman (the fence-based BATS test runner and bats helper libs) was extracted
+into [`amarbel-llc/bats`](https://github.com/amarbel-llc/bats) and is consumed
+here via the `bats` flake input. Bob calls `bats.lib.${system}.mkBats { ... }`
+to wire its local `sandcastle` derivation into the test wrapper.
 
 ## Build & Test Commands
 
@@ -112,9 +117,8 @@ Skills live in `skills/<name>/SKILL.md` with YAML frontmatter. Skills MAY have
   -----------------------------------------------------------------------------
   Directory                                  Purpose
   ------------------------------------------ ----------------------------------
-  `packages/`                                All packages (caldav, lux, batman,
-                                             potato, sandcastle,
-                                             and-so-can-you-repo)
+  `packages/`                                All packages (caldav, lux, potato,
+                                             sandcastle, and-so-can-you-repo)
 
   `skills/`                                  22 general-purpose skills
                                              (workflow, documentation,

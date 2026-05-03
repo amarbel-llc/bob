@@ -1,7 +1,6 @@
 
 cmd_nix_dev := "nix develop " + justfile_directory() + " --command "
 cmd_nix_dev_go := "nix develop " + justfile_directory() + "#go --command "
-cmd_batman_bats := justfile_directory() + "/result-batman/bin/bats"
 
 default: build test vendor
 
@@ -16,8 +15,9 @@ build-lux:
 build-caldav:
     nix build .#caldav
 
+# Realize the batman bundle into the nix store and print its path.
 build-batman:
-    nix build .#batman -o result-batman
+    @nix build --no-link --print-out-paths .#batman
 
 tap-dancer-go-test := "tap-dancer go-test -skip-empty"
 tap-dancer-cargo-test := "tap-dancer cargo-test -skip-empty"
@@ -76,15 +76,17 @@ vendor-hash:
 
 # Run integration tests
 # claude-code is in the devShell, so claude is on PATH inside nix develop.
-test-integration: build-batman
-    nix build
-    {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} \
-      zz-tests_bats/validate_plugin_repos.bats
+test-integration:
+    @batman=$(nix build --no-link --print-out-paths .#batman); \
+      nix build; \
+      {{cmd_nix_dev}} $batman/bin/bats --jobs {{num_cpus()}} \
+        zz-tests_bats/validate_plugin_repos.bats
 
 # Run lifecycle tests
-test-lifecycle: build-batman
-    nix build
-    {{cmd_nix_dev}} {{cmd_batman_bats}} --jobs {{num_cpus()}} zz-tests_bats/lux_service.bats
+test-lifecycle:
+    @batman=$(nix build --no-link --print-out-paths .#batman); \
+      nix build; \
+      {{cmd_nix_dev}} $batman/bin/bats --jobs {{num_cpus()}} zz-tests_bats/lux_service.bats
 
 # Validate own plugin manifest
 validate:
@@ -105,27 +107,10 @@ validate-mcp-caldav: build-caldav
 
 validate-mcp: validate-mcp-lux validate-mcp-caldav
 
-test-lux-bats: build-batman
-    nix build .#lux
-    {{cmd_nix_dev}} {{cmd_batman_bats}} --bin-dir result/bin --jobs {{num_cpus()}} packages/lux/zz-tests_bats/fmt.bats
-
-test-batman-bats: build-batman
-    BATS_WRAPPER={{justfile_directory()}}/result-batman/bin/bats BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman PATH="{{justfile_directory()}}/result-batman/bin:$PATH" {{cmd_nix_dev}} just packages/batman/zz-tests_bats/test
-
-# Run batman.bats under PLAIN nixpkgs bats. Filters /home/* dirs out of
-# PATH inside the dev shell so a profile-installed sandcastle-wrapped
-# `bats` (e.g. /home/$user/eng/result/bin/bats from a purse-first
-# install) doesn't shadow the dev-shell's plain pkgs.bats. Without this
-# filter, the wrapped bats's default sandbox=true causes sandcastle's
-# bwrap to nest inside fence's bwrap and fence fails to set up sockets.
-test-batman-fence: build-batman
-    BATMAN_BIN={{justfile_directory()}}/result-batman/bin/batman \
-      BATS_LIB_PATH={{justfile_directory()}}/result-batman/share/bats \
-      {{cmd_nix_dev}} bash -c 'PATH=$(echo "$PATH" | tr ":" "\n" | grep -Ev "^/home/" | tr "\n" ":"); exec bats --tap --jobs $(nproc) packages/batman/zz-tests_bats/batman.bats'
-
-# Invoke the built batman binary with arbitrary args. Useful for manual smoke-testing.
-run-batman *args: build-batman
-    {{justfile_directory()}}/result-batman/bin/batman {{args}}
+test-lux-bats:
+    @batman=$(nix build --no-link --print-out-paths .#batman); \
+      nix build .#lux; \
+      {{cmd_nix_dev}} $batman/bin/bats --bin-dir result/bin --jobs {{num_cpus()}} packages/lux/zz-tests_bats/fmt.bats
 
 # Bump version for a package. Usage: just bump-version lux 0.2.0
 bump-version package version:
@@ -151,7 +136,6 @@ validate-lux-defaults: build-lux
     XDG_CONFIG_HOME="$tmpdir" result/bin/lux validate
 
 test: \
-    test-batman-bats \
     test-caldav \
     test-go \
     test-integration \
@@ -168,5 +152,5 @@ update-nix:
 # Clean build artifacts
 clean:
     rm -rf build/
-    rm -rf result result-batman
+    rm -rf result
 
