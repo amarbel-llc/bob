@@ -208,7 +208,6 @@
           };
 
           batmanPkgs = bats.lib.${system}.mkBats {
-            sandcastle = sandcastlePkg;
             tap-dancer-go = tap.packages.${system}.tap-dancer-go;
           };
 

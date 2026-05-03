@@ -12,8 +12,10 @@ marketplace.
 
 Batman (the fence-based BATS test runner and bats helper libs) was extracted
 into [`amarbel-llc/bats`](https://github.com/amarbel-llc/bats) and is consumed
-here via the `bats` flake input. Bob calls `bats.lib.${system}.mkBats { ... }`
-to wire its local `sandcastle` derivation into the test wrapper.
+here via the `bats` flake input. The bats wrapper sandboxes test commands
+with `fence` (from `pkgs.fence` in the amarbel-llc nixpkgs overlay); bob's
+local `sandcastle` derivation in `packages/sandcastle/` is no longer wired
+into the wrapper.
 
 ## Build & Test Commands
 
