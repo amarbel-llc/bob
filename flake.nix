@@ -9,7 +9,7 @@
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
     # Master nixpkgs pinned directly for go_1_26 availability.
-    nixpkgs-master.url = "github:NixOS/nixpkgs/ae921939fcbd44874664477bd1d22543c10a8306";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/bb7e5d8ac99f4b9d2527f2355e614d6bb0f3288d";
 
     purse-first = {
       url = "github:amarbel-llc/purse-first";
