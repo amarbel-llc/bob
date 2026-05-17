@@ -74,19 +74,15 @@ vendor-hash:
     sed -i -E 's|(goVendorHash = )"sha256-[^"]+";|\1"'"$hash"'";|' flake.nix
     echo "updated goVendorHash to $hash"
 
-# Run integration tests
-# claude-code is in the devShell, so claude is on PATH inside nix develop.
-test-integration:
-    @batman=$(nix build --no-link --print-out-paths .#batman); \
-      nix build; \
-      {{cmd_nix_dev}} $batman/bin/bats --jobs {{num_cpus()}} \
-        zz-tests_bats/validate_plugin_repos.bats
+# Run every bats lane (authoritative). Each lane runs inside the
+# nix build sandbox with binaries injected via env vars from bats.nix.
+# Adding a new lane → add it to bats.nix, then re-run this recipe.
+test-bats:
+    nix build .#bats-default --no-link --print-build-logs
 
-# Run lifecycle tests
-test-lifecycle:
-    @batman=$(nix build --no-link --print-out-paths .#batman); \
-      nix build; \
-      {{cmd_nix_dev}} $batman/bin/bats --jobs {{num_cpus()}} zz-tests_bats/lux_service.bats
+# Run a single named lane (e.g. `just test-bats-lane lux-fmt-unit`).
+test-bats-lane name:
+    nix build .#bats-{{name}} --no-link --print-build-logs
 
 # Validate own plugin manifest
 validate:
@@ -106,11 +102,6 @@ validate-mcp-caldav: build-caldav
     CALDAV_URL="http://localhost:1" CALDAV_USERNAME="test" CALDAV_PASSWORD="test" purse-first validate-mcp result/bin/caldav
 
 validate-mcp: validate-mcp-lux validate-mcp-caldav
-
-test-lux-bats:
-    @batman=$(nix build --no-link --print-out-paths .#batman); \
-      nix build .#lux; \
-      {{cmd_nix_dev}} $batman/bin/bats --bin-dir result/bin --jobs {{num_cpus()}} packages/lux/zz-tests_bats/fmt.bats
 
 # Bump version for a package. Usage: just bump-version lux 0.2.0
 bump-version package version:
@@ -138,9 +129,8 @@ validate-lux-defaults: build-lux
 test: \
     test-caldav \
     test-go \
-    test-integration \
+    test-bats \
     test-lux \
-    test-lux-bats \
     validate-lux-defaults \
     validate-mcp
 

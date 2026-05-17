@@ -12,11 +12,13 @@ setup() {
 
   # Create fake formatters in BATS_TEST_TMPDIR.
 
-  # fake-gofumpt: rejects invalid syntax, echoes valid input.
+  # Shebangs use `/bin/sh` (always present in nix builders via
+  # stdenv.shell) rather than `/usr/bin/env bash` (which is absent in
+  # the nix build sandbox where `bats-lux-fmt-unit` runs).
   fake_gofumpt="$BATS_TEST_TMPDIR/fake-gofumpt"
   cat >"$fake_gofumpt" <<'SCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 input=$(cat)
 if echo "$input" | grep -q 'func main('; then
   echo "$input"
@@ -30,7 +32,7 @@ SCRIPT
   # fake-empty: exits 0 but produces no output (truncation bug).
   fake_empty="$BATS_TEST_TMPDIR/fake-empty"
   cat >"$fake_empty" <<'SCRIPT'
-#!/usr/bin/env bash
+#!/bin/sh
 cat > /dev/null
 exit 0
 SCRIPT
@@ -41,7 +43,7 @@ SCRIPT
   # a file path argument and ignores stdin, producing no stdout.
   fake_ignores_stdin="$BATS_TEST_TMPDIR/fake-ignores-stdin"
   cat >"$fake_ignores_stdin" <<'SCRIPT'
-#!/usr/bin/env bash
+#!/bin/sh
 cat > /dev/null
 exit 0
 SCRIPT
@@ -313,8 +315,8 @@ function fmt_invokes_goimports_when_configured { # @test
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
   local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
   cat >"$fake_goimports" <<SCRIPT
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 touch "$sentinel"
 cat
 SCRIPT
@@ -345,8 +347,8 @@ function fmt_silently_skips_formatter_not_in_formatters_toml { # @test
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
   local sentinel="$BATS_TEST_TMPDIR/goimports-was-called"
   cat >"$fake_goimports" <<SCRIPT
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 touch "$sentinel"
 cat
 SCRIPT
@@ -424,8 +426,8 @@ function fmt_goimports_adds_missing_import { # @test
   # Fake goimports: simulates adding a missing import for fmt.Println.
   local fake_goimports="$BATS_TEST_TMPDIR/fake-goimports"
   cat >"$fake_goimports" <<'SCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 input=$(cat)
 # If input uses fmt.Println but doesn't import "fmt", add it.
 if echo "$input" | grep -q 'fmt\.Println' && ! echo "$input" | grep -q '"fmt"'; then

@@ -280,6 +280,54 @@
         let
           pkgs = import nixpkgs { inherit system; };
           localPkgs = buildPackages system;
+
+          # nixpkgs view with claude-code's unfree predicate accepted;
+          # used to expose the `claude` binary to the validate lane.
+          pkgs-unfree = import nixpkgs {
+            inherit system;
+            config.allowUnfreePredicate =
+              pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "claude-code" ];
+          };
+
+          # Cleaned bats source filters. Keeping each lane's source
+          # store-path stable across unrelated edits — see the
+          # eng:wiring-bats-tests skill's flake.nix template. Includes
+          # fixtures/ so tests referencing $BATS_TEST_DIRNAME/fixtures/
+          # find their data in the nix sandbox.
+          luxFmtUnitSrc = pkgs.lib.cleanSourceWith {
+            src = ./packages/lux/zz-tests_bats;
+            filter =
+              path: type:
+              let
+                bn = builtins.baseNameOf path;
+              in
+              type == "directory" || pkgs.lib.hasSuffix ".bats" bn || bn == "common.bash";
+          };
+
+          topLevelBatsSrc = pkgs.lib.cleanSourceWith {
+            src = ./zz-tests_bats;
+            filter =
+              path: type:
+              let
+                bn = builtins.baseNameOf path;
+              in
+              type == "directory"
+              || pkgs.lib.hasSuffix ".bats" bn
+              || pkgs.lib.hasSuffix ".lua" bn
+              || pkgs.lib.hasSuffix ".go" bn
+              || bn == "common.bash";
+          };
+
+          batsLib = import ./bats.nix {
+            inherit pkgs;
+            bats-libs = localPkgs.batmanPkgs.bats-libs;
+            batsLane = bats.lib.${system}.batsLane;
+            luxBin = localPkgs.luxPkg;
+            purseFirstBin = purse-first.packages.${system}.purse-first;
+            claudeBin = pkgs-unfree.claude-code;
+            marketplace = marketplaceOutputs.packages.${system}.default;
+            inherit luxFmtUnitSrc topLevelBatsSrc;
+          };
         in
         {
           packages =
@@ -315,7 +363,8 @@
                   localPkgs.luxPkg
                 ];
               };
-            };
+            }
+            // batsLib.batsLaneOutputs;
 
           devShells = {
             default = marketplaceOutputs.devShells.${system}.default;
@@ -331,6 +380,7 @@
             # Nix's build sandbox. If this breaks, every batman-via-Nix
             # consumer (passthru.tests, installCheckPhase) breaks too.
             probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
+            bats-default = batsLib.batsLaneOutputs.bats-default;
           };
         }
       )
