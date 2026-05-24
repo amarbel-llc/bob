@@ -24,13 +24,11 @@
     bats = {
       url = "github:amarbel-llc/bats";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.tap.follows = "tap";
     };
 
     # Build tooling
     gomod2nix = {
       url = "github:amarbel-llc/gomod2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
