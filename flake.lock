@@ -101,21 +101,6 @@
         "type": "github"
       }
     },
-    "crane_2": {
-      "locked": {
-        "lastModified": 1780029330,
-        "narHash": "sha256-fWFKEKB5CP+NO8/3uOaEZIVbd03mvDJ//VsnKkXty08=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "6823b493a0bc2142082075576efa6633b537197e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -372,22 +357,20 @@
     },
     "purse-first": {
       "inputs": {
-        "crane": "crane",
         "gomod2nix": "gomod2nix_2",
         "nixpkgs": [
           "nixpkgs"
         ],
         "nixpkgs-master": "nixpkgs-master_5",
-        "rust-overlay": "rust-overlay",
         "treefmt-nix": "treefmt-nix_3",
         "utils": "utils_2"
       },
       "locked": {
-        "lastModified": 1780050290,
-        "narHash": "sha256-exDHAoNilgiNZviomulm8CQ/RhwN2IpjfepZOUZKaqg=",
+        "lastModified": 1780052782,
+        "narHash": "sha256-B3K6gSAIXJPkIqsQU/Vliy0BDBYXHA0kjLhagh5Ke24=",
         "owner": "amarbel-llc",
         "repo": "purse-first",
-        "rev": "2988b758ea3e3ab748871f20587b0be01dfe018a",
+        "rev": "70ecf1a215b55acfffd778706c8b662892d4cbb1",
         "type": "github"
       },
       "original": {
@@ -448,7 +431,7 @@
         "nixpkgs": "nixpkgs",
         "nixpkgs-master": "nixpkgs-master_4",
         "purse-first": "purse-first",
-        "rust-overlay": "rust-overlay_2",
+        "rust-overlay": "rust-overlay",
         "tap": "tap",
         "utils": "utils_4"
       }
@@ -456,7 +439,6 @@
     "rust-overlay": {
       "inputs": {
         "nixpkgs": [
-          "purse-first",
           "nixpkgs"
         ]
       },
@@ -475,26 +457,6 @@
       }
     },
     "rust-overlay_2": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1780024773,
-        "narHash": "sha256-aU9nlrS9S+IJ2EiCzsaxzOXUhggogqTrJojBicE6Oeg=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "40b0a3a193e0840c76174b4a322874c8f6dd0a63",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "rust-overlay_3": {
       "inputs": {
         "nixpkgs": [
           "tap",
@@ -623,14 +585,14 @@
     "tap": {
       "inputs": {
         "bats": "bats_2",
-        "crane": "crane_2",
+        "crane": "crane",
         "gomod2nix": "gomod2nix_3",
         "nixpkgs": [
           "nixpkgs"
         ],
         "nixpkgs-master": "nixpkgs-master_7",
         "purse-first": "purse-first_2",
-        "rust-overlay": "rust-overlay_3",
+        "rust-overlay": "rust-overlay_2",
         "treefmt-nix": "treefmt-nix_5",
         "utils": "utils_3"
       },
