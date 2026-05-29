@@ -5,7 +5,7 @@
     # Fork of upstream nixpkgs. The overlay (`overlays.default`) adds
     # gomod2nix's buildGoApplication / mkGoEnv, bun2nix helpers, and
     # other amarbel-llc additions on top of an upstream pin.
-    nixpkgs.url = "github:amarbel-llc/nixpkgs";
+    nixpkgs.url = "github:amarbel-llc/igloo";
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
     # Master nixpkgs pinned directly for go_1_26 availability.
