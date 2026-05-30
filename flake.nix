@@ -5,7 +5,7 @@
     # Fork of upstream nixpkgs. The overlay (`overlays.default`) adds
     # gomod2nix's buildGoApplication / mkGoEnv, bun2nix helpers, and
     # other amarbel-llc additions on top of an upstream pin.
-    nixpkgs.url = "github:amarbel-llc/igloo";
+    igloo.url = "github:amarbel-llc/igloo";
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
     # Master nixpkgs pinned directly for go_1_26 availability.
@@ -13,17 +13,17 @@
 
     purse-first = {
       url = "github:amarbel-llc/purse-first";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
     };
 
     tap = {
       url = "github:amarbel-llc/tap";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
     };
 
     bats = {
       url = "github:amarbel-llc/bats";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
     };
 
     # Build tooling
@@ -32,7 +32,7 @@
     };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "igloo";
     };
   };
 
@@ -42,7 +42,7 @@
       purse-first,
       tap,
       bats,
-      nixpkgs,
+      igloo,
       nixpkgs-master,
       utils,
       gomod2nix,
@@ -51,7 +51,7 @@
     let
       mkMarketplace = purse-first.lib.mkMarketplace;
 
-      goWorkspaceSrc = nixpkgs.lib.cleanSourceWith {
+      goWorkspaceSrc = igloo.lib.cleanSourceWith {
         src = ./.;
         filter =
           path: type:
@@ -59,13 +59,13 @@
             baseName = builtins.baseNameOf path;
           in
           type == "directory"
-          || nixpkgs.lib.hasSuffix ".go" baseName
+          || igloo.lib.hasSuffix ".go" baseName
           || baseName == "go.mod"
           || baseName == "go.sum"
           || baseName == "go.work"
           || baseName == "go.work.sum"
-          || nixpkgs.lib.hasSuffix ".scd" baseName
-          || nixpkgs.lib.hasSuffix ".tmpl" baseName
+          || igloo.lib.hasSuffix ".scd" baseName
+          || igloo.lib.hasSuffix ".tmpl" baseName
           || builtins.match ".*testdata/.*" path != null;
       };
 
@@ -84,11 +84,11 @@
       buildDevShellPackages =
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
-          pkgs-unfree = import nixpkgs {
+          pkgs = import igloo { inherit system; };
+          pkgs-unfree = import igloo {
             inherit system;
             config.allowUnfreePredicate =
-              pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "claude-code" ];
+              pkg: builtins.elem (igloo.lib.getName pkg) [ "claude-code" ];
           };
           pkgs-master = import nixpkgs-master { inherit system; };
           pkgs-rust = import nixpkgs-master.outPath {
@@ -143,9 +143,9 @@
         let
           # nixpkgs is the amarbel-llc fork; overlays.default exposes
           # buildGoApplication, mkGoEnv, fence, bun2nix helpers, etc.
-          pkgs = import nixpkgs {
+          pkgs = import igloo {
             inherit system;
-            overlays = [ nixpkgs.overlays.default ];
+            overlays = [ igloo.overlays.default ];
           };
           pkgs-master = import nixpkgs-master { inherit system; };
 
@@ -234,7 +234,8 @@
         };
 
       marketplaceOutputs = mkMarketplace {
-        inherit nixpkgs nixpkgs-master utils;
+        nixpkgs = igloo;
+        inherit nixpkgs-master utils;
         name = "bob";
         owner = {
           name = "friedenberg";
@@ -272,19 +273,19 @@
         '';
       };
     in
-    nixpkgs.lib.recursiveUpdate marketplaceOutputs (
+    igloo.lib.recursiveUpdate marketplaceOutputs (
       utils.lib.eachDefaultSystem (
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import igloo { inherit system; };
           localPkgs = buildPackages system;
 
           # nixpkgs view with claude-code's unfree predicate accepted;
           # used to expose the `claude` binary to the validate lane.
-          pkgs-unfree = import nixpkgs {
+          pkgs-unfree = import igloo {
             inherit system;
             config.allowUnfreePredicate =
-              pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "claude-code" ];
+              pkg: builtins.elem (igloo.lib.getName pkg) [ "claude-code" ];
           };
 
           # Cleaned bats source filters. Keeping each lane's source
