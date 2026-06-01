@@ -49,8 +49,6 @@
       rust-overlay,
     }:
     let
-      mkMarketplace = purse-first.lib.mkMarketplace;
-
       goWorkspaceSrc = igloo.lib.cleanSourceWith {
         src = ./.;
         filter =
@@ -70,7 +68,7 @@
       };
 
       # Computed after first `go work vendor` — placeholder until then.
-      goVendorHash = "sha256-oCjv7v2R513pLQRWnawd49k2CNQEjg3ZLPlKgkw/AGY=";
+      goVendorHash = "sha256-1Wh2+2IgHtSo42GPXITBR+kAI6kYrJROticL0TzdTn4=";
 
       # Burnt into the caldav binary via the fork's auto-injected -ldflags
       # (-X main.version / -X main.commit). Single source of truth for
@@ -196,15 +194,6 @@
             commit = caldavCommit;
           };
 
-          luxPkg = import ./lib/packages/lux.nix {
-            inherit
-              pkgs
-              goWorkspaceSrc
-              goVendorHash
-              go
-              ;
-          };
-
           batmanPkgs = bats.lib.${system}.mkBats {
             tap-dancer-go = tap.packages.${system}.tap-dancer-go;
           };
@@ -223,7 +212,6 @@
         {
           inherit
             caldavPkg
-            luxPkg
             batmanPkgs
             sandcastlePkg
             andSoCanYouRepoPkg
@@ -232,156 +220,105 @@
             probeFenceSandboxPkg
             ;
         };
-
-      marketplaceOutputs = mkMarketplace {
-        nixpkgs = igloo;
-        inherit nixpkgs-master utils;
-        name = "bob";
-        owner = {
-          name = "friedenberg";
-          email = "sasha@friedenberg.me";
-        };
-        description = "MCP servers, CLI tools, and development workflow skills";
-        repo = "amarbel-llc/bob";
-        purse-first-cli = purse-first;
-        plugins =
-          system:
-          let
-            pkgs = buildPackages system;
-          in
-          [
-            pkgs.caldavPkg
-            pkgs.luxPkg
-          ];
-        skills = ./skills;
-        packageToml = ./package.toml;
-        pluginConfig = builtins.fromJSON (builtins.readFile ./marketplace-config.json);
-        devShellPackages =
-          system: pkgs: pkgs-master:
-          let
-            localPkgs = buildPackages system;
-          in
-          [
-            pkgs.neovim
-            localPkgs.batmanPkgs.default
-            purse-first.packages.${system}.purse-first
-            tap.packages.${system}.tap-dancer
-          ]
-          ++ buildDevShellPackages system;
-        devShellHook = ''
-          echo "bob - dev environment"
-        '';
-      };
     in
-    igloo.lib.recursiveUpdate marketplaceOutputs (
-      utils.lib.eachDefaultSystem (
-        system:
-        let
-          pkgs = import igloo { inherit system; };
-          localPkgs = buildPackages system;
+    utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import igloo { inherit system; };
+        localPkgs = buildPackages system;
 
-          # nixpkgs view with claude-code's unfree predicate accepted;
-          # used to expose the `claude` binary to the validate lane.
-          pkgs-unfree = import igloo {
-            inherit system;
-            config.allowUnfreePredicate =
-              pkg: builtins.elem (igloo.lib.getName pkg) [ "claude-code" ];
-          };
+        # nixpkgs view with claude-code's unfree predicate accepted;
+        # used to expose the `claude` binary to the validate lane.
+        pkgs-unfree = import igloo {
+          inherit system;
+          config.allowUnfreePredicate =
+            pkg: builtins.elem (igloo.lib.getName pkg) [ "claude-code" ];
+        };
 
-          # Cleaned bats source filters. Keeping each lane's source
-          # store-path stable across unrelated edits — see the
-          # eng:wiring-bats-tests skill's flake.nix template. Includes
-          # fixtures/ so tests referencing $BATS_TEST_DIRNAME/fixtures/
-          # find their data in the nix sandbox.
-          luxFmtUnitSrc = pkgs.lib.cleanSourceWith {
-            src = ./packages/lux/zz-tests_bats;
-            filter =
-              path: type:
-              let
-                bn = builtins.baseNameOf path;
-              in
-              type == "directory" || pkgs.lib.hasSuffix ".bats" bn || bn == "common.bash";
-          };
-
-          topLevelBatsSrc = pkgs.lib.cleanSourceWith {
-            src = ./zz-tests_bats;
-            filter =
-              path: type:
-              let
-                bn = builtins.baseNameOf path;
-              in
-              type == "directory"
-              || pkgs.lib.hasSuffix ".bats" bn
-              || pkgs.lib.hasSuffix ".lua" bn
-              || pkgs.lib.hasSuffix ".go" bn
-              || bn == "common.bash";
-          };
-
-          batsLib = import ./bats.nix {
-            inherit pkgs;
-            bats-libs = localPkgs.batmanPkgs.bats-libs;
-            batsLane = bats.lib.${system}.batsLane;
-            luxBin = localPkgs.luxPkg;
-            purseFirstBin = purse-first.packages.${system}.purse-first;
-            claudeBin = pkgs-unfree.claude-code;
-            marketplace = marketplaceOutputs.packages.${system}.default;
-            inherit luxFmtUnitSrc topLevelBatsSrc;
-          };
-        in
-        {
-          packages =
+        # Cleaned bats source filters. Keeping each lane's source
+        # store-path stable across unrelated edits — see the
+        # eng:wiring-bats-tests skill's flake.nix template. Includes
+        # fixtures/ so tests referencing $BATS_TEST_DIRNAME/fixtures/
+        # find their data in the nix sandbox.
+        topLevelBatsSrc = pkgs.lib.cleanSourceWith {
+          src = ./zz-tests_bats;
+          filter =
+            path: type:
             let
-              marketplacePkgs = marketplaceOutputs.packages.${system} or { };
-              nonPluginPkgs = [
-                localPkgs.batmanPkgs.default
-                localPkgs.sandcastlePkg
-                localPkgs.andSoCanYouRepoPkg
-                localPkgs.potatoPkg
-                localPkgs.polkadotsPkg
-              ];
+              bn = builtins.baseNameOf path;
             in
-            marketplacePkgs
-            // {
-              default = pkgs.symlinkJoin {
-                name = "bob-all";
-                paths = [ marketplacePkgs.default ] ++ nonPluginPkgs;
-              };
-              caldav = localPkgs.caldavPkg;
-              lux = localPkgs.luxPkg;
-              batman = localPkgs.batmanPkgs.default;
-              bats-libs = localPkgs.batmanPkgs.bats-libs;
-              sandcastle = localPkgs.sandcastlePkg;
-              and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
-              potato = localPkgs.potatoPkg;
-              polkadots = localPkgs.polkadotsPkg;
-              probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
-              mcp-all = pkgs.symlinkJoin {
-                name = "mcp-all";
-                paths = [
-                  localPkgs.caldavPkg
-                  localPkgs.luxPkg
-                ];
-              };
-            }
-            // batsLib.batsLaneOutputs;
+            type == "directory"
+            || pkgs.lib.hasSuffix ".bats" bn
+            || pkgs.lib.hasSuffix ".lua" bn
+            || pkgs.lib.hasSuffix ".go" bn
+            || bn == "common.bash";
+        };
 
-          devShells = {
-            default = marketplaceOutputs.devShells.${system}.default;
-            go = pkgs.mkShell {
-              packages = [
-                (import nixpkgs-master { inherit system; }).go
-              ];
+        batsLib = import ./bats.nix {
+          inherit pkgs;
+          bats-libs = localPkgs.batmanPkgs.bats-libs;
+          batsLane = bats.lib.${system}.batsLane;
+          purseFirstBin = purse-first.packages.${system}.purse-first;
+          claudeBin = pkgs-unfree.claude-code;
+          caldavPkg = localPkgs.caldavPkg;
+          inherit topLevelBatsSrc;
+        };
+      in
+      {
+        packages =
+          let
+            nonPluginPkgs = [
+              localPkgs.batmanPkgs.default
+              localPkgs.sandcastlePkg
+              localPkgs.andSoCanYouRepoPkg
+              localPkgs.potatoPkg
+              localPkgs.polkadotsPkg
+            ];
+          in
+          {
+            default = pkgs.symlinkJoin {
+              name = "bob-all";
+              paths = [ localPkgs.caldavPkg ] ++ nonPluginPkgs;
             };
-          };
-
-          checks = {
-            # Regression check: fence's bwrap must keep working inside
-            # Nix's build sandbox. If this breaks, every batman-via-Nix
-            # consumer (passthru.tests, installCheckPhase) breaks too.
+            caldav = localPkgs.caldavPkg;
+            batman = localPkgs.batmanPkgs.default;
+            bats-libs = localPkgs.batmanPkgs.bats-libs;
+            sandcastle = localPkgs.sandcastlePkg;
+            and-so-can-you-repo = localPkgs.andSoCanYouRepoPkg;
+            potato = localPkgs.potatoPkg;
+            polkadots = localPkgs.polkadotsPkg;
             probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
-            bats-default = batsLib.batsLaneOutputs.bats-default;
+          }
+          // batsLib.batsLaneOutputs;
+
+        devShells = {
+          default = pkgs.mkShell {
+            packages = [
+              pkgs.just
+              pkgs.neovim
+              localPkgs.batmanPkgs.default
+              purse-first.packages.${system}.purse-first
+              tap.packages.${system}.tap-dancer
+            ]
+            ++ buildDevShellPackages system;
+            shellHook = ''
+              echo "bob - dev environment"
+            '';
           };
-        }
-      )
+          go = pkgs.mkShell {
+            packages = [
+              (import nixpkgs-master { inherit system; }).go
+            ];
+          };
+        };
+
+        checks = {
+          # Regression check: fence's bwrap must keep working inside
+          # Nix's build sandbox. If this breaks, every batman-via-Nix
+          # consumer (passthru.tests, installCheckPhase) breaks too.
+          probe-fence-sandbox = localPkgs.probeFenceSandboxPkg;
+          bats-default = batsLib.batsLaneOutputs.bats-default;
+        };
+      }
     );
 }

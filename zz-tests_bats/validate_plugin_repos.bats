@@ -12,22 +12,12 @@ teardown() {
   teardown_test_home
 }
 
-function claude_validates_lux { # @test
-  run "$claude_bin" plugin validate "$(plugin_share_dir lux)/.claude-plugin/plugin.json"
+function claude_validates_caldav { # @test
+  run "$claude_bin" plugin validate "$(plugin_share_dir caldav)/.claude-plugin/plugin.json"
   assert_success
 }
 
-function claude_validates_bob { # @test
-  run "$claude_bin" plugin validate "$(plugin_share_dir bob)/.claude-plugin/plugin.json"
-  assert_success
-}
-
-function purse_first_validates_lux { # @test
-  run "$purse_first" validate "$(plugin_share_dir lux)"
-  assert_success
-}
-
-function purse_first_validates_bob { # @test
-  run "$purse_first" validate "$(plugin_share_dir bob)"
+function purse_first_validates_caldav { # @test
+  run "$purse_first" validate "$(plugin_share_dir caldav)"
   assert_success
 }

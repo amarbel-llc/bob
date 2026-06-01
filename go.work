@@ -3,7 +3,5 @@ go 1.26
 use (
 	./dummies/go
 	./packages/caldav
-
-	./packages/lux
 	./packages/potato
 )

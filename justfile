@@ -4,14 +4,11 @@ cmd_nix_dev_go := "nix develop " + justfile_directory() + "#go --command "
 
 default: build test vendor
 
-# Build all packages (default = marketplace bundle)
+# Build all packages (default = caldav + non-MCP bundle)
 build:
     nix build
 
 # Build individual packages
-build-lux:
-    nix build .#lux
-
 build-caldav:
     nix build .#caldav
 
@@ -23,9 +20,6 @@ tap-dancer-go-test := "tap-dancer go-test -skip-empty"
 tap-dancer-cargo-test := "tap-dancer cargo-test -skip-empty"
 
 # Test individual Go packages
-test-lux:
-    {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/lux/...
-
 test-caldav:
     {{cmd_nix_dev}} {{tap-dancer-go-test}} ./packages/caldav/...
 
@@ -80,7 +74,7 @@ vendor-hash:
 test-bats:
     nix build .#bats-default --no-link --print-build-logs
 
-# Run a single named lane (e.g. `just test-bats-lane lux-fmt-unit`).
+# Run a single named lane (e.g. `just test-bats-lane validate-plugin-repos`).
 test-bats-lane name:
     nix build .#bats-{{name}} --no-link --print-build-logs
 
@@ -89,49 +83,19 @@ validate:
     {{cmd_nix_dev}} go run ./dummies/go/cmd/... validate .claude-plugin/plugin.json || true
 
 # Validate MCP server annotations via purse-first validate-mcp
-validate-mcp-lux: build-lux
-    #!/usr/bin/env bash
-    set -euo pipefail
-    tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
-    mkdir -p "$tmpdir/lux"
-    touch "$tmpdir/lux/lsps.toml"
-    XDG_CONFIG_HOME="$tmpdir" purse-first validate-mcp result/bin/lux mcp-stdio
-
 validate-mcp-caldav: build-caldav
     CALDAV_URL="http://localhost:1" CALDAV_USERNAME="test" CALDAV_PASSWORD="test" purse-first validate-mcp result/bin/caldav
 
-validate-mcp: validate-mcp-lux validate-mcp-caldav
-
-# Bump version for a package. Usage: just bump-version lux 0.2.0
-bump-version package version:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  jq --arg pkg "{{package}}" --arg ver "{{version}}" \
-    '.plugins[$pkg].version = $ver' marketplace-config.json > marketplace-config.json.tmp
-  mv marketplace-config.json.tmp marketplace-config.json
-  gum log --level info "{{package}}: version bumped to {{version}}"
-  gum log --level warn "Remember to update Cargo.toml and SKILL.md frontmatter if applicable"
+validate-mcp: validate-mcp-caldav
 
 # Build dummy Go MCP servers
 build-dummies-go:
     {{cmd_nix_dev}} go build -o build/ ./dummies/go/cmd/...
 
-# Validate lux default configs are internally consistent
-validate-lux-defaults: build-lux
-    #!/usr/bin/env bash
-    set -euo pipefail
-    tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
-    XDG_CONFIG_HOME="$tmpdir" result/bin/lux init --default --force
-    XDG_CONFIG_HOME="$tmpdir" result/bin/lux validate
-
 test: \
     test-caldav \
     test-go \
     test-bats \
-    test-lux \
-    validate-lux-defaults \
     validate-mcp
 
 update: update-nix

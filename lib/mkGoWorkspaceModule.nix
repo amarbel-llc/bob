@@ -7,9 +7,9 @@
 #   mkGoModule = import ./lib/mkGoWorkspaceModule.nix {
 #     inherit pkgs goWorkspaceSrc goVendorHash;
 #   };
-#   luxPkg = mkGoModule {
-#     pname = "lux";
-#     subPackages = [ "packages/lux/cmd/lux" ];
+#   potatoPkg = mkGoModule {
+#     pname = "potato";
+#     subPackages = [ "packages/potato/cmd/potato" ];
 #   };
 {
   pkgs,
